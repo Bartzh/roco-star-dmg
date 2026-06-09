@@ -73,3 +73,12 @@ with open('datas/skill_catalog.json', 'r', encoding='utf-8') as f:
 skill_urls = get_image_urls({s_id: f'文件:Skill_{s_info['icon_id']}.png' for s_id, s_info in skill_catalog.items() if s_id != '_meta'})
 with open('datas/skill_icon_urls.json', 'w', encoding='utf-8') as f:
     json.dump(skill_urls, f, indent=4, ensure_ascii=False)
+
+
+with open('types.json', 'r', encoding='utf-8') as f:
+    types = json.load(f)
+element_icon_urls = get_image_urls({e_id: f'文件:图标_宠物_属性_{e_id}.png' for e_id in types.keys()})
+for e_id, icon_url in element_icon_urls.items():
+    types[e_id]['iconUrl'] = icon_url
+with open('types.json', 'w', encoding='utf-8') as f:
+    json.dump(types, f, indent=4, ensure_ascii=False)

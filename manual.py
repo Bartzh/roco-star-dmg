@@ -7,7 +7,7 @@ api_url = "https://wiki.biligame.com/rocom/api.php"
 # 构造 API 请求参数
 params = {
     "action": "query",
-    "titles": "文件:JL_guiyankungchong.png",
+    "titles": "文件:图标_宠物_属性_普通.png",
 
     "prop": "imageinfo",
     "iiprop": "url",
