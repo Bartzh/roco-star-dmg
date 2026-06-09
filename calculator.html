@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>☄️ 星陨伤害计算器</title>
 <style>
+
 /* ============ CSS Variables ============ */
 :root {
   --bg-primary: #080c1a;
@@ -778,24 +779,156 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+
+/* Spirit card image */
+.spirit-image {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.spirit-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.spirit-image .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.modal-spirit-image {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-spirit-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.modal-spirit-image .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+}
+
+/* Type tags wrapper */
+.type-tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 10px; }
+.type-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid var(--tag-color, #888);
+  background: var(--tag-bg, rgba(255,255,255,0.05));
+  color: var(--tag-color, #888);
+}
+.spirit-card .type-tag { font-size: 0.72rem; padding: 2px 10px; }
+
+/* Stats: 5-column grid */
+.spirit-card .stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  font-size: 0.7rem;
+}
+.spirit-card .stat-label { font-size: 0.6rem; }
+.spirit-card .stat-value { font-size: 0.78rem; }
+
+/* Skill power/damage class display */
+.skill-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.skill-meta .badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+}
+.skill-meta .badge.atk { color: #ff8c00; }
+.skill-meta .badge.matk { color: #aa66ff; }
+.skill-meta .badge.power { color: var(--accent-cyan); }
+
+/* Result damage rows */
+.result-damage-rows {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  position: relative;
+}
+.result-damage-rows .item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.result-damage-rows .item .label { font-size: 0.7rem; color: var(--text-secondary); }
+.result-damage-rows .item .value { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); font-family: 'Courier New', monospace; }
+.result-damage-rows .item.total .value { color: var(--accent-cyan); font-size: 1.3rem; }
+.result-damage-rows .item.star .value { color: var(--accent-gold); }
+.result-damage-rows .item .sub { font-size: 0.6rem; color: var(--text-secondary); }
+
+.badge-starnone {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.6rem;
+  color: #ff8c00;
+  background: rgba(255,140,0,0.1);
+  border: 1px solid rgba(255,140,0,0.3);
+}
+
 </style>
 </head>
 <body>
+
+<!-- Data injection marker for build.py: replaced with <script type="application/json"> blocks when building calculator.built.html -->
+<!-- INJECT_DATA_HERE -->
 
 <canvas id="star-canvas"></canvas>
 <div id="atmosphere-overlay"></div>
 <div id="flash-overlay"></div>
 
 <div class="container" id="main-container">
-  <!-- Header -->
   <div class="header">
     <h1>☄️ <span>星陨</span>伤害计算器</h1>
     <div class="subtitle">选择精灵与技能，拖动星陨印记，实时计算伤害</div>
   </div>
 
-  <!-- Battle Area -->
   <div class="battle-area">
-    <!-- Attacker Panel -->
     <div class="spirit-panel glass-panel" id="attacker-panel">
       <div class="panel-label"><span class="icon">⚔️</span> 攻击方</div>
       <div id="attacker-select-area">
@@ -807,23 +940,17 @@ body {
       </div>
     </div>
 
-    <!-- Star Seal (Center) -->
     <div class="seal-container">
       <div class="seal-label">☄️ 星陨层数</div>
       <div class="seal-wrapper" id="seal-wrapper">
         <canvas id="particle-canvas" width="280" height="280"></canvas>
         <div class="seal" id="seal">
           <svg viewBox="0 0 200 200" id="seal-svg">
-            <!-- Outer ring -->
             <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
             <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
-            <!-- Tick marks -->
             <g id="seal-ticks"></g>
-            <!-- Inner geometric pattern -->
             <circle cx="100" cy="100" r="70" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
-            <!-- Pentagram-ish lines -->
             <g id="seal-runes" opacity="0.3"></g>
-            <!-- Center circle -->
             <circle cx="100" cy="100" r="45" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
           </svg>
           <span class="seal-number" id="seal-number">0</span>
@@ -834,10 +961,8 @@ body {
         <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0">
         <div class="slider-labels"><span>0</span><span>50</span><span>99</span></div>
       </div>
-      <div class="seal-bonus" id="seal-bonus">星陨加成: ×1.00</div>
     </div>
 
-    <!-- Defender Panel -->
     <div class="spirit-panel glass-panel" id="defender-panel">
       <div class="panel-label"><span class="icon">🛡️</span> 防御方</div>
       <div id="defender-select-area">
@@ -850,7 +975,6 @@ body {
     </div>
   </div>
 
-  <!-- Result Area -->
   <div class="result-area" id="result-area">
     <div class="result-card" id="result-card">
       <div id="result-content">
@@ -860,7 +984,6 @@ body {
       </div>
     </div>
 
-    <!-- Breakdown -->
     <button class="breakdown-toggle" id="breakdown-toggle" onclick="toggleBreakdown()" style="display:none">
       <span>📊 伤害计算明细</span>
       <span class="arrow">▼</span>
@@ -871,7 +994,6 @@ body {
   </div>
 </div>
 
-<!-- Spirit Selection Modal -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
   <div class="modal">
     <h2 id="modal-title">选择精灵</h2>
@@ -881,127 +1003,147 @@ body {
 </div>
 
 <script>
+
 // ============================================================
-// DATA
+// DATA: 18 element types
 // ============================================================
 const ELEMENTS = {
-  fire:     { name: '火', emoji: '🔥', cls: 'el-fire',     color: '#ff4444' },
-  water:    { name: '水', emoji: '🌊', cls: 'el-water',    color: '#4488ff' },
-  grass:    { name: '草', emoji: '🌿', cls: 'el-grass',    color: '#44cc44' },
-  electric: { name: '电', emoji: '⚡', cls: 'el-electric', color: '#ffcc00' },
-  dark:     { name: '暗', emoji: '🌑', cls: 'el-dark',     color: '#aa66ff' },
-  light:    { name: '光', emoji: '✨', cls: 'el-light',    color: '#ffeedd' },
-  neutral:  { name: '普通', emoji: '⚪', cls: '',           color: '#aaaaaa' }
+  '普通': { name: '普通', emoji: '⚪', color: '#a0a0a0' },
+  '草':   { name: '草',   emoji: '🌿', color: '#44cc44' },
+  '火':   { name: '火',   emoji: '🔥', color: '#ff4444' },
+  '水':   { name: '水',   emoji: '🌊', color: '#4488ff' },
+  '光':   { name: '光',   emoji: '✨', color: '#ffeedd' },
+  '地':   { name: '地',   emoji: '⛰️', color: '#b07a3d' },
+  '冰':   { name: '冰',   emoji: '❄️', color: '#88ddff' },
+  '龙':   { name: '龙',   emoji: '🐉', color: '#7a4dff' },
+  '电':   { name: '电',   emoji: '⚡', color: '#ffcc00' },
+  '毒':   { name: '毒',   emoji: '☠️', color: '#c266ff' },
+  '虫':   { name: '虫',   emoji: '🐛', color: '#b0a040' },
+  '武':   { name: '武',   emoji: '🥊', color: '#d45a3a' },
+  '翼':   { name: '翼',   emoji: '🦅', color: '#77bbee' },
+  '萌':   { name: '萌',   emoji: '🌸', color: '#ff99cc' },
+  '幽':   { name: '幽',   emoji: '👻', color: '#9966cc' },
+  '恶':   { name: '恶',   emoji: '😈', color: '#aa3344' },
+  '机械': { name: '机械', emoji: '⚙️', color: '#8899aa' },
+  '幻':   { name: '幻',   emoji: '🔮', color: '#dd66aa' }
 };
+const FALLBACK_EL = { name: '无', emoji: '❔', color: '#666666' };
 
-// Element effectiveness: attacker -> defender -> multiplier
-const EFFECTIVENESS = {
-  fire:     { grass: 1.5, water: 0.7, fire: 0.7 },
-  water:    { fire: 1.5, electric: 0.7, water: 0.7 },
-  grass:    { water: 1.5, fire: 0.7, grass: 0.7 },
-  electric: { water: 1.5, grass: 0.7, electric: 0.7 },
-  dark:     { light: 1.5, dark: 0.7 },
-  light:    { dark: 1.5, light: 0.7 }
-};
+// Strip trailing 系 (e.g. "草系" -> "草")
+function stripXi(name) {
+  if (!name) return '';
+  return name.endsWith('系') ? name.slice(0, -1) : name;
+}
+function elOf(rawName) {
+  if (!rawName || rawName === '无系别' || rawName === '空') return FALLBACK_EL;
+  const key = stripXi(rawName);
+  return ELEMENTS[key] || FALLBACK_EL;
+}
 
-const SPIRITS = [
-  {
-    id: 'phoenix', name: '烈焰凤凰', emoji: '🦅', element: 'fire',
-    hp: 520, atk: 310, def: 170,
-    skills: [
-      { name: '烈焰冲击', element: 'fire', power: 130 },
-      { name: '凤翼天翔', element: 'fire', power: 160 },
-      { name: '火羽飞弹', element: 'fire', power: 90 },
-      { name: '舍身撞击', element: 'neutral', power: 120 }
-    ]
-  },
-  {
-    id: 'leviathan', name: '沧澜海神', emoji: '🐉', element: 'water',
-    hp: 780, atk: 275, def: 230,
-    skills: [
-      { name: '怒涛洪流', element: 'water', power: 125 },
-      { name: '深渊之息', element: 'water', power: 155 },
-      { name: '冰霜射线', element: 'water', power: 95 },
-      { name: '水流喷射', element: 'neutral', power: 110 }
-    ]
-  },
-  {
-    id: 'guardian', name: '翡翠守卫', emoji: '🦎', element: 'grass',
-    hp: 350, atk: 250, def: 120,
-    skills: [
-      { name: '藤蔓缠绕', element: 'grass', power: 115 },
-      { name: '自然之怒', element: 'grass', power: 150 },
-      { name: '叶刃风暴', element: 'grass', power: 85 },
-      { name: '猛力冲击', element: 'neutral', power: 115 }
-    ]
-  },
-  {
-    id: 'thor', name: '雷霆战神', emoji: '⚡', element: 'electric',
-    hp: 14600, atk: 345, def: 155,
-    skills: [
-      { name: '万伏雷枪', element: 'electric', power: 135 },
-      { name: '天罚雷暴', element: 'electric', power: 170 },
-      { name: '电光一闪', element: 'electric', power: 80 },
-      { name: '雷电拳', element: 'neutral', power: 120 }
-    ]
-  },
-  {
-    id: 'shadow', name: '暗影魔君', emoji: '👤', element: 'dark',
-    hp: 16800, atk: 330, def: 185,
-    skills: [
-      { name: '暗影侵蚀', element: 'dark', power: 125 },
-      { name: '噬魂之爪', element: 'dark', power: 160 },
-      { name: '暗夜脉冲', element: 'dark', power: 90 },
-      { name: '暗影突袭', element: 'neutral', power: 115 }
-    ]
-  },
-  {
-    id: 'saint', name: '星辰圣女', emoji: '👼', element: 'light',
-    hp: 13800, atk: 370, def: 140,
-    skills: [
-      { name: '圣光裁决', element: 'light', power: 140 },
-      { name: '星辰陨落', element: 'light', power: 175 },
-      { name: '光辉弹', element: 'light', power: 85 },
-      { name: '全力一击', element: 'neutral', power: 125 }
-    ]
+// ============================================================
+// DATA: Load from inline <script type="application/json"> if present,
+// else fetch from the same directory (requires a local server).
+// ============================================================
+let SPRITES = {};
+let SKILLS = {};
+let TYPES = {};
+
+async function loadData() {
+  const inlineSprites = document.getElementById('sprites-data');
+  if (inlineSprites) {
+    // Built version: data was injected by build.py
+    SPRITES = JSON.parse(inlineSprites.textContent);
+    SKILLS  = JSON.parse(document.getElementById('skills-data').textContent);
+    TYPES   = JSON.parse(document.getElementById('types-data').textContent);
+    return;
   }
-];
+  // Source version: fetch from the same directory
+  const f = (p) => fetch(p).then(r => {
+    if (!r.ok) throw new Error(p + ' -> HTTP ' + r.status);
+    return r.json();
+  });
+  [SPRITES, SKILLS, TYPES] = await Promise.all([
+    f('sprites.json'),
+    f('skills.json'),
+    f('types.json')
+  ]);
+}
 
-const DEFENSE_SKILLS = [
-  { name: '无', reduction: 0, desc: '' },
-  { name: '铁壁', reduction: 0.25, desc: '-25%' },
-  { name: '光之护盾', reduction: 0.15, desc: '-15%' },
-  { name: '坚岩守护', reduction: 0.35, desc: '-35%' }
-];
+// Build skill arrays (ATTACK / DEFENSE category index)
+const ATTACK_SKILLS = {};
+const DEFENSE_SKILLS = {};
+function buildSkillIndices() {
+  ATTACK_SKILLS && Object.keys(ATTACK_SKILLS).forEach(k => delete ATTACK_SKILLS[k]);
+  DEFENSE_SKILLS && Object.keys(DEFENSE_SKILLS).forEach(k => delete DEFENSE_SKILLS[k]);
+  for (const [id, s] of Object.entries(SKILLS)) {
+    if (s.category === '攻击') ATTACK_SKILLS[id] = s;
+    else if (s.category === '防御') DEFENSE_SKILLS[id] = s;
+  }
+}
 
 // ============================================================
 // STATE
 // ============================================================
 let state = {
-  attacker: null,       // spirit object
-  defender: null,       // spirit object
-  attackSkill: null,    // skill object (index)
+  attacker: null,        // {id, ...SPRITES[id]}
+  defender: null,
+  attackSkill: null,     // full skill object (SKILLS[id])
   attackSkillIdx: -1,
-  defenseSkill: null,   // defense skill object
-  defenseSkillIdx: 0,
+  defenseSkill: null,    // full skill object (SKILLS[id]) or null = "无"
+  defenseSkillIdx: 0,    // 0 = "无"
   starLayer: 0,
-  modalTarget: null     // 'attacker' or 'defender'
+  modalTarget: null
 };
 
+// Build defense skill list for a given defender (defense category only, plus "无" pseudo)
+function getDefenseSkillOptions(defender) {
+  const opts = [{ id: '__none__', name: '无', reduction: 0, _pseudo: true }];
+  if (!defender) return opts;
+  for (const sid of (defender.skills || [])) {
+    const s = SKILLS[sid];
+    if (s && s.category === '防御') opts.push(s);
+  }
+  return opts;
+}
+function getAttackSkillOptions(attacker) {
+  if (!attacker) return [];
+  const out = [];
+  for (const sid of (attacker.skills || [])) {
+    const s = SKILLS[sid];
+    if (s && s.category === '攻击') out.push(s);
+  }
+  return out;
+}
+
 // ============================================================
-// STAR BACKGROUND
+// EFFECTIVENESS: (1 + weakCount) / (1 + resistCount)
+// ============================================================
+function effectiveness(skillElementRaw, defenderTypesRaw) {
+  if (!skillElementRaw || skillElementRaw === '无系别' || skillElementRaw === '空') return 1;
+  const atkName = stripXi(skillElementRaw);
+  if (!TYPES[atkName]) return 1;
+  let weak = 0, resist = 0;
+  for (const dt of (defenderTypesRaw || [])) {
+    const def = TYPES[stripXi(dt)];
+    if (!def) continue;
+    if (def.attackWeak && def.attackWeak.includes(atkName)) weak++;
+    if (def.defendStrong && def.defendStrong.includes(atkName)) resist++;
+  }
+  return (1 + weak) / (1 + resist);
+}
+
+// ============================================================
+// STAR BACKGROUND, PARTICLES, SEAL — original code preserved
 // ============================================================
 function initStarCanvas() {
   const canvas = document.getElementById('star-canvas');
   const ctx = canvas.getContext('2d');
   let stars = [];
-  
   function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     initStars();
   }
-  
   function initStars() {
     stars = [];
     const count = Math.floor((canvas.width * canvas.height) / 4000);
@@ -1015,7 +1157,6 @@ function initStarCanvas() {
       });
     }
   }
-  
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const time = Date.now() * 0.001;
@@ -1028,24 +1169,18 @@ function initStarCanvas() {
     });
     requestAnimationFrame(draw);
   }
-  
   window.addEventListener('resize', resize);
   resize();
   draw();
 }
 
-// ============================================================
-// PARTICLE SYSTEM (around seal)
-// ============================================================
 let particles = [];
 let particleCanvas, particleCtx;
-
 function initParticles() {
   particleCanvas = document.getElementById('particle-canvas');
   particleCtx = particleCanvas.getContext('2d');
   animateParticles();
 }
-
 function spawnParticle() {
   const cx = 140, cy = 140;
   const angle = Math.random() * Math.PI * 2;
@@ -1061,44 +1196,28 @@ function spawnParticle() {
     hue: 40 + Math.random() * 20
   });
 }
-
 function animateParticles() {
   particleCtx.clearRect(0, 0, 280, 280);
-  
-  // Spawn based on layer
   const spawnRate = Math.floor(state.starLayer / 8);
   for (let i = 0; i < spawnRate; i++) {
     if (Math.random() < 0.3) spawnParticle();
   }
-  
   particles.forEach((p, idx) => {
     p.x += p.vx;
     p.y += p.vy;
     p.life -= p.decay;
-    
-    if (p.life <= 0) {
-      particles.splice(idx, 1);
-      return;
-    }
-    
+    if (p.life <= 0) { particles.splice(idx, 1); return; }
     particleCtx.beginPath();
     particleCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
     const lightness = state.starLayer > 70 ? 90 : 70;
     particleCtx.fillStyle = `hsla(${p.hue}, 100%, ${lightness}%, ${p.life * 0.8})`;
     particleCtx.fill();
   });
-  
-  // Limit particles
   if (particles.length > 80) particles.splice(0, particles.length - 80);
-  
   requestAnimationFrame(animateParticles);
 }
 
-// ============================================================
-// SEAL SVG GENERATION
-// ============================================================
 function generateSealSVG() {
-  // Tick marks
   const ticks = document.getElementById('seal-ticks');
   let ticksHTML = '';
   for (let i = 0; i < 36; i++) {
@@ -1113,8 +1232,6 @@ function generateSealSVG() {
     ticksHTML += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>`;
   }
   ticks.innerHTML = ticksHTML;
-  
-  // Rune pattern (hexagon-ish)
   const runes = document.getElementById('seal-runes');
   let runesHTML = '';
   for (let i = 0; i < 6; i++) {
@@ -1125,23 +1242,17 @@ function generateSealSVG() {
     const x2 = 100 + r * Math.cos((angle + 60) * Math.PI / 180);
     const y2 = 100 + r * Math.sin((angle + 60) * Math.PI / 180);
     runesHTML += `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>`;
-    // Small dots at vertices
     runesHTML += `<circle cx="${x}" cy="${y}" r="2" fill="rgba(255,255,255,0.1)"/>`;
   }
   runes.innerHTML = runesHTML;
 }
 
-// ============================================================
-// SEAL INTERACTION
-// ============================================================
 function initSealInteraction() {
   const wrapper = document.getElementById('seal-wrapper');
   const slider = document.getElementById('seal-slider');
   let isDragging = false;
   let startY = 0;
   let startLayer = 0;
-  
-  // Mouse drag
   wrapper.addEventListener('mousedown', (e) => {
     isDragging = true;
     startY = e.clientY;
@@ -1149,137 +1260,96 @@ function initSealInteraction() {
     document.body.style.cursor = 'ns-resize';
     e.preventDefault();
   });
-  
   document.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
     const dy = startY - e.clientY;
     const newLayer = Math.max(0, Math.min(99, startLayer + Math.round(dy / 4)));
     setStarLayer(newLayer);
   });
-  
   document.addEventListener('mouseup', () => {
     isDragging = false;
     document.body.style.cursor = '';
   });
-  
-  // Touch drag
   wrapper.addEventListener('touchstart', (e) => {
     isDragging = true;
     startY = e.touches[0].clientY;
     startLayer = state.starLayer;
     e.preventDefault();
   }, { passive: false });
-  
   document.addEventListener('touchmove', (e) => {
     if (!isDragging) return;
     const dy = startY - e.touches[0].clientY;
     const newLayer = Math.max(0, Math.min(99, startLayer + Math.round(dy / 4)));
     setStarLayer(newLayer);
   }, { passive: false });
-  
   document.addEventListener('touchend', () => { isDragging = false; });
-  
-  // Scroll wheel
   wrapper.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -1 : 1;
     setStarLayer(Math.max(0, Math.min(99, state.starLayer + delta)));
   }, { passive: false });
-  
-  // Slider
   slider.addEventListener('input', (e) => {
     setStarLayer(parseInt(e.target.value));
   });
-  
-  // Keyboard
   document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowUp') setStarLayer(Math.min(99, state.starLayer + 1));
     if (e.key === 'ArrowDown') setStarLayer(Math.max(0, state.starLayer - 1));
   });
-  
-  // Double click to reset
   wrapper.addEventListener('dblclick', () => { setStarLayer(0); });
 }
 
 function setStarLayer(value) {
   const old = state.starLayer;
   state.starLayer = Math.round(value);
-  
-  // Update visuals
   const numberEl = document.getElementById('seal-number');
   const slider = document.getElementById('seal-slider');
-  const bonus = document.getElementById('seal-bonus');
-  
   animateNumber(numberEl, old, state.starLayer, 200);
   slider.value = state.starLayer;
-  
-  const mult = (1 + state.starLayer * 0.015).toFixed(2);
-  bonus.textContent = `星陨加成: ×${mult}`;
-  
-  // Update seal glow
   updateSealGlow();
-  
-  // Pop animation on change
   if (old !== state.starLayer) {
     numberEl.classList.remove('number-pop');
     void numberEl.offsetWidth;
     numberEl.classList.add('number-pop');
   }
-  
   calculateDamage();
 }
 
 function updateSealGlow() {
   const layer = state.starLayer;
   const t = layer / 99;
-  
-  // Color: from blue-ish to gold to white-hot
   let r, g, b;
   if (t < 0.5) {
-    // Blue to gold
     const p = t / 0.5;
     r = Math.round(100 + 155 * p);
     g = Math.round(140 + 75 * p);
     b = Math.round(255 - 255 * p);
   } else {
-    // Gold to white-hot
     const p = (t - 0.5) / 0.5;
     r = 255;
     g = Math.round(215 + 40 * p);
     b = Math.round(0 + 200 * p);
   }
-  
   const glowSize = 8 + layer * 1.5;
   const glowAlpha = 0.15 + t * 0.5;
   const pulseSpeed = 3 - t * 2;
-  
   const root = document.documentElement;
   root.style.setProperty('--seal-glow-color', `rgba(${r},${g},${b},${glowAlpha})`);
   root.style.setProperty('--seal-glow-size', `${glowSize}px`);
   root.style.setProperty('--seal-pulse-speed', `${pulseSpeed}s`);
-  
-  // SVG opacity
   const runes = document.getElementById('seal-runes');
   if (runes) runes.setAttribute('opacity', (0.2 + t * 0.8).toFixed(2));
-  
-  // Seal border glow for SVG circles
   const svgCircles = document.querySelectorAll('#seal-svg circle');
   svgCircles.forEach(c => {
     c.setAttribute('stroke', `rgba(${r},${g},${b},${0.05 + t * 0.15})`);
   });
 }
 
-// ============================================================
-// NUMBER ANIMATION
-// ============================================================
 function animateNumber(el, from, to, duration) {
   const start = performance.now();
   const diff = to - from;
-  
   function update(time) {
     const elapsed = time - start;
     const progress = Math.min(elapsed / duration, 1);
-    // Ease out
     const eased = 1 - Math.pow(1 - progress, 3);
     const current = Math.round(from + diff * eased);
     el.textContent = current;
@@ -1296,50 +1366,51 @@ function openModal(target) {
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-title');
   const grid = document.getElementById('spirit-grid');
-  
   title.textContent = target === 'attacker' ? '⚔️ 选择攻击方精灵' : '🛡️ 选择防御方精灵';
-  
-  grid.innerHTML = SPIRITS.map(s => `
-    <div class="spirit-option ${ELEMENTS[s.element].cls}" onclick="selectSpirit('${s.id}')">
-      <span class="emoji">${s.emoji}</span>
-      <div class="name">${s.name}</div>
-      <div class="mini-stats">
-        <span class="element-tag" style="background:${ELEMENTS[s.element].color}20;color:${ELEMENTS[s.element].color};border:1px solid ${ELEMENTS[s.element].color}40;font-size:0.65rem;padding:1px 6px;border-radius:10px;">
-          ${ELEMENTS[s.element].emoji} ${ELEMENTS[s.element].name}
-        </span>
+  const list = Object.entries(SPRITES);
+  grid.innerHTML = list.map(([id, s]) => {
+    const types = (s.types || []).map(t => elOf(t));
+    const tagsHTML = types.map(t =>
+      `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+    ).join('');
+    const illus = s.illustration_url
+      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${types[0]?.color || '#888'}'}))">`
+      : `<div class="placeholder" style="--el-color:${types[0]?.color || '#888'}">${(s.name||'').slice(0,1)}</div>`;
+    return `
+      <div class="spirit-option" style="--el-color:${types[0]?.color || '#888'}" onclick="selectSpirit('${id}')">
+        <div class="modal-spirit-image">${illus}</div>
+        <div class="name">${s.name}</div>
+        <div class="type-tags">${tagsHTML}</div>
+        <div class="mini-stats">HP ${s.hp} · ATK ${s.atk} · MATK ${s.matk} · DEF ${s.def} · MDEF ${s.mdef}</div>
       </div>
-      <div class="mini-stats">HP ${s.hp.toLocaleString()} · ATK ${s.atk} · DEF ${s.def}</div>
-    </div>
-  `).join('');
-  
+    `;
+  }).join('');
   overlay.classList.add('show');
 }
-
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
   state.modalTarget = null;
 }
-
 function closeModalOutside(e) {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 }
 
 function selectSpirit(id) {
-  const spirit = SPIRITS.find(s => s.id === id);
-  if (!spirit) return;
-  
+  const s = SPRITES[id];
+  if (!s) return;
   if (state.modalTarget === 'attacker') {
-    state.attacker = spirit;
-    state.attackSkillIdx = 0;
-    state.attackSkill = spirit.skills[0];
+    state.attacker = s;
+    const opts = getAttackSkillOptions(s);
+    state.attackSkill = opts[0] || null;
+    state.attackSkillIdx = state.attackSkill ? 0 : -1;
     renderSpiritCard('attacker');
   } else if (state.modalTarget === 'defender') {
-    state.defender = spirit;
+    state.defender = s;
+    const opts = getDefenseSkillOptions(s);
+    state.defenseSkill = opts[0]; // "无"
     state.defenseSkillIdx = 0;
-    state.defenseSkill = DEFENSE_SKILLS[0];
     renderSpiritCard('defender');
   }
-  
   closeModal();
   calculateDamage();
 }
@@ -1349,24 +1420,32 @@ function selectSpirit(id) {
 // ============================================================
 function renderSpiritCard(side) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
+  if (!spirit) return;
   const selectArea = document.getElementById(`${side}-select-area`);
   const skillsSection = document.getElementById(`${side}-skills`);
-  const elInfo = ELEMENTS[spirit.element];
-  
+  const types = (spirit.types || []).map(t => elOf(t));
+  const primaryColor = types[0]?.color || '#888';
+  const tagsHTML = types.map(t =>
+    `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+  ).join('');
+  const illus = spirit.illustration_url
+    ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
+    : `<div class="placeholder" style="--el-color:${primaryColor}">${(spirit.name||'').slice(0,1)}</div>`;
   selectArea.innerHTML = `
-    <div class="spirit-card ${elInfo.cls}" onclick="openModal('${side}')" style="--el-color:${elInfo.color}">
-      <span class="emoji">${spirit.emoji}</span>
+    <div class="spirit-card" onclick="openModal('${side}')" style="--el-color:${primaryColor}">
+      <div class="spirit-image">${illus}</div>
       <div class="name">${spirit.name}</div>
-      <span class="element-tag">${elInfo.emoji} ${elInfo.name}</span>
+      <div class="type-tags">${tagsHTML}</div>
       <div class="stats">
-        <div class="stat"><div class="stat-label">HP</div><div class="stat-value">${spirit.hp.toLocaleString()}</div></div>
+        <div class="stat"><div class="stat-label">HP</div><div class="stat-value">${spirit.hp}</div></div>
         <div class="stat"><div class="stat-label">ATK</div><div class="stat-value">${spirit.atk}</div></div>
+        <div class="stat"><div class="stat-label">MATK</div><div class="stat-value">${spirit.matk}</div></div>
         <div class="stat"><div class="stat-label">DEF</div><div class="stat-value">${spirit.def}</div></div>
+        <div class="stat"><div class="stat-label">MDEF</div><div class="stat-value">${spirit.mdef}</div></div>
       </div>
       <div class="change-hint">点击更换</div>
     </div>
   `;
-  
   skillsSection.style.display = 'block';
   renderSkills(side);
 }
@@ -1374,38 +1453,55 @@ function renderSpiritCard(side) {
 function renderSkills(side) {
   if (side === 'attacker') {
     const list = document.getElementById('attacker-skill-list');
-    list.innerHTML = state.attacker.skills.map((skill, idx) => {
-      const elInfo = ELEMENTS[skill.element];
+    const opts = getAttackSkillOptions(state.attacker);
+    if (!opts.length) {
+      list.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
+      return;
+    }
+    list.innerHTML = opts.map((sk, idx) => {
+      const el = elOf(sk.element);
+      const isMagic = sk.damage_class === '魔攻';
       return `
-        <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}" 
+        <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 onclick="selectAttackSkill(${idx})">
-          <span class="skill-name">${elInfo.emoji} ${skill.name}</span>
-          <span class="skill-power">威力 ${skill.power}</span>
+          <span class="skill-name">${el.emoji} ${sk.name}</span>
+          <span class="skill-meta">
+            <span class="badge ${isMagic ? 'matk' : 'atk'}">${sk.damage_class || '?'}</span>
+            <span class="badge power">威力 ${sk.power}</span>
+          </span>
         </button>
       `;
     }).join('');
   } else {
     const list = document.getElementById('defender-skill-list');
-    list.innerHTML = DEFENSE_SKILLS.map((skill, idx) => `
-      <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${idx === 0 ? 'none-skill' : ''}" 
-              onclick="selectDefenseSkill(${idx})">
-        <span class="skill-name">${skill.name}</span>
-        <span class="skill-power">${skill.desc || '—'}</span>
-      </button>
-    `).join('');
+    const opts = getDefenseSkillOptions(state.defender);
+    list.innerHTML = opts.map((sk, idx) => {
+      const isNone = sk._pseudo;
+      const reductionPct = Math.round((sk.reduction || 0) * 100);
+      return `
+        <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${isNone ? 'none-skill' : ''}"
+                onclick="selectDefenseSkill(${idx})">
+          <span class="skill-name">${isNone ? sk.name : sk.name}</span>
+          <span class="skill-power">${isNone ? '—' : '减伤 ' + reductionPct + '%'}</span>
+        </button>
+      `;
+    }).join('');
   }
 }
 
 function selectAttackSkill(idx) {
+  const opts = getAttackSkillOptions(state.attacker);
+  if (idx < 0 || idx >= opts.length) return;
   state.attackSkillIdx = idx;
-  state.attackSkill = state.attacker.skills[idx];
+  state.attackSkill = opts[idx];
   renderSkills('attacker');
   calculateDamage();
 }
-
 function selectDefenseSkill(idx) {
+  const opts = getDefenseSkillOptions(state.defender);
+  if (idx < 0 || idx >= opts.length) return;
   state.defenseSkillIdx = idx;
-  state.defenseSkill = DEFENSE_SKILLS[idx];
+  state.defenseSkill = opts[idx];
   renderSkills('defender');
   calculateDamage();
 }
@@ -1414,58 +1510,54 @@ function selectDefenseSkill(idx) {
 // DAMAGE CALCULATION
 // ============================================================
 function calculateDamage() {
-  if (!state.attacker || !state.defender) {
+  if (!state.attacker || !state.defender || !state.attackSkill) {
     renderWaiting();
     return;
   }
-  
   const atk = state.attacker;
   const def = state.defender;
   const skill = state.attackSkill;
-  const defSkill = state.defenseSkill || DEFENSE_SKILLS[0];
+  const defSkill = state.defenseSkill || { reduction: 0, _pseudo: true };
   const layer = state.starLayer;
-  
-  // Base damage formula
-  const atkStat = atk.atk;
-  const defStat = def.def;
-  const skillPower = skill.power;
-  
-  // Base = ATK^1.3 * skillPower * 2.5 / (DEF^0.8)
-  const baseDamage = Math.round(
-    Math.pow(atkStat, 1.3) * (skillPower / 80) * 2.5 / Math.pow(defStat, 0.8)
+  const n = layer;
+
+  const isMagic = skill.damage_class === '魔攻';
+  const atkStat = isMagic ? atk.matk : atk.atk;
+  const defStat = isMagic ? def.mdef : def.def;
+
+  // Skill damage
+  const skillEff = effectiveness(skill.element, def.types);
+  const skillDmg = Math.floor(
+    skill.power * (atkStat / defStat) * (37 / 41) * skillEff * (1 - (defSkill.reduction || 0))
   );
-  
-  // Element effectiveness (skill element vs defender element)
-  let elementMult = 1.0;
-  const effChart = EFFECTIVENESS[skill.element];
-  if (effChart && effChart[def.element]) {
-    elementMult = effChart[def.element];
+
+  // Starfall damage (幻 element)
+  const starPower = n * n + 24 * n - 24;
+  const isSkillIllusion = stripXi(skill.element) === '幻';
+  const starTriggered = n > 0 && !isSkillIllusion;
+  const starEff = effectiveness('幻系', def.types);
+  let starDmg = 0;
+  if (starTriggered) {
+    starDmg = Math.floor(
+      starPower * (atkStat / defStat) * (37 / 41) * starEff * (1 - (defSkill.reduction || 0))
+    );
   }
-  
-  // Star-fall multiplier
-  const starMult = 1 + layer * 0.015;
-  
-  // Defense skill reduction
-  const defMult = 1 - defSkill.reduction;
-  
-  // Final damage
-  const finalDamage = Math.round(baseDamage * elementMult * starMult * defMult);
-  
-  // HP percentage
+  const finalDamage = skillDmg + starDmg;
+
   const hpPercent = (finalDamage / def.hp) * 100;
   const remainingHP = Math.max(0, def.hp - finalDamage);
   const remainingPercent = (remainingHP / def.hp) * 100;
   const isKill = finalDamage >= def.hp;
   const overflow = isKill ? finalDamage - def.hp : 0;
-  
-  // Render result
+
   renderResult({
-    finalDamage, baseDamage, elementMult, starMult, defMult,
+    finalDamage, skillDmg, starDmg, starPower,
+    skillEff, starEff,
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
-    defHP: def.hp, skill, defSkill, atk, def
+    defHP: def.hp, skill, defSkill, atk, def,
+    isSkillIllusion, starTriggered, n,
+    atkStat, defStat, isMagic
   });
-  
-  // Update atmosphere
   updateAtmosphere(hpPercent, isKill);
 }
 
@@ -1476,33 +1568,44 @@ function renderResult(data) {
   const content = document.getElementById('result-content');
   const breakdownToggle = document.getElementById('breakdown-toggle');
   const breakdownList = document.getElementById('breakdown-list');
-  
-  // Determine HP bar color
+
   let barColor;
   if (data.isKill) barColor = '#ff3b3b';
   else if (data.remainingPercent < 25) barColor = '#ff3b3b';
   else if (data.remainingPercent < 50) barColor = '#ff8c00';
   else if (data.remainingPercent < 75) barColor = '#ffcc00';
   else barColor = '#00e676';
-  
+
   document.documentElement.style.setProperty('--hp-bar-color', barColor);
-  
-  // Effectiveness badge
+
+  // Skill effectiveness badge
   let effBadge = '';
-  if (data.elementMult > 1) {
-    effBadge = `<div class="effectiveness-badge super-effective">效果拔群! ×${data.elementMult}</div>`;
-  } else if (data.elementMult < 1) {
-    effBadge = `<div class="effectiveness-badge not-effective">效果不佳 ×${data.elementMult}</div>`;
+  if (data.skillEff > 1) {
+    effBadge = `<div class="effectiveness-badge super-effective">技能效果拔群! ×${data.skillEff}</div>`;
+  } else if (data.skillEff < 1) {
+    effBadge = `<div class="effectiveness-badge not-effective">技能效果不佳 ×${data.skillEff}</div>`;
   }
-  
+  // Star badge
+  let starBadge = '';
+  if (data.n > 0) {
+    if (data.isSkillIllusion) {
+      starBadge = `<div class="effectiveness-badge not-effective">幻系技能不触发星陨</div>`;
+    } else if (data.starEff !== 1) {
+      const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
+      const label = data.starEff > 1 ? '星陨效果拔群' : '星陨效果不佳';
+      starBadge = `<div class="effectiveness-badge ${cls}">${label} ×${data.starEff}</div>`;
+    }
+  }
+
   const displayPercent = Math.min(data.hpPercent, 999.9);
-  
+
   content.innerHTML = `
     <div class="result-label">${data.isKill ? '💀 伤害结果' : '⚔️ 伤害结果'}</div>
     <div class="result-percentage" id="result-pct">
       ${displayPercent.toFixed(1)}<span class="percent-sign">%</span>
     </div>
     ${effBadge}
+    ${starBadge}
     <div class="hp-bar-container">
       <div class="hp-bar-bg">
         <div class="hp-bar-fill" style="width: ${data.remainingPercent}%; background: ${barColor};"></div>
@@ -1510,46 +1613,52 @@ function renderResult(data) {
         <div class="hp-bar-text">${data.remainingHP.toLocaleString()} / ${data.defHP.toLocaleString()} HP</div>
       </div>
     </div>
-    <div class="result-numbers">
-      造成 <span class="damage-value">${data.finalDamage.toLocaleString()}</span> 点伤害
-      ${data.isKill ? '' : ` · 剩余 <span class="hp-value">${data.remainingHP.toLocaleString()}</span> HP`}
+    <div class="result-damage-rows">
+      <div class="item"><div class="label">技能伤害</div><div class="value">${data.skillDmg.toLocaleString()}</div></div>
+      <div class="item star"><div class="label">星陨伤害</div><div class="value">${data.starDmg.toLocaleString()}</div><div class="sub">${data.n}层${data.isSkillIllusion ? ' (幻系不触发)' : ''}</div></div>
+      <div class="item total"><div class="label">合计伤害</div><div class="value">${data.finalDamage.toLocaleString()}</div></div>
     </div>
     <div class="kill-banner ${data.isKill ? 'show' : ''}" id="kill-banner">
       ☠️ 确认击杀!
       ${data.overflow > 0 ? `<div class="overflow-damage">溢出伤害: ${data.overflow.toLocaleString()}</div>` : ''}
     </div>
   `;
-  
-  // Breakdown
+
   breakdownToggle.style.display = 'flex';
+  const skillNameEl = data.skill.element ? elOf(data.skill.element).name : '无';
   breakdownList.innerHTML = `
-    <div><span class="label">攻击力:</span> <span class="value">${data.atk.atk}</span></div>
-    <div><span class="label">技能威力:</span> <span class="value">${data.skill.name} (${data.skill.power})</span></div>
-    <div><span class="label">基础伤害:</span> <span class="value">${data.baseDamage.toLocaleString()}</span></div>
+    <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
+    <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
+    <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span></div>
+    <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
+    <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
+    <div><span class="label">威力:</span> <span class="value">${data.skill.power}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41) × ${data.skillEff} × ${(1 - (data.defSkill.reduction || 0)).toFixed(2)}</span></div>
+    <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
-    <div><span class="label">属性克制:</span> <span class="multiplier">×${data.elementMult}</span>
-      <span class="label" style="font-size:0.7rem"> (${ELEMENTS[data.skill.element].name} → ${ELEMENTS[data.def.element].name})</span></div>
-    <div><span class="label">星陨加成:</span> <span class="multiplier">×${data.starMult.toFixed(3)}</span>
-      <span class="label" style="font-size:0.7rem"> (${state.starLayer}层)</span></div>
-    <div><span class="label">防御减伤:</span> <span class="multiplier">×${data.defMult.toFixed(2)}</span>
-      <span class="label" style="font-size:0.7rem"> (${data.defSkill.name})</span></div>
+    <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
+    <div><span class="label">星陨层数:</span> <span class="value">${data.n}</span></div>
+    <div><span class="label">星陨 power:</span> <span class="value">${data.n}² + 24×${data.n} - 24 = ${data.starPower}</span></div>
+    ${data.isSkillIllusion ? `<div><span class="label">触发:</span> <span class="value" style="color:#ff8c00">否 (技能为幻系)</span></div>`
+      : (data.n > 0
+        ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
+           <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
+           <div><span class="label">克制(幻系):</span> <span class="multiplier">×${data.starEff}</span></div>
+           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(1 - (data.defSkill.reduction || 0)).toFixed(2)}</span></div>`
+        : `<div><span class="label">触发:</span> <span class="value" style="color:var(--text-secondary)">否 (层数为 0)</span></div>`)}
+    <div class="final-line"><span class="label">星陨伤害小计:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
     <hr class="divider">
-    <div class="final-line"><span class="label">最终伤害:</span> <span class="value">${data.finalDamage.toLocaleString()}</span>
+    <div class="final-line"><span class="label">最终合计伤害:</span> <span class="value" style="color:var(--accent-cyan);font-size:1.1rem">${data.finalDamage.toLocaleString()}</span>
       <span class="label" style="font-size:0.7rem"> / ${data.defHP.toLocaleString()} HP (${data.hpPercent.toFixed(1)}%)</span></div>
   `;
-  
-  // Animate the percentage number
+
   const pctEl = document.getElementById('result-pct');
   if (pctEl) {
     pctEl.classList.remove('number-pop');
     void pctEl.offsetWidth;
     pctEl.classList.add('number-pop');
   }
-  
-  // Kill effects
-  if (data.isKill) {
-    triggerKillEffects();
-  }
+  if (data.isKill) triggerKillEffects();
 }
 
 function renderWaiting() {
@@ -1557,47 +1666,34 @@ function renderWaiting() {
   let msg = '选择双方精灵后开始计算 ⚔️';
   if (state.attacker && !state.defender) msg = '选择防御方精灵以计算伤害 🛡️';
   if (!state.attacker && state.defender) msg = '选择攻击方精灵以计算伤害 ⚔️';
+  if (state.attacker && state.defender && !state.attackSkill) msg = '该攻击方无可用攻击技能';
   content.innerHTML = `<div class="result-waiting">${msg}</div>`;
   document.getElementById('breakdown-toggle').style.display = 'none';
   document.getElementById('breakdown-content').classList.remove('open');
-  
-  // Reset atmosphere
   updateAtmosphere(0, false);
 }
 
 // ============================================================
-// KILL EFFECTS
+// KILL EFFECTS, ATMOSPHERE, BREAKDOWN TOGGLE
 // ============================================================
 let lastKillState = false;
-
 function triggerKillEffects() {
-  if (lastKillState) return; // Already triggered
+  if (lastKillState) return;
   lastKillState = true;
-  
-  // Screen shake
   const container = document.getElementById('main-container');
   container.classList.add('shake');
   setTimeout(() => container.classList.remove('shake'), 500);
-  
-  // Flash overlay
   const flash = document.getElementById('flash-overlay');
   flash.classList.remove('flash');
   void flash.offsetWidth;
   flash.classList.add('flash');
 }
+function resetKillEffects() { lastKillState = false; }
 
-function resetKillEffects() {
-  lastKillState = false;
-}
-
-// ============================================================
-// ATMOSPHERE SYSTEM
-// ============================================================
 function updateAtmosphere(damagePercent, isKill) {
   const root = document.documentElement;
   const overlay = document.getElementById('atmosphere-overlay');
   const card = document.getElementById('result-card');
-  
   if (!state.attacker || !state.defender) {
     root.style.setProperty('--atmosphere-color', 'transparent');
     root.style.setProperty('--atmosphere-intensity', '0');
@@ -1606,7 +1702,6 @@ function updateAtmosphere(damagePercent, isKill) {
     resetKillEffects();
     return;
   }
-  
   if (isKill) {
     root.style.setProperty('--atmosphere-color', 'rgba(255,30,30,0.15)');
     root.style.setProperty('--atmosphere-intensity', '1');
@@ -1640,9 +1735,6 @@ function updateAtmosphere(damagePercent, isKill) {
   }
 }
 
-// ============================================================
-// BREAKDOWN TOGGLE
-// ============================================================
 function toggleBreakdown() {
   const content = document.getElementById('breakdown-content');
   const toggle = document.getElementById('breakdown-toggle');
@@ -1650,9 +1742,6 @@ function toggleBreakdown() {
   toggle.classList.toggle('open');
 }
 
-// ============================================================
-// INIT
-// ============================================================
 function init() {
   initStarCanvas();
   generateSealSVG();
@@ -1662,7 +1751,18 @@ function init() {
   renderWaiting();
 }
 
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadData();
+  } catch (e) {
+    const rc = document.getElementById('result-content');
+    if (rc) rc.innerHTML = '<div class="result-waiting">数据加载失败: ' + (e.message || e) + '<br><br>若用 file:// 打开，请先执行 <code>python build.py</code> 生成 calculator.built.html。</div>';
+    return;
+  }
+  buildSkillIndices();
+  init();
+});
+
 </script>
 </body>
 </html>
