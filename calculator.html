@@ -1587,7 +1587,7 @@ function renderInlineBadge(sk) {
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
-    const pct = Math.round((sk.reduction || 0) * 100);
+    const pct = Math.round((1 - (sk.reduction || 0)) * 100);
     badges.push(`<span class="skill-badge reduction">减伤 ${pct}%</span>`);
   }
   return badges.join('');
@@ -1676,7 +1676,7 @@ function calculateDamage() {
   // Skill damage
   const skillEff = effectiveness(skill.element, def.types);
   const skillDmg = Math.floor(
-    skill.power * (atkStat / defStat) * (37 / 41) * skillEff * (1 - (defSkill.reduction || 0))
+    skill.power * (atkStat / defStat) * (37 / 41) * skillEff * (defSkill.reduction || 1)
   );
 
   // Starfall damage (幻 element)
@@ -1687,7 +1687,7 @@ function calculateDamage() {
   let starDmg = 0;
   if (starTriggered) {
     starDmg = Math.floor(
-      starPower * (atkStat / defStat) * (37 / 41) * starEff * (1 - (defSkill.reduction || 0))
+      starPower * (atkStat / defStat) * (37 / 41) * starEff * (defSkill.reduction || 1)
     );
   }
   const finalDamage = skillDmg + starDmg;
@@ -1781,7 +1781,7 @@ function renderResult(data) {
     <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
     <div><span class="label">威力:</span> <span class="value">${data.skill.power}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41) × ${data.skillEff} × ${(1 - (data.defSkill.reduction || 0)).toFixed(2)}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41) × ${data.skillEff} × ${(data.defSkill.reduction || 1).toFixed(2)}</span></div>
     <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
     <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
@@ -1792,7 +1792,7 @@ function renderResult(data) {
         ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
            <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
            <div><span class="label">克制(幻系):</span> <span class="multiplier">×${data.starEff}</span></div>
-           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(1 - (data.defSkill.reduction || 0)).toFixed(2)}</span></div>`
+           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction || 1).toFixed(2)}</span></div>`
         : `<div><span class="label">触发:</span> <span class="value" style="color:var(--text-secondary)">否 (层数为 0)</span></div>`)}
     <div class="final-line"><span class="label">星陨伤害小计:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
     <hr class="divider">
