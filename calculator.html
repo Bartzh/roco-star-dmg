@@ -214,51 +214,138 @@ body {
   letter-spacing: 1px;
   margin-bottom: 10px;
 }
-.skill-list { display: flex; flex-direction: column; gap: 8px; }
+/* Scrollable + 2-column grid; fixed height to align both panels */
+.skill-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  min-height: 280px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+/* Make a lone skill card span both columns for visual balance */
+.skill-btn:only-child { grid-column: 1 / -1; }
+
+/* Skill card: 40px icon (left) + content (name+badges / sub / desc) */
 .skill-btn {
-  width: 100%;
-  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   color: var(--text-primary);
-  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.25s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   text-align: left;
+  position: relative;
+  overflow: hidden;
+  font-size: 0.85rem;
 }
 .skill-btn:hover {
   background: rgba(255,255,255,0.08);
   border-color: rgba(255,255,255,0.2);
-  transform: translateX(4px);
+  transform: translateY(-1px);
 }
 .skill-btn.active {
   background: rgba(0,229,255,0.1);
   border-color: var(--accent-cyan);
   box-shadow: 0 0 12px rgba(0,229,255,0.15);
 }
-.skill-btn .skill-name { font-weight: 500; }
-.skill-btn .skill-power {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  background: rgba(255,255,255,0.05);
-  padding: 2px 8px;
-  border-radius: 6px;
+.skill-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent-cyan);
+  border-radius: 10px 0 0 10px;
 }
-.skill-btn.active .skill-power {
-  background: rgba(0,229,255,0.15);
-  color: var(--accent-cyan);
-}
-
-/* Defense skill - none option */
 .skill-btn.none-skill {
   border-style: dashed;
+  opacity: 0.85;
 }
 .skill-btn.none-skill.active {
   border-style: solid;
+  opacity: 1;
+}
+
+/* Skill icon (square, 40px — smaller than spirit icon) */
+.skill-icon {
+  width: 40px;
+  height: 40px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.skill-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.skill-icon .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* Right side content */
+.skill-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+.skill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.skill-name {
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.skill-sub {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.skill-desc {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 /* ============ Star Seal (Center) ============ */
@@ -772,6 +859,14 @@ body {
   .seal-number { font-size: 2.2rem; }
   .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
   .container { padding: 20px 16px 40px; }
+  /* Skill list: single column on mobile, taller scroll area */
+  .skill-list {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    max-height: 360px;
+  }
+  .skill-icon { width: 36px; height: 36px; }
+  .skill-badges { flex-direction: row; gap: 4px; }
 }
 
 /* Scrollbar */
@@ -863,24 +958,29 @@ body {
 .spirit-card .stat-label { font-size: 0.6rem; }
 .spirit-card .stat-value { font-size: 0.78rem; }
 
-/* Skill power/damage class display */
-.skill-meta {
+/* Skill badges (damage class, power, reduction) */
+.skill-badges {
   display: flex;
-  gap: 6px;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
 }
-.skill-meta .badge {
+.skill-badges .badge {
   display: inline-block;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 600;
   background: rgba(255,255,255,0.06);
   color: var(--text-secondary);
+  white-space: nowrap;
+  line-height: 1.4;
 }
-.skill-meta .badge.atk { color: #ff8c00; }
-.skill-meta .badge.matk { color: #aa66ff; }
-.skill-meta .badge.power { color: var(--accent-cyan); }
+.skill-badges .badge.atk { color: #ff8c00; }
+.skill-badges .badge.matk { color: #aa66ff; }
+.skill-badges .badge.power { color: var(--accent-cyan); }
+.skill-badges .badge.reduction { color: #00e676; }
 
 /* Result damage rows */
 .result-damage-rows {
@@ -1450,12 +1550,20 @@ function renderSpiritCard(side) {
   renderSkills(side);
 }
 
+function renderSkillIconHTML(sk, el) {
+  // Prefer real icon_url; fall back to element emoji in a colored gradient tile
+  if (sk.icon_url) {
+    return `<img src="${sk.icon_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${el.emoji}',style:'--el-color:${el.color}'}))">`;
+  }
+  return `<div class="placeholder" style="--el-color:${el.color}">${el.emoji}</div>`;
+}
+
 function renderSkills(side) {
   if (side === 'attacker') {
     const list = document.getElementById('attacker-skill-list');
     const opts = getAttackSkillOptions(state.attacker);
     if (!opts.length) {
-      list.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
+      list.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
       return;
     }
     list.innerHTML = opts.map((sk, idx) => {
@@ -1464,11 +1572,18 @@ function renderSkills(side) {
       return `
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 onclick="selectAttackSkill(${idx})">
-          <span class="skill-name">${el.emoji} ${sk.name}</span>
-          <span class="skill-meta">
-            <span class="badge ${isMagic ? 'matk' : 'atk'}">${sk.damage_class || '?'}</span>
-            <span class="badge power">威力 ${sk.power}</span>
-          </span>
+          <div class="skill-icon">${renderSkillIconHTML(sk, el)}</div>
+          <div class="skill-content">
+            <div class="skill-header">
+              <span class="skill-name">${sk.name}</span>
+              <span class="skill-badges">
+                <span class="badge ${isMagic ? 'matk' : 'atk'}">${sk.damage_class || '?'}</span>
+                <span class="badge power">威力 ${sk.power}</span>
+              </span>
+            </div>
+            <div class="skill-sub">${el.emoji} ${el.name} · ${sk.category || '—'}</div>
+            <div class="skill-desc">${sk.desc || ''}</div>
+          </div>
         </button>
       `;
     }).join('');
@@ -1477,12 +1592,32 @@ function renderSkills(side) {
     const opts = getDefenseSkillOptions(state.defender);
     list.innerHTML = opts.map((sk, idx) => {
       const isNone = sk._pseudo;
-      const reductionPct = Math.round((sk.reduction || 0) * 100);
+      let iconHTML, badgesHTML, subHTML, nameText;
+      if (isNone) {
+        iconHTML = `<div class="placeholder" style="--el-color:#666">—</div>`;
+        badgesHTML = '';
+        subHTML = `<div class="skill-sub">无防御技能</div>`;
+        nameText = '无';
+      } else {
+        const el = elOf(sk.element);
+        const reductionPct = Math.round((sk.reduction || 0) * 100);
+        iconHTML = renderSkillIconHTML(sk, el);
+        badgesHTML = `<span class="badge reduction">减伤 ${reductionPct}%</span>`;
+        subHTML = `<div class="skill-sub">${el.emoji} ${el.name} · ${sk.category || '—'}</div>`;
+        nameText = sk.name;
+      }
       return `
         <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${isNone ? 'none-skill' : ''}"
                 onclick="selectDefenseSkill(${idx})">
-          <span class="skill-name">${isNone ? sk.name : sk.name}</span>
-          <span class="skill-power">${isNone ? '—' : '减伤 ' + reductionPct + '%'}</span>
+          <div class="skill-icon">${iconHTML}</div>
+          <div class="skill-content">
+            <div class="skill-header">
+              <span class="skill-name">${nameText}</span>
+              <span class="skill-badges">${badgesHTML}</span>
+            </div>
+            ${subHTML}
+            <div class="skill-desc">${isNone ? '不选择任何防御技能' : (sk.desc || '')}</div>
+          </div>
         </button>
       `;
     }).join('');
