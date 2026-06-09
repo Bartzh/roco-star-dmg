@@ -1,4 +1,5 @@
 import json
+import re
 
 with open('datas/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
@@ -59,6 +60,13 @@ for skill_id, skill_info in skill_catalog.items():
         else:
             skill_info['reduction'] = 0
             print('no reduction:', skill_info['name'])
+    elif skill_info['category'] == '攻击':
+        if '连击' in skill_info['desc']:
+            match = re.search(r'(\d+)连击', skill_info['desc'])
+            if match:
+                skill_info['combo'] = int(match.group(1))
+            else:
+                print('no combo:', skill_info['name'])
     if icon_url := skill_icon_urls.get(skill_id):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
 
