@@ -8,8 +8,8 @@
 
 /* ============ CSS Variables ============ */
 :root {
-  --bg-primary: #080c1a;
-  --bg-secondary: #0d1229;
+  --bg-primary: #000000;
+  --bg-secondary: #1b1b1b;
   --glass-bg: rgba(255,255,255,0.05);
   --glass-border: rgba(255,255,255,0.1);
   --glass-blur: 16px;
@@ -150,7 +150,7 @@ body {
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
-  padding: 20px;
+  padding: 35px 0px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -219,22 +219,22 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  min-height: 240px;
-  max-height: 240px;
+  min-height: 145px;
+  max-height: 145px;
   overflow-y: auto;
   padding-right: 2px;
 }
 /* Make a lone skill card span both columns for visual balance */
 .skill-btn:only-child { grid-column: 1 / -1; }
 
-/* Skill card: 48px icon (fills card height) + name-row (badge + name, right-aligned) */
+/* Skill card: 48px icon (fills card height) + right-side content (name + badges row) */
 .skill-btn {
   display: grid;
   grid-template-columns: 48px 1fr;
   gap: 12px;
   align-items: center;
-  padding: 10px 10px;
-  min-height: 48px;
+  padding: 8px 10px;
+  min-height: 58px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
@@ -314,34 +314,13 @@ body {
   display: block;
 }
 
-/* Skill name row: small inline badge + right-aligned name */
-.skill-name-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+/* Right side: name (top, right-aligned) + badges row (bottom) */
+.skill-content {
   min-width: 0;
-  overflow: hidden;
-}
-.skill-badge-inline {
-  font-size: 0.62rem;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 1.4;
-  letter-spacing: 0.2px;
-}
-.skill-badge-inline.power {
-  color: var(--accent-cyan);
-  background: rgba(0, 229, 255, 0.12);
-  border: 1px solid rgba(0, 229, 255, 0.25);
-}
-.skill-badge-inline.reduction {
-  color: #00e676;
-  background: rgba(0, 230, 118, 0.12);
-  border: 1px solid rgba(0, 230, 118, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
 }
 .skill-name {
   font-weight: 600;
@@ -350,9 +329,31 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: right;
-  min-width: 0;
+  max-width: 100%;
   letter-spacing: 0.3px;
 }
+.skill-badges-row {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: center;
+}
+.skill-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+.skill-badge.atk     { color: #ff8c00; }
+.skill-badge.matk    { color: #aa66ff; }
+.skill-badge.power   { color: var(--accent-cyan); }
+.skill-badge.reduction { color: #00e676; }
 
 /* ============ Star Seal (Center) ============ */
 .seal-container {
@@ -872,7 +873,7 @@ body {
     max-height: 360px;
   }
   .skill-btn {
-    min-height: 44px;
+    min-height: 54px;
     padding: 0 8px;
     gap: 10px;
   }
@@ -895,10 +896,10 @@ body {
 
 /* Spirit card image */
 .spirit-image {
-  width: 100%;
+  width: 200px;
   aspect-ratio: 1;
   border-radius: 10px;
-  margin-bottom: 12px;
+  margin: 0 auto 12px;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -975,8 +976,7 @@ body {
 .spirit-card .stat-label { font-size: 0.6rem; }
 .spirit-card .stat-value { font-size: 0.78rem; }
 
-/* Skill badges (damage class, power, reduction) — single row */
-/* (old .skill-badges removed — replaced by .skill-badge-inline) */
+/* Skill badges (damage class + power / reduction) — shown in a row below the skill name */
 
 /* Result damage rows */
 .result-damage-rows {
@@ -1572,19 +1572,25 @@ function renderSkillIconHTML(sk, el) {
   return main + elOverlay;
 }
 
-// Compact badge to the left of the skill name (single number/percentage)
+// Build the badge row (物攻/魔攻 + 威力 / 减伤) — multiple badges
 function renderInlineBadge(sk) {
   if (sk._pseudo) return '';
+  const badges = [];
+  if (sk.damage_class === '物攻') {
+    badges.push(`<span class="skill-badge atk">物攻</span>`);
+  } else if (sk.damage_class === '魔攻') {
+    badges.push(`<span class="skill-badge matk">魔攻</span>`);
+  }
   if (sk.damage_class) {
-    // attack: show power
-    return `<span class="skill-badge-inline power">${sk.power}</span>`;
+    // attack skill: show power
+    badges.push(`<span class="skill-badge power">威力 ${sk.power}</span>`);
   }
   if (sk.reduction !== undefined) {
-    // defense: show reduction
+    // defense skill: show reduction
     const pct = Math.round((sk.reduction || 0) * 100);
-    return `<span class="skill-badge-inline reduction">减伤 ${pct}%</span>`;
+    badges.push(`<span class="skill-badge reduction">减伤 ${pct}%</span>`);
   }
-  return '';
+  return badges.join('');
 }
 
 function renderSkills(side) {
@@ -1601,9 +1607,9 @@ function renderSkills(side) {
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 onclick="selectAttackSkill(${idx})">
           <div class="skill-icon">${renderSkillIconHTML(sk, el)}</div>
-          <div class="skill-name-row">
-            ${renderInlineBadge(sk)}
+          <div class="skill-content">
             <span class="skill-name">${sk.name}</span>
+            <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
           </div>
         </button>
       `;
@@ -1621,9 +1627,9 @@ function renderSkills(side) {
         <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${isNone ? 'none-skill' : ''}"
                 onclick="selectDefenseSkill(${idx})">
           <div class="skill-icon">${iconHTML}</div>
-          <div class="skill-name-row">
-            ${renderInlineBadge(sk)}
+          <div class="skill-content">
             <span class="skill-name">${isNone ? '无' : sk.name}</span>
+            <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
           </div>
         </button>
       `;
