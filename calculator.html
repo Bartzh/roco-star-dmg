@@ -1462,6 +1462,20 @@ function getFinalStat(spirit, statKey, nature, ivs) {
 }
 
 // ============================================================
+// STAB (Same-Type Attack Bonus): ×1.25 if the skill's element
+// matches any of the attacker's types. Applied BEFORE type
+// effectiveness. Star damage does NOT receive STAB.
+// ============================================================
+function getStabMultiplier(attacker, skill) {
+  if (!attacker || !skill || !skill.element) return 1;
+  const skillEl = stripXi(skill.element);
+  if (!skillEl || !ELEMENTS[skillEl]) return 1;
+  const attackerTypes = (attacker.types || []).map(t => stripXi(t));
+  if (attackerTypes.includes(skillEl)) return 1.25;
+  return 1;
+}
+
+// ============================================================
 // EFFECTIVENESS: (1 + weakCount) / (1 + resistCount)
 // ============================================================
 function effectiveness(skillElementRaw, defenderTypesRaw) {
@@ -2026,10 +2040,11 @@ function calculateDamage() {
   // Defender's max HP for HP bar / kill check uses final HP
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
 
-  // Skill damage
+  // Skill damage (STAB applied BEFORE type effectiveness)
+  const stab = getStabMultiplier(atk, skill);
   const skillEff = effectiveness(skill.element, def.types);
   const skillDmg = Math.floor(
-    skill.power * (atkStat / defStat) * (37 / 41) * skillEff * (defSkill.reduction || 1)
+    skill.power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction || 1)
   );
 
   // Starfall damage (幻 element)
@@ -2053,7 +2068,7 @@ function calculateDamage() {
 
   renderResult({
     finalDamage, skillDmg, starDmg, starPower,
-    skillEff, starEff,
+    skillEff, starEff, stab,
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
@@ -2127,14 +2142,18 @@ function renderResult(data) {
 
   breakdownToggle.style.display = 'flex';
   const skillNameEl = data.skill.element ? elOf(data.skill.element).name : '无';
+  const stabBadge = data.stab > 1
+    ? ' <span class="skill-badge stab">本系 ×1.25</span>'
+    : '';
+  const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
   breakdownList.innerHTML = `
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
     <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
-    <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span></div>
+    <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span>${stabBadge}</div>
     <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
     <div><span class="label">威力:</span> <span class="value">${data.skill.power}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41) × ${data.skillEff} × ${(data.defSkill.reduction || 1).toFixed(2)}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction || 1).toFixed(2)}</span></div>
     <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
     <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
