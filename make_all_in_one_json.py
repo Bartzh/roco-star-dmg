@@ -56,7 +56,12 @@ for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('id', None)
     if skill_info['category'] == '防御':
         if skill_info['desc'].startswith('减伤'):
-            skill_info['reduction'] = 1 - int(skill_info['desc'][2:4]) / 100
+            match = re.search(r'(\d+)%', skill_info['desc'])
+            if match:
+                skill_info['reduction'] = 1 - int(match.group(1)) / 100
+            else:
+                skill_info['reduction'] = 0
+                print('no reduction:', skill_info['name'])
         else:
             skill_info['reduction'] = 0
             print('no reduction:', skill_info['name'])

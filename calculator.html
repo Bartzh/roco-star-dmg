@@ -1413,7 +1413,7 @@ function setIVs(side, ivs) {
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
-  const opts = [{ id: '__none__', name: '无', reduction: 0, _pseudo: true }];
+  const opts = [{ id: '__none__', name: '无', reduction: 1, _pseudo: true }];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
     const s = SKILLS[sid];
@@ -1952,7 +1952,7 @@ function renderInlineBadge(sk) {
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
-    const pct = Math.round((1 - (sk.reduction || 0)) * 100);
+    const pct = Math.round((1 - (sk.reduction ?? 0)) * 100);
     badges.push(`<span class="skill-badge reduction">减伤 ${pct}%</span>`);
   }
   return badges.join('');
@@ -2030,7 +2030,7 @@ function calculateDamage() {
   const atk = state.attacker;
   const def = state.defender;
   const skill = state.attackSkill;
-  const defSkill = state.defenseSkill || { reduction: 0, _pseudo: true };
+  const defSkill = state.defenseSkill || { reduction: 1, _pseudo: true };
   const layer = state.starLayer;
   const n = layer;
 
@@ -2051,7 +2051,7 @@ function calculateDamage() {
   const stab = getStabMultiplier(atk, skill);
   const skillEff = effectiveness(skill.element, def.types);
   const skillDmg = Math.floor(
-    skill.power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction || 1)
+    skill.power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1)
   );
 
   // Starfall damage (幻 element)
@@ -2062,7 +2062,7 @@ function calculateDamage() {
   let starDmg = 0;
   if (starTriggered) {
     starDmg = Math.floor(
-      starPower * (atkStat / defStat) * (37 / 41) * starEff * (defSkill.reduction || 1)
+      starPower * (atkStat / defStat) * (37 / 41) * starEff * (defSkill.reduction ?? 1)
     );
   }
   const finalDamage = skillDmg + starDmg;
@@ -2160,7 +2160,7 @@ function renderResult(data) {
     <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
     <div><span class="label">威力:</span> <span class="value">${data.skill.power}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction || 1).toFixed(2)}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>
     <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
     <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
@@ -2171,7 +2171,7 @@ function renderResult(data) {
         ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
            <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
            <div><span class="label">克制(幻系):</span> <span class="multiplier">×${data.starEff}</span></div>
-           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction || 1).toFixed(2)}</span></div>`
+           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
         : `<div><span class="label">触发:</span> <span class="value" style="color:var(--text-secondary)">否 (层数为 0)</span></div>`)}
     <div class="final-line"><span class="label">星陨伤害小计:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
     <hr class="divider">
