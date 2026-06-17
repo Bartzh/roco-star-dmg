@@ -978,7 +978,15 @@ body {
   background: var(--tag-bg, rgba(255,255,255,0.05));
   color: var(--tag-color, #888);
 }
+.type-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
 .spirit-card .type-tag { font-size: 0.72rem; padding: 2px 10px; }
+.spirit-card .type-icon { width: 20px; height: 20px; }
 
 /* Stats: 5-column grid */
 .spirit-card .stats {
@@ -1281,24 +1289,24 @@ body {
 // DATA: 18 element types
 // ============================================================
 const ELEMENTS = {
-  '普通': { name: '普通', emoji: '⚪', color: '#a0a0a0' },
-  '草':   { name: '草',   emoji: '🌿', color: '#44cc44' },
-  '火':   { name: '火',   emoji: '🔥', color: '#ff4444' },
-  '水':   { name: '水',   emoji: '🌊', color: '#4488ff' },
-  '光':   { name: '光',   emoji: '✨', color: '#ffeedd' },
-  '地':   { name: '地',   emoji: '⛰️', color: '#b07a3d' },
-  '冰':   { name: '冰',   emoji: '❄️', color: '#88ddff' },
-  '龙':   { name: '龙',   emoji: '🐉', color: '#7a4dff' },
-  '电':   { name: '电',   emoji: '⚡', color: '#ffcc00' },
-  '毒':   { name: '毒',   emoji: '☠️', color: '#c266ff' },
-  '虫':   { name: '虫',   emoji: '🐛', color: '#b0a040' },
-  '武':   { name: '武',   emoji: '🥊', color: '#d45a3a' },
-  '翼':   { name: '翼',   emoji: '🦅', color: '#77bbee' },
-  '萌':   { name: '萌',   emoji: '🌸', color: '#ff99cc' },
-  '幽':   { name: '幽',   emoji: '👻', color: '#9966cc' },
-  '恶':   { name: '恶',   emoji: '😈', color: '#aa3344' },
-  '机械': { name: '机械', emoji: '⚙️', color: '#8899aa' },
-  '幻':   { name: '幻',   emoji: '🔮', color: '#dd66aa' }
+  '普通': { name: '普通', emoji: '⚪', color: '#3f89b4' },
+  '草':   { name: '草',   emoji: '🌿', color: '#4ebc73' },
+  '火':   { name: '火',   emoji: '🔥', color: '#db5525' },
+  '水':   { name: '水',   emoji: '🌊', color: '#6aa9fe' },
+  '光':   { name: '光',   emoji: '✨', color: '#50c0ff' },
+  '地':   { name: '地',   emoji: '⛰️', color: '#9a7e3f' },
+  '冰':   { name: '冰',   emoji: '❄️', color: '#5faddd' },
+  '龙':   { name: '龙',   emoji: '🐉', color: '#ed4962' },
+  '电':   { name: '电',   emoji: '⚡', color: '#e7c506' },
+  '毒':   { name: '毒',   emoji: '☠️', color: '#ba62e0' },
+  '虫':   { name: '虫',   emoji: '🐛', color: '#9ece21' },
+  '武':   { name: '武',   emoji: '🥊', color: '#ff9636' },
+  '翼':   { name: '翼',   emoji: '🦅', color: '#3ec7ca' },
+  '萌':   { name: '萌',   emoji: '🌸', color: '#fc7cac' },
+  '幽':   { name: '幽',   emoji: '👻', color: '#9446ec' },
+  '恶':   { name: '恶',   emoji: '😈', color: '#cf467a' },
+  '机械': { name: '机械', emoji: '⚙️', color: '#40cba9' },
+  '幻':   { name: '幻',   emoji: '🔮', color: '#9fa7f8' }
 };
 const FALLBACK_EL = { name: '无', emoji: '❔', color: '#666666' };
 
@@ -1738,7 +1746,9 @@ function openModal(target) {
   grid.innerHTML = list.map(([id, s]) => {
     const types = (s.types || []).map(t => elOf(t));
     const tagsHTML = types.map(t =>
-      `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+      t.iconUrl
+        ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
+        : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
     ).join('');
     const illus = s.illustration_url
       ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${types[0]?.color || '#888'}'}))">`
@@ -1799,7 +1809,9 @@ function renderSpiritCard(side) {
   const types = (spirit.types || []).map(t => elOf(t));
   const primaryColor = types[0]?.color || '#888';
   const tagsHTML = types.map(t =>
-    `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+    t.iconUrl
+      ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
+      : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
   ).join('');
   const illus = spirit.illustration_url
     ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
