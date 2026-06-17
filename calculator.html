@@ -209,11 +209,15 @@ body {
 }
 .skills-section .section-title {
   font-size: 0.75rem;
-  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.skills-section .section-title .icon { font-size: 1rem; }
 /* Scrollable + 2-column grid; fixed height to align both panels */
 .skill-list {
   display: grid;
@@ -990,13 +994,20 @@ body {
 .stats-section {
   margin-top: 20px;
 }
-.stats-section .stats-title {
+.stats-section .section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
+.stats-section .section-title .icon { font-size: 1rem; }
+/* stats-title: push counters to the right */
 .stats-section .stat-counters {
+  margin-left: auto;
   font-size: 0.62rem;
   color: var(--text-secondary);
   font-weight: 400;
@@ -1182,16 +1193,16 @@ body {
       <div id="attacker-select-area">
         <button class="spirit-select" onclick="openModal('attacker')">+ 选择攻击方精灵</button>
       </div>
-      <div class="skills-section" id="attacker-skills" style="display:none">
-        <div class="section-title">🎯 攻击技能</div>
-        <div class="skill-list" id="attacker-skill-list"></div>
-      </div>
       <div class="stats-section" id="attacker-stats" style="display:none">
-        <div class="section-title stats-title">
-          <span>📊 属性配置</span>
+        <div class="section-title">
+          <span class="icon">📊</span> 属性配置
           <span class="stat-counters" id="attacker-stat-counters"></span>
         </div>
         <div class="stats-grid" id="attacker-stats-grid"></div>
+      </div>
+      <div class="skills-section" id="attacker-skills" style="display:none">
+        <div class="section-title"><span class="icon">🎯</span> 攻击技能</div>
+        <div class="skill-list" id="attacker-skill-list"></div>
       </div>
     </div>
 
@@ -1223,16 +1234,16 @@ body {
       <div id="defender-select-area">
         <button class="spirit-select" onclick="openModal('defender')">+ 选择防御方精灵</button>
       </div>
-      <div class="skills-section" id="defender-skills" style="display:none">
-        <div class="section-title">🛡️ 防御技能 <span style="font-size:0.65rem;color:var(--text-secondary)">(可选)</span></div>
-        <div class="skill-list" id="defender-skill-list"></div>
-      </div>
       <div class="stats-section" id="defender-stats" style="display:none">
-        <div class="section-title stats-title">
-          <span>📊 属性配置</span>
+        <div class="section-title">
+          <span class="icon">📊</span> 属性配置
           <span class="stat-counters" id="defender-stat-counters"></span>
         </div>
         <div class="stats-grid" id="defender-stats-grid"></div>
+      </div>
+      <div class="skills-section" id="defender-skills" style="display:none">
+        <div class="section-title"><span class="icon">🛡️</span> 防御技能 <span style="font-size:0.65rem;color:var(--text-secondary);text-transform:none;letter-spacing:normal">(可选)</span></div>
+        <div class="skill-list" id="defender-skill-list"></div>
       </div>
     </div>
   </div>
@@ -1358,7 +1369,7 @@ function buildSkillIndices() {
 // ============================================================
 // Stat keys in display order
 const STAT_KEYS = ['hp', 'atk', 'matk', 'def', 'mdef', 'spd'];
-const STAT_LABELS = { hp: 'HP', atk: 'ATK', matk: 'MATK', def: 'DEF', mdef: 'MDEF', spd: 'SPD' };
+const STAT_LABELS = { hp: '生命', atk: '物攻', matk: '魔攻', def: '物防', mdef: '魔防', spd: '速度' };
 const MAX_IV = 3;
 const IV_BONUS = 60;
 
@@ -1716,7 +1727,7 @@ function openModal(target) {
         <div class="modal-spirit-image">${illus}</div>
         <div class="name">${s.name}</div>
         <div class="type-tags">${tagsHTML}</div>
-        <div class="mini-stats">HP ${s.hp} · ATK ${s.atk} · MATK ${s.matk} · DEF ${s.def} · MDEF ${s.mdef} · SPD ${s.spd ?? 0}</div>
+        <div class="mini-stats">生命 ${s.hp} · 物攻 ${s.atk} · 魔攻 ${s.matk} · 物防 ${s.def} · 魔防 ${s.mdef} · 速度 ${s.spd ?? 0}</div>
       </div>
     `;
   }).join('');
@@ -1801,8 +1812,8 @@ function renderStatsConfig(side) {
   const ivFull = ivs.length >= MAX_IV;
 
   // Counters in title
-  const upLabel   = nature.up   ? STAT_LABELS[nature.up].toUpperCase()   : '—';
-  const downLabel = nature.down ? STAT_LABELS[nature.down].toUpperCase() : '—';
+  const upLabel   = nature.up   ? STAT_LABELS[nature.up]   : '—';
+  const downLabel = nature.down ? STAT_LABELS[nature.down] : '—';
   counters.innerHTML =
     `<span class="counter iv">个体 ${ivs.length}/${MAX_IV}</span>` +
     `<span class="counter nat">性格 ↑${upLabel} / ↓${downLabel}</span>`;
