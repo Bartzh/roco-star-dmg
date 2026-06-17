@@ -885,6 +885,16 @@ body {
     width: 20px;
     height: 20px;
   }
+  .stats-section .stat-counters {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .stat-cell {
+    padding: 6px 4px;
+    gap: 4px;
+  }
+  .iv-slot { min-width: 38px; font-size: 0.6rem; }
 }
 
 /* Scrollbar */
@@ -976,6 +986,148 @@ body {
 .spirit-card .stat-label { font-size: 0.6rem; }
 .spirit-card .stat-value { font-size: 0.78rem; }
 
+/* ============ Stats Config Section ============ */
+.stats-section {
+  margin-top: 20px;
+}
+.stats-section .stats-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.stats-section .stat-counters {
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.stats-section .stat-counters .counter.iv  { color: var(--accent-gold); }
+.stats-section .stat-counters .counter.nat { color: var(--accent-cyan); }
+
+/* 3x2 grid for 6 stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.stat-cell {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+.stat-cell:hover { background: rgba(255,255,255,0.06); }
+
+/* Nature slot (left): 18px column */
+.nature-slot {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.12);
+  color: transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.nature-slot:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.25);
+}
+.nature-slot.up {
+  background: rgba(0,230,118,0.18);
+  border: 1px solid rgba(0,230,118,0.5);
+  color: #00e676;
+  text-shadow: 0 0 6px rgba(0,230,118,0.6);
+}
+.nature-slot.down {
+  background: rgba(255,59,59,0.18);
+  border: 1px solid rgba(255,59,59,0.5);
+  color: #ff5e5e;
+  text-shadow: 0 0 6px rgba(255,59,59,0.6);
+}
+.nature-slot.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Stat center column: label on top, value below */
+.stat-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  gap: 1px;
+}
+.stat-center .stat-label {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.stat-center .stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* IV slot (right) */
+.iv-slot {
+  min-width: 44px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.12);
+  color: transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+.iv-slot:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.25);
+}
+.iv-slot.active {
+  background: rgba(255,215,0,0.18);
+  border: 1px solid rgba(255,215,0,0.5);
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255,215,0,0.5);
+}
+.iv-slot.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Skill badges (damage class + power / reduction) — shown in a row below the skill name */
 
 /* Result damage rows */
@@ -1034,6 +1186,13 @@ body {
         <div class="section-title">🎯 攻击技能</div>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
+      <div class="stats-section" id="attacker-stats" style="display:none">
+        <div class="section-title stats-title">
+          <span>📊 属性配置</span>
+          <span class="stat-counters" id="attacker-stat-counters"></span>
+        </div>
+        <div class="stats-grid" id="attacker-stats-grid"></div>
+      </div>
     </div>
 
     <div class="seal-container">
@@ -1067,6 +1226,13 @@ body {
       <div class="skills-section" id="defender-skills" style="display:none">
         <div class="section-title">🛡️ 防御技能 <span style="font-size:0.65rem;color:var(--text-secondary)">(可选)</span></div>
         <div class="skill-list" id="defender-skill-list"></div>
+      </div>
+      <div class="stats-section" id="defender-stats" style="display:none">
+        <div class="section-title stats-title">
+          <span>📊 属性配置</span>
+          <span class="stat-counters" id="defender-stat-counters"></span>
+        </div>
+        <div class="stats-grid" id="defender-stats-grid"></div>
       </div>
     </div>
   </div>
@@ -1190,6 +1356,23 @@ function buildSkillIndices() {
 // ============================================================
 // STATE
 // ============================================================
+// Stat keys in display order
+const STAT_KEYS = ['hp', 'atk', 'matk', 'def', 'mdef', 'spd'];
+const STAT_LABELS = { hp: 'HP', atk: 'ATK', matk: 'MATK', def: 'DEF', mdef: 'MDEF', spd: 'SPD' };
+const MAX_IV = 3;
+const IV_BONUS = 60;
+
+// Defaults: attacker = +SPD/-HP nature, IVs in [ATK, MATK, SPD]
+//           defender = +HP/-ATK nature, IVs in [HP, DEF, MDEF]
+const DEFAULT_NATURE = {
+  attacker: { up: 'spd', down: 'hp' },
+  defender: { up: 'hp',  down: 'atk' }
+};
+const DEFAULT_IVS = {
+  attacker: ['atk', 'matk', 'spd'],
+  defender: ['hp',  'def',  'mdef']
+};
+
 let state = {
   attacker: null,        // {id, ...SPRITES[id]}
   defender: null,
@@ -1198,8 +1381,24 @@ let state = {
   defenseSkill: null,    // full skill object (SKILLS[id]) or null = "无"
   defenseSkillIdx: 0,    // 0 = "无"
   starLayer: 0,
-  modalTarget: null
+  modalTarget: null,
+  // Per-side nature { up: statKey|null, down: statKey|null } and IVs (array of statKeys)
+  attackerNature: { up: null, down: null },
+  defenderNature: { up: null, down: null },
+  attackerIVs: [],
+  defenderIVs: []
 };
+
+function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
+function getIVs(side)     { return side === 'attacker' ? state.attackerIVs    : state.defenderIVs; }
+function setNature(side, n) {
+  if (side === 'attacker') state.attackerNature = n;
+  else                     state.defenderNature = n;
+}
+function setIVs(side, ivs) {
+  if (side === 'attacker') state.attackerIVs = ivs;
+  else                     state.defenderIVs = ivs;
+}
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
@@ -1219,6 +1418,36 @@ function getAttackSkillOptions(attacker) {
     if (s && s.category === '攻击') out.push(s);
   }
   return out;
+}
+
+// ============================================================
+// STAT MODIFIERS: nature (×1.2 / ×0.9) and IVs (+60 each, max 3)
+// Final stat formula (rounded):
+//   HP:    (base * 1.7 + ivBonus * 0.85 + 70) * natureMult + 100
+//   other: (base * 1.1 + ivBonus * 0.55 + 10) * natureMult + 50
+// ============================================================
+function getNatureMultiplier(nature, statKey) {
+  if (!nature) return 1;
+  if (nature.up   === statKey) return 1.2;
+  if (nature.down === statKey) return 0.9;
+  return 1;
+}
+function getIVBonus(statKey, ivs) {
+  if (!ivs || !ivs.includes(statKey)) return 0;
+  return IV_BONUS;
+}
+function getFinalStat(spirit, statKey, nature, ivs) {
+  if (!spirit) return 0;
+  const base = spirit[statKey] || 0;
+  const iv = getIVBonus(statKey, ivs);
+  const mult = getNatureMultiplier(nature, statKey);
+  let val;
+  if (statKey === 'hp') {
+    val = (base * 1.7 + iv * 0.85 + 70) * mult + 100;
+  } else {
+    val = (base * 1.1 + iv * 0.55 + 10) * mult + 50;
+  }
+  return Math.round(val);
 }
 
 // ============================================================
@@ -1487,7 +1716,7 @@ function openModal(target) {
         <div class="modal-spirit-image">${illus}</div>
         <div class="name">${s.name}</div>
         <div class="type-tags">${tagsHTML}</div>
-        <div class="mini-stats">HP ${s.hp} · ATK ${s.atk} · MATK ${s.matk} · DEF ${s.def} · MDEF ${s.mdef}</div>
+        <div class="mini-stats">HP ${s.hp} · ATK ${s.atk} · MATK ${s.matk} · DEF ${s.def} · MDEF ${s.mdef} · SPD ${s.spd ?? 0}</div>
       </div>
     `;
   }).join('');
@@ -1509,12 +1738,18 @@ function selectSpirit(id) {
     const opts = getAttackSkillOptions(s);
     state.attackSkill = opts[0] || null;
     state.attackSkillIdx = state.attackSkill ? 0 : -1;
+    // Apply default nature/IVs for attacker
+    state.attackerNature = { ...DEFAULT_NATURE.attacker };
+    state.attackerIVs    = DEFAULT_IVS.attacker.slice();
     renderSpiritCard('attacker');
   } else if (state.modalTarget === 'defender') {
     state.defender = s;
     const opts = getDefenseSkillOptions(s);
     state.defenseSkill = opts[0]; // "无"
     state.defenseSkillIdx = 0;
+    // Apply default nature/IVs for defender
+    state.defenderNature = { ...DEFAULT_NATURE.defender };
+    state.defenderIVs    = DEFAULT_IVS.defender.slice();
     renderSpiritCard('defender');
   }
   closeModal();
@@ -1542,18 +1777,116 @@ function renderSpiritCard(side) {
       <div class="spirit-image">${illus}</div>
       <div class="name">${spirit.name}</div>
       <div class="type-tags">${tagsHTML}</div>
-      <div class="stats">
-        <div class="stat"><div class="stat-label">HP</div><div class="stat-value">${spirit.hp}</div></div>
-        <div class="stat"><div class="stat-label">ATK</div><div class="stat-value">${spirit.atk}</div></div>
-        <div class="stat"><div class="stat-label">MATK</div><div class="stat-value">${spirit.matk}</div></div>
-        <div class="stat"><div class="stat-label">DEF</div><div class="stat-value">${spirit.def}</div></div>
-        <div class="stat"><div class="stat-label">MDEF</div><div class="stat-value">${spirit.mdef}</div></div>
-      </div>
       <div class="change-hint">点击更换</div>
     </div>
   `;
   skillsSection.style.display = 'block';
   renderSkills(side);
+  renderStatsConfig(side);
+}
+
+// ============================================================
+// STATS CONFIG: 3x2 grid, clickable nature & IV slots
+// ============================================================
+function renderStatsConfig(side) {
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+  if (!spirit) return;
+  const statsSection = document.getElementById(`${side}-stats`);
+  const grid = document.getElementById(`${side}-stats-grid`);
+  const counters = document.getElementById(`${side}-stat-counters`);
+  statsSection.style.display = 'block';
+
+  const nature = getNature(side);
+  const ivs = getIVs(side);
+  const ivFull = ivs.length >= MAX_IV;
+
+  // Counters in title
+  const upLabel   = nature.up   ? STAT_LABELS[nature.up].toUpperCase()   : '—';
+  const downLabel = nature.down ? STAT_LABELS[nature.down].toUpperCase() : '—';
+  counters.innerHTML =
+    `<span class="counter iv">个体 ${ivs.length}/${MAX_IV}</span>` +
+    `<span class="counter nat">性格 ↑${upLabel} / ↓${downLabel}</span>`;
+
+  // Build 3x2 grid
+  grid.innerHTML = STAT_KEYS.map(statKey => {
+    const isUp   = nature.up   === statKey;
+    const isDown = nature.down === statKey;
+    const hasIV  = ivs.includes(statKey);
+    const finalVal = getFinalStat(spirit, statKey, nature, ivs);
+    // Determine if this slot can be assigned (only if both natures are not yet set, and slot is empty)
+    // The slot is "available" if: (no up and no down) OR (only up set and this slot is not the up) OR (only down set and this slot is not the down)
+    const noNature = !nature.up && !nature.down;
+    const onlyUp   = nature.up && !nature.down;
+    const onlyDown = !nature.up && nature.down;
+    const natureAvailable = (isUp || isDown)
+      ? false // already set, click clears
+      : (noNature || onlyUp || onlyDown);
+    const ivAddable = !hasIV && !ivFull;
+    return `
+      <div class="stat-cell" data-stat="${statKey}">
+        <div class="nature-slot ${isUp ? 'up' : ''} ${isDown ? 'down' : ''} ${!isUp && !isDown && !natureAvailable ? 'disabled' : ''}"
+             title="性格: ${isUp ? '正面' : isDown ? '负面' : '未设置'}"
+             onclick="onNatureSlotClick('${side}', '${statKey}', event)">
+          ${isUp ? '▲' : isDown ? '▼' : ''}
+        </div>
+        <div class="stat-center">
+          <div class="stat-label">${STAT_LABELS[statKey]}</div>
+          <div class="stat-value">${finalVal}</div>
+        </div>
+        <div class="iv-slot ${hasIV ? 'active' : ''} ${!hasIV && !ivAddable ? 'disabled' : ''}"
+             title="个体值: ${hasIV ? '已选' : '未选'}"
+             onclick="onIVSlotClick('${side}', '${statKey}', event)">
+          ${hasIV ? '(+60)' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Nature slot click behavior (E2):
+// - If slot has value (▲/▼): clear that side
+// - If slot is empty:
+//     - no up & no down: assign ▲ (up)
+//     - only up set: assign ▼ (down)
+//     - only down set: assign ▲ (up)
+//     - both set: do nothing
+function onNatureSlotClick(side, statKey, ev) {
+  ev.stopPropagation();
+  const nature = { ...getNature(side) };
+  if (nature.up === statKey) {
+    nature.up = null;
+  } else if (nature.down === statKey) {
+    nature.down = null;
+  } else {
+    // slot is empty
+    if (nature.up && nature.down) return; // both already set
+    if (!nature.up && !nature.down) {
+      nature.up = statKey;       // first → up
+    } else if (nature.up) {
+      nature.down = statKey;      // missing negative
+    } else {
+      nature.up = statKey;        // missing positive
+    }
+  }
+  setNature(side, nature);
+  renderStatsConfig(side);
+  calculateDamage();
+}
+
+// IV slot click: toggle on/off (subject to MAX_IV)
+function onIVSlotClick(side, statKey, ev) {
+  ev.stopPropagation();
+  const ivs = getIVs(side).slice();
+  const idx = ivs.indexOf(statKey);
+  if (idx >= 0) {
+    ivs.splice(idx, 1);
+  } else {
+    if (ivs.length >= MAX_IV) return;
+    ivs.push(statKey);
+  }
+  setIVs(side, ivs);
+  renderStatsConfig(side);
+  calculateDamage();
 }
 
 function renderSkillIconHTML(sk, el) {
@@ -1670,8 +2003,17 @@ function calculateDamage() {
   const n = layer;
 
   const isMagic = skill.damage_class === '魔攻';
-  const atkStat = isMagic ? atk.matk : atk.atk;
-  const defStat = isMagic ? def.mdef : def.def;
+  // Use final stats (base + IVs + nature) for both attacker and defender
+  const atkNature = getNature('attacker');
+  const defNature = getNature('defender');
+  const atkIVs    = getIVs('attacker');
+  const defIVs    = getIVs('defender');
+  const atkStatKey = isMagic ? 'matk' : 'atk';
+  const defStatKey = isMagic ? 'mdef' : 'def';
+  const atkStat = getFinalStat(atk, atkStatKey, atkNature, atkIVs);
+  const defStat = getFinalStat(def, defStatKey, defNature, defIVs);
+  // Defender's max HP for HP bar / kill check uses final HP
+  const defHP = getFinalStat(def, 'hp', defNature, defIVs);
 
   // Skill damage
   const skillEff = effectiveness(skill.element, def.types);
@@ -1692,17 +2034,17 @@ function calculateDamage() {
   }
   const finalDamage = skillDmg + starDmg;
 
-  const hpPercent = (finalDamage / def.hp) * 100;
-  const remainingHP = Math.max(0, def.hp - finalDamage);
-  const remainingPercent = (remainingHP / def.hp) * 100;
-  const isKill = finalDamage >= def.hp;
-  const overflow = isKill ? finalDamage - def.hp : 0;
+  const hpPercent = (finalDamage / defHP) * 100;
+  const remainingHP = Math.max(0, defHP - finalDamage);
+  const remainingPercent = (remainingHP / defHP) * 100;
+  const isKill = finalDamage >= defHP;
+  const overflow = isKill ? finalDamage - defHP : 0;
 
   renderResult({
     finalDamage, skillDmg, starDmg, starPower,
     skillEff, starEff,
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
-    defHP: def.hp, skill, defSkill, atk, def,
+    defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic
   });
