@@ -2065,45 +2065,65 @@ function selectDefenseSkill(idx) {
 }
 
 // ============================================================
-// DYNAMIC SKILL MODIFIERS: hardcoded per-skill special logic
-// (e.g. power / combo that depends on star layer). Add a new
-// branch for each special skill as it's introduced.
+// DYNAMIC SKILL MODIFIERS: skill-id-keyed function dictionary.
+// Each entry takes (skill, ctx) and returns either null or
+//   { comboAdd?: number, powerMult?: number, notes?: string[] }.
+// The aggregator (computeSkillDynamicModifiers) merges them.
 // ============================================================
-const SKILL_ID_MULTIDIMENSIONAL_STRIKE = 'skill_000727'; // 多维击打
-const SKILL_ID_STARGAZING             = 'skill_000031'; // 观星
+const SKILL_MODS = {
+  // 多维击打：敌方每有 1 层星陨，本次连击 +1
+  skill_000727(_skill, ctx) {
+    return {
+      comboAdd: ctx.starLayer,
+      notes: [`连击 +${ctx.starLayer}（星陨 ${ctx.starLayer} 层）`],
+    };
+  },
+  // 观星：地系技能威力每层星陨 +20%
+  skill_000031(_skill, ctx) {
+    if (stripXi(ctx.activeSkill.element) !== '地') return null;
+    const mult = 1 + 0.2 * ctx.starLayer;
+    return {
+      powerMult: mult,
+      notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
+    };
+  },
+  // Add more skills here as they're introduced.
+};
 
 // Returns { powerMult, comboAdd, notes: [{source, text}, ...] }.
-// `attacker.skills` is scanned for skills whose category === '特性';
-// no positional assumption is made.
-function computeSkillDynamicModifiers(attacker, skill, starLayer) {
-  let mods = { powerMult: 1, comboAdd: 0, notes: [] };
+// Iterates the attacker's skills (category === '特性') to collect
+// passive characteristics; no positional assumption is made.
+function computeSkillDynamicModifiers(attacker, activeSkill, starLayer) {
+  const ctx = { starLayer, activeSkill, attacker };
+  const result = { powerMult: 1, comboAdd: 0, notes: [] };
+
+  const apply = (skill) => {
+    const fn = SKILL_MODS[skill?.id];
+    if (!fn) return;
+    const mod = fn(skill, ctx);
+    if (!mod) return;
+    if (mod.comboAdd)  result.comboAdd  += mod.comboAdd;
+    if (mod.powerMult) result.powerMult *= mod.powerMult;
+    for (const text of (mod.notes || [])) {
+      result.notes.push({ source: skill.name, text });
+    }
+  };
 
   // (1) Active skill self-modifier.
-  if (skill.id === SKILL_ID_MULTIDIMENSIONAL_STRIKE) {
-    // 多维击打：敌方每有 1 层星陨，本次连击 +1
-    mods.comboAdd += starLayer;
-    mods.notes.push({ source: skill.name, text: `连击 +${starLayer}（星陨 ${starLayer} 层）` });
-  }
+  apply(activeSkill);
 
-  // (2) Attacker's 特性 (characteristics): iterate the skill list
-  //     and pick skills with category === '特性'. Usually only one,
-  //     but we don't rely on position.
+  // (2) Attacker's 特性 (characteristics).
   for (const sid of (attacker.skills || [])) {
     const sk = SKILLS[sid];
     if (!sk || sk.category !== '特性') continue;
-
-    if (sk.id === SKILL_ID_STARGAZING && stripXi(skill.element) === '地') {
-      // 观星：地系技能威力每层星陨 +20%
-      const mult = 1 + 0.2 * starLayer;
-      mods.powerMult *= mult;
-      mods.notes.push({ source: sk.name, text: `威力 ×${mult.toFixed(2)}（星陨 ${starLayer} 层 ×20%）` });
-    }
-    // Add more 特性 branches here as they're introduced.
-
+    apply(sk);
+    // 只存在一个特性
     break;
   }
 
-  return mods;
+  // 也还可以有防御者的特性和技能，暂时可能不需要
+
+  return result;
 }
 
 // ============================================================
