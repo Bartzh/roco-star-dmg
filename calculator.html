@@ -2065,6 +2065,48 @@ function selectDefenseSkill(idx) {
 }
 
 // ============================================================
+// DYNAMIC SKILL MODIFIERS: hardcoded per-skill special logic
+// (e.g. power / combo that depends on star layer). Add a new
+// branch for each special skill as it's introduced.
+// ============================================================
+const SKILL_ID_MULTIDIMENSIONAL_STRIKE = 'skill_000727'; // 多维击打
+const SKILL_ID_STARGAZING             = 'skill_000031'; // 观星
+
+// Returns { powerMult, comboAdd, notes: [{source, text}, ...] }.
+// `attacker.skills` is scanned for skills whose category === '特性';
+// no positional assumption is made.
+function computeSkillDynamicModifiers(attacker, skill, starLayer) {
+  let mods = { powerMult: 1, comboAdd: 0, notes: [] };
+
+  // (1) Active skill self-modifier.
+  if (skill.id === SKILL_ID_MULTIDIMENSIONAL_STRIKE) {
+    // 多维击打：敌方每有 1 层星陨，本次连击 +1
+    mods.comboAdd += starLayer;
+    mods.notes.push({ source: skill.name, text: `连击 +${starLayer}（星陨 ${starLayer} 层）` });
+  }
+
+  // (2) Attacker's 特性 (characteristics): iterate the skill list
+  //     and pick skills with category === '特性'. Usually only one,
+  //     but we don't rely on position.
+  for (const sid of (attacker.skills || [])) {
+    const sk = SKILLS[sid];
+    if (!sk || sk.category !== '特性') continue;
+
+    if (sk.id === SKILL_ID_STARGAZING && stripXi(skill.element) === '地') {
+      // 观星：地系技能威力每层星陨 +20%
+      const mult = 1 + 0.2 * starLayer;
+      mods.powerMult *= mult;
+      mods.notes.push({ source: sk.name, text: `威力 ×${mult.toFixed(2)}（星陨 ${starLayer} 层 ×20%）` });
+    }
+    // Add more 特性 branches here as they're introduced.
+
+    break;
+  }
+
+  return mods;
+}
+
+// ============================================================
 // DAMAGE CALCULATION
 // ============================================================
 function calculateDamage() {
@@ -2092,12 +2134,15 @@ function calculateDamage() {
   // Defender's max HP for HP bar / kill check uses final HP
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
 
+  // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
+  const dyn = computeSkillDynamicModifiers(atk, skill, n);
   // Skill damage (STAB applied BEFORE type effectiveness)
   const stab = getStabMultiplier(atk, skill);
   const skillEff = effectiveness(skill.element, def.types);
-  const combo = skill.combo ?? 1; // combo coefficient: number of hits (1 if not present)
+  const combo = (skill.combo ?? 1) + dyn.comboAdd;
+  const power = (skill.power ?? 0) * dyn.powerMult;
   const skillDmg = Math.floor(
-    skill.power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
+    power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
   );
 
   // Starfall damage (幻 element)
@@ -2125,7 +2170,7 @@ function calculateDamage() {
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
-    atkStat, defStat, isMagic
+    atkStat, defStat, isMagic, dyn
   });
   updateAtmosphere(hpPercent, isKill);
 }
@@ -2199,14 +2244,29 @@ function renderResult(data) {
     ? ' <span class="skill-badge stab">本系 ×1.25</span>'
     : '';
   const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
+  // Dynamic-modifier display: show effective power / combo and per-source notes
+  const dynMods = data.dyn || { powerMult: 1, comboAdd: 0, notes: [] };
+  const basePower = data.skill.power ?? 0;
+  const effCombo  = (data.skill.combo ?? 1) + dynMods.comboAdd;
+  const effPowerStr = (basePower * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
+  const powerText = dynMods.powerMult !== 1
+    ? `${basePower} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`
+    : `${basePower}`;
+  const dynNotesHTML = dynMods.notes.length
+    ? `<div><span class="label">动态修正:</span></div>` +
+      dynMods.notes.map(n =>
+        `<div style="padding-left:1.4em"><span class="multiplier">· ${n.source}: ${n.text}</span></div>`
+      ).join('')
+    : '';
   breakdownList.innerHTML = `
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
     <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
     <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span>${stabBadge}</div>
     <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
-    <div><span class="label">威力:</span> <span class="value">${data.skill.power}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${data.combo > 1 ? ' × ' + data.combo + ' (连击)' : ''}</span></div>
+    <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo > 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
+    ${dynNotesHTML}
     <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
     <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
