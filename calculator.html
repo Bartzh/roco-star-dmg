@@ -1979,7 +1979,8 @@ function renderInlineBadge(sk, powerClass = '') {
   if (sk.damage_class) {
     // attack skill: show power
     const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
-    badges.push(`<span class="${cls}">威力 ${sk.power}</span>`);
+    const comboSuffix = sk.combo != null ? `x${sk.combo}` : '';
+    badges.push(`<span class="${cls}">威力 ${sk.power}${comboSuffix}</span>`);
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
