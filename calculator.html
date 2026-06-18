@@ -1497,7 +1497,8 @@ function getStabMultiplier(attacker, skill) {
 }
 
 // ============================================================
-// EFFECTIVENESS: (1 + weakCount) / (1 + resistCount)
+// EFFECTIVENESS: 攻击方属性 vs 防御方属性
+// 双重克制：3倍，双重抵抗：0.25倍
 // ============================================================
 function effectiveness(skillElementRaw, defenderTypesRaw) {
   if (!skillElementRaw || skillElementRaw === '无系别' || skillElementRaw === '空') return 1;
@@ -1507,10 +1508,11 @@ function effectiveness(skillElementRaw, defenderTypesRaw) {
   for (const dt of (defenderTypesRaw || [])) {
     const def = TYPES[stripXi(dt)];
     if (!def) continue;
-    if (def.attackWeak && def.attackWeak.includes(atkName)) weak++;
+    // 防御方的弱点列表中包含攻击方属性 ⇒ 攻击方克制防御方
+    if (def.defendWeak && def.defendWeak.includes(atkName)) weak++;
+    // 防御方的强防列表中包含攻击方属性 ⇒ 防御方抵抗攻击方
     if (def.defendStrong && def.defendStrong.includes(atkName)) resist++;
   }
-  // 双重克制：3倍，双重抵抗：0.25倍
   const diff = weak - resist;
   if (diff === 0) return 1;
   else if (diff === 1) return 2;
