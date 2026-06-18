@@ -38,6 +38,7 @@ for pet_id, pet_info in core.items():
         no_skills.append(pet_id)
         continue
     sprites[pet_id] = {
+        'id': pet_id,
         'name': pet_info['t'], # str: 精灵的名字。
         'types': pet_info['tp'], # list[str]: 精灵所属系别，如“水系”（任何系别都会带一个“系”字），部分精灵有两个系别。
         'hp': pet_info['st']['hp'], # int: 精灵的生命值。
@@ -55,7 +56,6 @@ print('no_skills:', no_skills)
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
-    skill_info.pop('id', None)
     if skill_info['category'] == '防御':
         if skill_info['desc'].startswith('减伤'):
             match = re.search(r'(\d+)%', skill_info['desc'])
