@@ -356,6 +356,20 @@ body {
 .skill-badge.atk     { color: #ff8c00; }
 .skill-badge.matk    { color: #aa66ff; }
 .skill-badge.power   { color: var(--accent-cyan); }
+.skill-badge.power.super-effective {
+  color: var(--accent-green);
+}
+.skill-badge.power.super-effective.double {
+  color: #00ff66;
+  text-shadow: 0 0 10px rgba(0, 255, 102, 0.55)
+}
+.skill-badge.power.not-effective {
+  color: var(--accent-red);
+}
+.skill-badge.power.not-effective.double {
+  color: #ff2525;
+  text-shadow: 0 0 10px rgba(255, 37, 37, 0.55);
+}
 .skill-badge.reduction { color: #00e676; }
 
 /* ============ Star Seal (Center) ============ */
@@ -1792,6 +1806,8 @@ function selectSpirit(id) {
     state.defenderNature = { ...DEFAULT_NATURE.defender };
     state.defenderIVs    = DEFAULT_IVS.defender.slice();
     renderSpiritCard('defender');
+    // Defender changed → attacker's power-badge colors need to refresh
+    if (state.attacker) renderSkills('attacker');
   }
   closeModal();
   calculateDamage();
@@ -1949,7 +1965,8 @@ function renderSkillIconHTML(sk, el) {
 }
 
 // Build the badge row (物攻/魔攻 + 威力 / 减伤) — multiple badges
-function renderInlineBadge(sk) {
+// `powerClass` optionally adds 'super-effective' / 'not-effective' to the power badge
+function renderInlineBadge(sk, powerClass = '') {
   if (sk._pseudo) return '';
   const badges = [];
   if (sk.damage_class === '物攻') {
@@ -1959,7 +1976,8 @@ function renderInlineBadge(sk) {
   }
   if (sk.damage_class) {
     // attack skill: show power
-    badges.push(`<span class="skill-badge power">威力 ${sk.power}</span>`);
+    const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
+    badges.push(`<span class="${cls}">威力 ${sk.power}</span>`);
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
@@ -1977,15 +1995,28 @@ function renderSkills(side) {
       list.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
       return;
     }
+    // For each attack skill, determine power-badge color based on
+    // type-effectiveness against the (current) defender's types.
+    // 3  = 双重克制 (darker green)
+    // 2  = 单重克制 (light green)
+    // 0.5 = 单重抵抗 (light red)
+    // 0.25 = 双重抵抗 (darker red)
+    const defenderTypes = state.defender ? (state.defender.types || []) : [];
     list.innerHTML = opts.map((sk, idx) => {
       const el = elOf(sk.element);
+      const eff = effectiveness(sk.element, defenderTypes);
+      let powerClass = '';
+      if (eff === 3)        powerClass = 'super-effective double';
+      else if (eff === 2)   powerClass = 'super-effective';
+      else if (eff === 0.5) powerClass = 'not-effective';
+      else if (eff === 0.25) powerClass = 'not-effective double';
       return `
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 onclick="selectAttackSkill(${idx})">
           <div class="skill-icon">${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
             <span class="skill-name">${sk.name}</span>
-            <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
+            <div class="skill-badges-row">${renderInlineBadge(sk, powerClass)}</div>
           </div>
         </button>
       `;
