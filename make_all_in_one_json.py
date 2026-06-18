@@ -56,6 +56,7 @@ print('no_skills:', no_skills)
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
+    skill_info['id'] = skill_id
     if skill_info['category'] == '防御':
         if skill_info['desc'].startswith('减伤'):
             match = re.search(r'(\d+)%', skill_info['desc'])
