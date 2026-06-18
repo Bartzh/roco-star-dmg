@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>☄️ 星陨伤害计算器</title>
+<title>星陨伤害计算器</title>
 <style>
 
 /* ============ CSS Variables ============ */
@@ -1190,31 +1190,31 @@ body {
 
 <div class="container" id="main-container">
   <div class="header">
-    <h1>☄️ <span>星陨</span>伤害计算器</h1>
+    <h1><span>星陨</span>伤害计算器</h1>
     <div class="subtitle">选择精灵与技能，拖动星陨印记，实时计算伤害</div>
   </div>
 
   <div class="battle-area">
     <div class="spirit-panel glass-panel" id="attacker-panel">
-      <div class="panel-label"><span class="icon">⚔️</span> 攻击方</div>
+      <div class="panel-label">攻击方</div>
       <div id="attacker-select-area">
         <button class="spirit-select" onclick="openModal('attacker')">+ 选择攻击方精灵</button>
       </div>
       <div class="stats-section" id="attacker-stats" style="display:none">
         <div class="section-title">
-          <span class="icon">📊</span> 属性配置
+          属性配置
           <span class="stat-counters" id="attacker-stat-counters"></span>
         </div>
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
-        <div class="section-title"><span class="icon">🎯</span> 攻击技能</div>
+        <div class="section-title">攻击技能</div>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
     </div>
 
     <div class="seal-container">
-      <div class="seal-label">☄️ 星陨层数</div>
+      <div class="seal-label">星陨层数</div>
       <div class="seal-wrapper" id="seal-wrapper">
         <canvas id="particle-canvas" width="280" height="280"></canvas>
         <div class="seal" id="seal">
@@ -1237,19 +1237,19 @@ body {
     </div>
 
     <div class="spirit-panel glass-panel" id="defender-panel">
-      <div class="panel-label"><span class="icon">🛡️</span> 防御方</div>
+      <div class="panel-label">防御方</div>
       <div id="defender-select-area">
         <button class="spirit-select" onclick="openModal('defender')">+ 选择防御方精灵</button>
       </div>
       <div class="stats-section" id="defender-stats" style="display:none">
         <div class="section-title">
-          <span class="icon">📊</span> 属性配置
+          属性配置
           <span class="stat-counters" id="defender-stat-counters"></span>
         </div>
         <div class="stats-grid" id="defender-stats-grid"></div>
       </div>
       <div class="skills-section" id="defender-skills" style="display:none">
-        <div class="section-title"><span class="icon">🛡️</span> 防御技能 <span style="font-size:0.65rem;color:var(--text-secondary);text-transform:none;letter-spacing:normal">(可选)</span></div>
+        <div class="section-title">防御技能 <span style="font-size:0.65rem;color:var(--text-secondary);text-transform:none;letter-spacing:normal">(可选)</span></div>
         <div class="skill-list" id="defender-skill-list"></div>
       </div>
     </div>
@@ -1259,13 +1259,13 @@ body {
     <div class="result-card" id="result-card">
       <div id="result-content">
         <div class="result-waiting">
-          选择双方精灵后开始计算 ⚔️
+          选择双方精灵后开始计算
         </div>
       </div>
     </div>
 
     <button class="breakdown-toggle" id="breakdown-toggle" onclick="toggleBreakdown()" style="display:none">
-      <span>📊 伤害计算明细</span>
+      <span>伤害计算明细</span>
       <span class="arrow">▼</span>
     </button>
     <div class="breakdown-content" id="breakdown-content">
@@ -1740,7 +1740,7 @@ function openModal(target) {
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-title');
   const grid = document.getElementById('spirit-grid');
-  title.textContent = target === 'attacker' ? '⚔️ 选择攻击方精灵' : '🛡️ 选择防御方精灵';
+  title.textContent = target === 'attacker' ? '选择攻击方精灵' : '选择防御方精灵';
   const list = Object.entries(SPRITES);
   grid.innerHTML = list.map(([id, s]) => {
     const types = (s.types || []).map(t => elOf(t));
@@ -2135,7 +2135,7 @@ function renderResult(data) {
   const displayPercent = Math.min(data.hpPercent, 999.9);
 
   content.innerHTML = `
-    <div class="result-label">${data.isKill ? '💀 伤害结果' : '⚔️ 伤害结果'}</div>
+    <div class="result-label">${data.isKill ? '伤害结果' : '伤害结果'}</div>
     <div class="result-percentage" id="result-pct">
       ${displayPercent.toFixed(1)}<span class="percent-sign">%</span>
     </div>
@@ -2202,9 +2202,9 @@ function renderResult(data) {
 
 function renderWaiting() {
   const content = document.getElementById('result-content');
-  let msg = '选择双方精灵后开始计算 ⚔️';
-  if (state.attacker && !state.defender) msg = '选择防御方精灵以计算伤害 🛡️';
-  if (!state.attacker && state.defender) msg = '选择攻击方精灵以计算伤害 ⚔️';
+  let msg = '选择双方精灵后开始计算';
+  if (state.attacker && !state.defender) msg = '选择防御方精灵以计算伤害';
+  if (!state.attacker && state.defender) msg = '选择攻击方精灵以计算伤害';
   if (state.attacker && state.defender && !state.attackSkill) msg = '该攻击方无可用攻击技能';
   content.innerHTML = `<div class="result-waiting">${msg}</div>`;
   document.getElementById('breakdown-toggle').style.display = 'none';
