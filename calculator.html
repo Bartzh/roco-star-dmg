@@ -1966,7 +1966,7 @@ function renderSkillIconHTML(sk, el) {
   return main + elOverlay;
 }
 
-// Build the badge row (物攻/魔攻 + 威力 / 减伤) — multiple badges
+// Build the badge row (物攻/魔攻 + 威力 * 减伤) — multiple badges
 // `powerClass` optionally adds 'super-effective' / 'not-effective' to the power badge
 function renderInlineBadge(sk, powerClass = '') {
   if (sk._pseudo) return '';

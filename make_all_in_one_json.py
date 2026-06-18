@@ -28,6 +28,8 @@ for pet_id, pet_info in core.items():
         skills.append(fs)
     if ns := learnset.get('ns'):
         skills.extend(s['sk'] for s in ns)
+    if lg := learnset.get('lg'):
+        skills.append(lg['sk'])
     if ss := learnset.get('ss'):
         skills.extend(ss)
     if bs := learnset.get('bs'):
