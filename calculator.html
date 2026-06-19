@@ -79,6 +79,7 @@ body {
   font-weight: 300;
   letter-spacing: 4px;
   color: var(--text-primary);
+  text-shadow: 0 0 24px rgba(0,229,255,0.18);
 }
 .header h1 span { color: var(--accent-gold); font-weight: 600; }
 .header .subtitle {
@@ -393,6 +394,12 @@ body {
   cursor: ns-resize;
   user-select: none;
   -webkit-user-select: none;
+  border-radius: 50%;
+}
+.seal-wrapper:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 8px;
+  box-shadow: 0 0 0 6px rgba(0,229,255,0.12);
 }
 .seal-wrapper canvas {
   position: absolute;
@@ -1227,6 +1234,52 @@ body {
   border: 1px solid rgba(255,140,0,0.3);
 }
 
+/* ============ Accessibility: focus rings ============ */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.skill-btn:focus-visible,
+.spirit-option:focus-visible,
+.spirit-card:focus-visible,
+.buff-chip:focus-visible,
+.nature-slot:focus-visible,
+.iv-slot:focus-visible,
+.breakdown-toggle:focus-visible,
+.spirit-select:focus-visible,
+.modal-close:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0,229,255,0.15);
+}
+.buff-chip:focus-visible { outline-offset: 3px; }
+
+/* ============ Accessibility: reduced motion ============ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .seal { animation: none; }
+  .star-canvas, #particle-canvas { display: none; }
+  .shake, .number-pop, .kill-banner.show { animation: none; }
+}
+
+/* ============ Accessibility: skip-link target ============ */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
 </style>
 </head>
 <body>
@@ -1239,36 +1292,40 @@ body {
 <div id="flash-overlay"></div>
 
 <div class="container" id="main-container">
-  <div class="header">
+  <header class="header">
     <h1><span>星陨</span>伤害计算器</h1>
-    <div class="subtitle">选择精灵与技能，拖动星陨印记，实时计算伤害</div>
-  </div>
+    <p class="subtitle">选择精灵与技能，拖动星陨印记，实时计算伤害</p>
+  </header>
 
-  <div class="battle-area">
-    <div class="spirit-panel glass-panel" id="attacker-panel">
-      <div class="panel-label">攻击方</div>
+  <section class="battle-area" aria-label="对战配置区">
+    <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方">
+      <h2 class="panel-label">攻击方</h2>
       <div id="attacker-select-area">
-        <button class="spirit-select" onclick="openModal('attacker')">+ 选择攻击方精灵</button>
+        <button class="spirit-select" type="button" onclick="openModal('attacker')" aria-label="选择攻击方精灵">+ 选择攻击方精灵</button>
       </div>
       <div class="stats-section" id="attacker-stats" style="display:none">
-        <div class="section-title">
+        <h3 class="section-title">
           属性配置
-          <span class="buff-chips" id="attacker-buff-chips"></span>
-        </div>
+          <span class="buff-chips" id="attacker-buff-chips" aria-label="攻击方 buff 调节"></span>
+        </h3>
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
-        <div class="section-title">攻击技能</div>
+        <h3 class="section-title">攻击技能</h3>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
-    </div>
+    </section>
 
-    <div class="seal-container">
-      <div class="seal-label">星陨层数</div>
-      <div class="seal-wrapper" id="seal-wrapper">
-        <canvas id="particle-canvas" width="280" height="280"></canvas>
-        <div class="seal" id="seal">
-          <svg viewBox="0 0 200 200" id="seal-svg">
+    <section class="seal-container" aria-label="星陨印记控制">
+      <h2 class="seal-label">星陨层数</h2>
+      <div class="seal-wrapper" id="seal-wrapper"
+           role="slider"
+           tabindex="0"
+           aria-label="星陨层数滑块（拖拽、滚轮、上下方向键或下方滑块调节，双击重置）"
+           aria-valuemin="0" aria-valuemax="99" aria-valuenow="0">
+        <canvas id="particle-canvas" width="280" height="280" aria-hidden="true"></canvas>
+        <div class="seal" id="seal" aria-hidden="true">
+          <svg viewBox="0 0 200 200" id="seal-svg" aria-hidden="true">
             <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
             <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
             <g id="seal-ticks"></g>
@@ -1276,59 +1333,60 @@ body {
             <g id="seal-runes" opacity="0.3"></g>
             <circle cx="100" cy="100" r="45" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
           </svg>
-          <span class="seal-number" id="seal-number">0</span>
+          <span class="seal-number" id="seal-number" aria-hidden="true">0</span>
         </div>
       </div>
       <div class="seal-hint">↕ 拖拽 · 滚轮 · 或滑块调节</div>
       <div class="seal-slider-container">
-        <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0">
-        <div class="slider-labels"><span>0</span><span>50</span><span>99</span></div>
+        <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0"
+               aria-label="星陨层数（数值滑块）">
+        <div class="slider-labels" aria-hidden="true"><span>0</span><span>50</span><span>99</span></div>
       </div>
-    </div>
+    </section>
 
-    <div class="spirit-panel glass-panel" id="defender-panel">
-      <div class="panel-label">防御方</div>
+    <section class="spirit-panel glass-panel" id="defender-panel" aria-label="防御方">
+      <h2 class="panel-label">防御方</h2>
       <div id="defender-select-area">
-        <button class="spirit-select" onclick="openModal('defender')">+ 选择防御方精灵</button>
+        <button class="spirit-select" type="button" onclick="openModal('defender')" aria-label="选择防御方精灵">+ 选择防御方精灵</button>
       </div>
       <div class="stats-section" id="defender-stats" style="display:none">
-        <div class="section-title">
+        <h3 class="section-title">
           属性配置
-          <span class="buff-chips" id="defender-buff-chips"></span>
-        </div>
+          <span class="buff-chips" id="defender-buff-chips" aria-label="防御方 buff 调节"></span>
+        </h3>
         <div class="stats-grid" id="defender-stats-grid"></div>
       </div>
       <div class="skills-section" id="defender-skills" style="display:none">
-        <div class="section-title">防御技能 <span style="font-size:0.65rem;color:var(--text-secondary);text-transform:none;letter-spacing:normal">(可选)</span></div>
+        <h3 class="section-title">防御技能 <span style="font-size:0.65rem;color:var(--text-secondary);text-transform:none;letter-spacing:normal">(可选)</span></h3>
         <div class="skill-list" id="defender-skill-list"></div>
       </div>
-    </div>
-  </div>
+    </section>
+  </section>
 
-  <div class="result-area" id="result-area">
+  <section class="result-area" id="result-area" aria-label="伤害计算结果">
     <div class="result-card" id="result-card">
-      <div id="result-content">
+      <div id="result-content" aria-live="polite" aria-atomic="true">
         <div class="result-waiting">
           选择双方精灵后开始计算
         </div>
       </div>
     </div>
 
-    <button class="breakdown-toggle" id="breakdown-toggle" onclick="toggleBreakdown()" style="display:none">
+    <button class="breakdown-toggle" id="breakdown-toggle" type="button" onclick="toggleBreakdown()" style="display:none" aria-expanded="false" aria-controls="breakdown-content">
       <span>伤害计算明细</span>
-      <span class="arrow">▼</span>
+      <span class="arrow" aria-hidden="true">▼</span>
     </button>
-    <div class="breakdown-content" id="breakdown-content">
+    <div class="breakdown-content" id="breakdown-content" role="region" aria-label="伤害计算明细">
       <div class="breakdown-list" id="breakdown-list"></div>
     </div>
-  </div>
+  </section>
 </div>
 
-<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
-  <div class="modal">
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)" role="presentation">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <h2 id="modal-title">选择精灵</h2>
     <div class="spirit-grid" id="spirit-grid"></div>
-    <button class="modal-close" onclick="closeModal()">关闭</button>
+    <button class="modal-close" type="button" onclick="closeModal()" aria-label="关闭选择面板">关闭</button>
   </div>
 </div>
 
@@ -1753,8 +1811,10 @@ function setStarLayer(value) {
   state.starLayer = Math.round(value);
   const numberEl = document.getElementById('seal-number');
   const slider = document.getElementById('seal-slider');
+  const sealWrapper = document.getElementById('seal-wrapper');
   animateNumber(numberEl, old, state.starLayer, 200);
   slider.value = state.starLayer;
+  if (sealWrapper) sealWrapper.setAttribute('aria-valuenow', String(state.starLayer));
   updateSealGlow();
   if (old !== state.starLayer) {
     numberEl.classList.remove('number-pop');
@@ -1829,7 +1889,11 @@ function openModal(target) {
       ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${types[0]?.color || '#888'}'}))">`
       : `<div class="placeholder" style="--el-color:${types[0]?.color || '#888'}">${(s.name||'').slice(0,1)}</div>`;
     return `
-      <div class="spirit-option" style="--el-color:${types[0]?.color || '#888'}" onclick="selectSpirit('${id}')">
+      <div class="spirit-option" role="button" tabindex="0"
+           aria-label="选择 ${s.name}"
+           style="--el-color:${types[0]?.color || '#888'}"
+           onclick="selectSpirit('${id}')"
+           onkeydown="onSpiritOptionKey(event, '${id}')">
         <div class="modal-spirit-image">${illus}</div>
         <div class="name">${s.name}</div>
         <div class="type-tags">${tagsHTML}</div>
@@ -1838,14 +1902,32 @@ function openModal(target) {
     `;
   }).join('');
   overlay.classList.add('show');
+  // Remember the trigger so we can restore focus on close
+  state._modalReturnFocus = document.activeElement;
+  // Move focus into the modal: first option
+  const firstOption = grid.querySelector('.spirit-option');
+  if (firstOption) firstOption.focus();
 }
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
   state.modalTarget = null;
+  // Restore focus to the element that opened the modal
+  if (state._modalReturnFocus && typeof state._modalReturnFocus.focus === 'function') {
+    try { state._modalReturnFocus.focus(); } catch (_) {}
+  }
+  state._modalReturnFocus = null;
 }
 function closeModalOutside(e) {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
 }
+
+// Global Esc-to-close-modal handler
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('modal-overlay').classList.contains('show')) {
+    e.preventDefault();
+    closeModal();
+  }
+});
 
 function selectSpirit(id) {
   const s = SPRITES[id];
@@ -1898,7 +1980,11 @@ function renderSpiritCard(side) {
     ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
     : `<div class="placeholder" style="--el-color:${primaryColor}">${(spirit.name||'').slice(0,1)}</div>`;
   selectArea.innerHTML = `
-    <div class="spirit-card" onclick="openModal('${side}')" style="--el-color:${primaryColor}">
+    <div class="spirit-card" role="button" tabindex="0"
+         aria-label="更换${side === 'attacker' ? '攻击方' : '防御方'}精灵（当前：${spirit.name}）"
+         onclick="openModal('${side}')"
+         onkeydown="onSpiritCardKey(event, '${side}')"
+         style="--el-color:${primaryColor}">
       <div class="spirit-image">${illus}</div>
       <div class="name">${spirit.name}</div>
       <div class="type-tags">${tagsHTML}</div>
@@ -1945,8 +2031,12 @@ function renderStatsConfig(side) {
     return `
       <div class="stat-cell" data-stat="${statKey}">
         <div class="nature-slot ${isUp ? 'up' : ''} ${isDown ? 'down' : ''} ${!isUp && !isDown && !natureAvailable ? 'disabled' : ''}"
+             role="button" tabindex="${(!isUp && !isDown && !natureAvailable) ? -1 : 0}"
+             aria-label="${STAT_LABELS[statKey]} 性格：${isUp ? '正面' : isDown ? '负面' : '未设置'}（点击切换）"
+             aria-pressed="${(isUp || isDown) ? 'true' : 'false'}"
              title="性格: ${isUp ? '正面' : isDown ? '负面' : '未设置'}"
-             onclick="onNatureSlotClick('${side}', '${statKey}', event)">
+             onclick="onNatureSlotClick('${side}', '${statKey}', event)"
+             onkeydown="onNatureSlotKey(event, '${side}', '${statKey}')">
           ${isUp ? '▲' : isDown ? '▼' : ''}
         </div>
         <div class="stat-center">
@@ -1954,8 +2044,12 @@ function renderStatsConfig(side) {
           <div class="stat-value">${finalVal}</div>
         </div>
         <div class="iv-slot ${hasIV ? 'active' : ''} ${!hasIV && !ivAddable ? 'disabled' : ''}"
+             role="button" tabindex="${!hasIV && !ivAddable ? -1 : 0}"
+             aria-label="${STAT_LABELS[statKey]} 个体值：${hasIV ? '已选' : '未选'}（点击切换）"
+             aria-pressed="${hasIV ? 'true' : 'false'}"
              title="个体值: ${hasIV ? '已选' : '未选'}"
-             onclick="onIVSlotClick('${side}', '${statKey}', event)">
+             onclick="onIVSlotClick('${side}', '${statKey}', event)"
+             onkeydown="onIVSlotKey(event, '${side}', '${statKey}')">
           ${hasIV ? '(+60)' : ''}
         </div>
       </div>
@@ -2030,13 +2124,17 @@ function renderBuffChips(side) {
     const val = getBuff(side, c.key);
     const cls = val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
     return `<div class="buff-chip ${cls}"
+                 role="slider" tabindex="0"
+                 aria-label="${c.label} 调整（当前 ${formatBuff(val)}，左右方向键调节，R 键重置）"
+                 aria-valuemin="${-BUFF_MAX_PCT}" aria-valuemax="${BUFF_MAX_PCT}" aria-valuenow="${val}"
                  data-side="${side}" data-stat="${c.key}"
                  onpointerdown="onBuffPointerDown(event)"
                  onpointermove="onBuffPointerMove(event)"
                  onpointerup="onBuffPointerUp(event)"
                  onpointercancel="onBuffPointerUp(event)"
                  ondblclick="onBuffDoubleClick(event)"
-                 title="按住横向拖动调节 · 双击重置">${c.label} <span class="buff-val">${formatBuff(val)}</span></div>`;
+                 onkeydown="onBuffKeyDown(event)"
+                 title="按住横向拖动调节 · 双击重置 · 左右方向键 · R 键重置">${c.label} <span class="buff-val">${formatBuff(val)}</span></div>`;
   }).join('');
 }
 
@@ -2075,6 +2173,7 @@ function onBuffPointerMove(e) {
   if (valSpan) valSpan.textContent = formatBuff(newVal);
   buffDrag.chip.classList.remove('positive', 'negative', 'neutral');
   buffDrag.chip.classList.add(_buffChipClass(newVal));
+  buffDrag.chip.setAttribute('aria-valuenow', String(newVal));
   calculateDamage();
 }
 
@@ -2095,6 +2194,79 @@ function onBuffDoubleClick(e) {
   setBuff(side, stat, 0);
   renderBuffChips(side);
   calculateDamage();
+}
+
+// Keyboard support for buff chips: ←/→ adjust by 10%, Shift = 50%, R = reset
+function onBuffKeyDown(e) {
+  const chip = e.currentTarget;
+  const side = chip.dataset.side;
+  const stat = chip.dataset.stat;
+  const cur = getBuff(side, stat);
+  let delta = 0;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') delta = -BUFF_STEP_PCT;
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') delta = BUFF_STEP_PCT;
+  else if (e.key === 'r' || e.key === 'R') {
+    e.preventDefault();
+    if (cur === 0) return;
+    setBuff(side, stat, 0);
+    renderBuffChips(side);
+    calculateDamage();
+    return;
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    setBuff(side, stat, -BUFF_MAX_PCT);
+    renderBuffChips(side);
+    calculateDamage();
+    return;
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    setBuff(side, stat, BUFF_MAX_PCT);
+    renderBuffChips(side);
+    calculateDamage();
+    return;
+  } else {
+    return;
+  }
+  e.preventDefault();
+  const step = e.shiftKey ? BUFF_STEP_PCT * 5 : BUFF_STEP_PCT;
+  setBuff(side, stat, cur + Math.sign(delta) * step);
+  renderBuffChips(side);
+  // restore focus to the same chip (renderBuffChips rebuilds the DOM)
+  const rebuilt = document.querySelector(`.buff-chip[data-side="${side}"][data-stat="${stat}"]`);
+  if (rebuilt) rebuilt.focus();
+  calculateDamage();
+}
+
+// Keyboard support for spirit-card (Enter/Space to open the picker)
+function onSpiritCardKey(e, side) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    openModal(side);
+  }
+}
+
+// Keyboard support for spirit-option in the modal (Enter/Space to select)
+function onSpiritOptionKey(e, id) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    selectSpirit(id);
+  }
+}
+
+// Keyboard support for nature slot (Enter/Space to toggle)
+function onNatureSlotKey(e, side, statKey) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    onNatureSlotClick(side, statKey, e);
+  }
+}
+
+// Keyboard support for IV slot (Enter/Space to toggle)
+function onIVSlotKey(e, side, statKey) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    onIVSlotClick(side, statKey, e);
+  }
 }
 
 function renderSkillIconHTML(sk, el) {
@@ -2553,8 +2725,9 @@ function updateAtmosphere(damagePercent, isKill) {
 function toggleBreakdown() {
   const content = document.getElementById('breakdown-content');
   const toggle = document.getElementById('breakdown-toggle');
-  content.classList.toggle('open');
-  toggle.classList.toggle('open');
+  const isOpen = content.classList.toggle('open');
+  toggle.classList.toggle('open', isOpen);
+  toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 
 function init() {
