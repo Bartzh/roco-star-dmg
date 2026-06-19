@@ -902,7 +902,7 @@ body {
     width: 20px;
     height: 20px;
   }
-  .stats-section .stat-counters {
+  .stats-section .buff-chips {
     flex-direction: column;
     align-items: flex-end;
     gap: 2px;
@@ -1026,20 +1026,57 @@ body {
   gap: 6px;
 }
 .stats-section .section-title .icon { font-size: 1rem; }
-/* stats-title: push counters to the right */
-.stats-section .stat-counters {
+/* Buff chips (replaces old stat-counters: shows adjustable atk/matk | def/mdef %) */
+.stats-section .buff-chips {
   margin-left: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
   font-size: 0.62rem;
   color: var(--text-secondary);
   font-weight: 400;
   letter-spacing: 0.3px;
   text-transform: none;
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
-.stats-section .stat-counters .counter.iv  { color: var(--accent-gold); }
-.stats-section .stat-counters .counter.nat { color: var(--accent-cyan); }
+.buff-chip {
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  touch-action: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.buff-chip:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.22);
+}
+.buff-chip.positive {
+  background: rgba(0,230,118,0.15);
+  border-color: rgba(0,230,118,0.45);
+  color: #00e676;
+}
+.buff-chip.negative {
+  background: rgba(255,59,59,0.15);
+  border-color: rgba(255,59,59,0.45);
+  color: #ff5e5e;
+}
+.buff-chip.dragging {
+  background: rgba(0,229,255,0.18);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0,229,255,0.35);
+}
+.buff-chip .buff-val {
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  margin-left: 1px;
+}
 
 /* 3x2 grid for 6 stats */
 .stats-grid {
@@ -1217,7 +1254,7 @@ body {
       <div class="stats-section" id="attacker-stats" style="display:none">
         <div class="section-title">
           属性配置
-          <span class="stat-counters" id="attacker-stat-counters"></span>
+          <span class="buff-chips" id="attacker-buff-chips"></span>
         </div>
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
@@ -1258,7 +1295,7 @@ body {
       <div class="stats-section" id="defender-stats" style="display:none">
         <div class="section-title">
           属性配置
-          <span class="stat-counters" id="defender-stat-counters"></span>
+          <span class="buff-chips" id="defender-buff-chips"></span>
         </div>
         <div class="stats-grid" id="defender-stats-grid"></div>
       </div>
@@ -1418,7 +1455,11 @@ let state = {
   attackerNature: { up: null, down: null },
   defenderNature: { up: null, down: null },
   attackerIVs: [],
-  defenderIVs: []
+  defenderIVs: [],
+  // Per-side adjustable buff (in %): attacker buffs attack stats; defender buffs defense stats
+  // Range [-990, +990], step 10; default 0 (no modification)
+  attackerBuff: { atk: 0, matk: 0 },
+  defenderBuff: { def: 0, mdef: 0 }
 };
 
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
@@ -1430,6 +1471,20 @@ function setNature(side, n) {
 function setIVs(side, ivs) {
   if (side === 'attacker') state.attackerIVs = ivs;
   else                     state.defenderIVs = ivs;
+}
+function getBuff(side, stat) {
+  const obj = side === 'attacker' ? state.attackerBuff : state.defenderBuff;
+  return obj[stat] || 0;
+}
+function setBuff(side, stat, val) {
+  const clamped = Math.max(-990, Math.min(990, Math.round(val / 10) * 10));
+  if (side === 'attacker') state.attackerBuff[stat] = clamped;
+  else                     state.defenderBuff[stat] = clamped;
+}
+function formatBuff(val) {
+  if (val > 0) return '+' + val + '%';
+  if (val < 0) return val + '%';   // already has minus sign
+  return '+0%';
 }
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
@@ -1798,6 +1853,8 @@ function selectSpirit(id) {
     // Apply default nature/IVs for attacker
     state.attackerNature = { ...DEFAULT_NATURE.attacker };
     state.attackerIVs    = DEFAULT_IVS.attacker.slice();
+    // Reset attacker buffs on spirit change
+    state.attackerBuff   = { atk: 0, matk: 0 };
     renderSpiritCard('attacker');
   } else if (state.modalTarget === 'defender') {
     state.defender = s;
@@ -1807,6 +1864,8 @@ function selectSpirit(id) {
     // Apply default nature/IVs for defender
     state.defenderNature = { ...DEFAULT_NATURE.defender };
     state.defenderIVs    = DEFAULT_IVS.defender.slice();
+    // Reset defender buffs on spirit change
+    state.defenderBuff   = { def: 0, mdef: 0 };
     renderSpiritCard('defender');
     // Defender changed → attacker's power-badge colors need to refresh
     if (state.attacker) renderSkills('attacker');
@@ -1854,19 +1913,14 @@ function renderStatsConfig(side) {
   if (!spirit) return;
   const statsSection = document.getElementById(`${side}-stats`);
   const grid = document.getElementById(`${side}-stats-grid`);
-  const counters = document.getElementById(`${side}-stat-counters`);
   statsSection.style.display = 'block';
 
   const nature = getNature(side);
   const ivs = getIVs(side);
   const ivFull = ivs.length >= MAX_IV;
 
-  // Counters in title
-  const upLabel   = nature.up   ? STAT_LABELS[nature.up]   : '—';
-  const downLabel = nature.down ? STAT_LABELS[nature.down] : '—';
-  counters.innerHTML =
-    `<span class="counter iv">个体 ${ivs.length}/${MAX_IV}</span>` +
-    `<span class="counter nat">性格 ↑${upLabel} / ↓${downLabel}</span>`;
+  // Buff chips in title (replaces old "个体 X/3 / 性格 ↑A / ↓B" text)
+  renderBuffChips(side);
 
   // Build 3x2 grid
   grid.innerHTML = STAT_KEYS.map(statKey => {
@@ -1947,6 +2001,94 @@ function onIVSlotClick(side, statKey, ev) {
   }
   setIVs(side, ivs);
   renderStatsConfig(side);
+  calculateDamage();
+}
+
+// ============================================================
+// BUFF CHIPS: press-and-drag horizontal to adjust the atk/matk
+// (or def/mdef) stat by ±10% per 8px; double-click to reset.
+// ============================================================
+const BUFF_STAT_CONFIGS = {
+  attacker: [{ key: 'atk',  label: '物攻' }, { key: 'matk', label: '魔攻' }],
+  defender: [{ key: 'def',  label: '物防' }, { key: 'mdef', label: '魔防' }]
+};
+const BUFF_DRAG_PX_PER_STEP = 8;   // 8px → 10% step
+const BUFF_STEP_PCT = 10;
+const BUFF_MAX_PCT = 990;
+let buffDrag = null;  // { chip, side, stat, startX, startVal, pointerId }
+
+function renderBuffChips(side) {
+  const container = document.getElementById(`${side}-buff-chips`);
+  if (!container) return;
+  const configs = BUFF_STAT_CONFIGS[side] || [];
+  container.innerHTML = configs.map(c => {
+    const val = getBuff(side, c.key);
+    const cls = val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
+    return `<div class="buff-chip ${cls}"
+                 data-side="${side}" data-stat="${c.key}"
+                 onpointerdown="onBuffPointerDown(event)"
+                 onpointermove="onBuffPointerMove(event)"
+                 onpointerup="onBuffPointerUp(event)"
+                 onpointercancel="onBuffPointerUp(event)"
+                 ondblclick="onBuffDoubleClick(event)"
+                 title="按住横向拖动调节 · 双击重置">${c.label} <span class="buff-val">${formatBuff(val)}</span></div>`;
+  }).join('');
+}
+
+function _buffChipClass(val) {
+  return val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
+}
+
+function onBuffPointerDown(e) {
+  const chip = e.currentTarget;
+  e.preventDefault();
+  e.stopPropagation();
+  const side = chip.dataset.side;
+  const stat = chip.dataset.stat;
+  buffDrag = {
+    chip,
+    side,
+    stat,
+    startX: e.clientX,
+    startVal: getBuff(side, stat),
+    pointerId: e.pointerId
+  };
+  try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+  chip.classList.add('dragging');
+}
+
+function onBuffPointerMove(e) {
+  if (!buffDrag || e.pointerId !== buffDrag.pointerId) return;
+  e.preventDefault();
+  const dx = e.clientX - buffDrag.startX;
+  const delta = Math.round(dx / BUFF_DRAG_PX_PER_STEP) * BUFF_STEP_PCT;
+  const newVal = Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT, buffDrag.startVal + delta));
+  if (newVal === getBuff(buffDrag.side, buffDrag.stat)) return;
+  setBuff(buffDrag.side, buffDrag.stat, newVal);
+  // Live update the chip text + color (without re-rendering the whole stats config)
+  const valSpan = buffDrag.chip.querySelector('.buff-val');
+  if (valSpan) valSpan.textContent = formatBuff(newVal);
+  buffDrag.chip.classList.remove('positive', 'negative', 'neutral');
+  buffDrag.chip.classList.add(_buffChipClass(newVal));
+  calculateDamage();
+}
+
+function onBuffPointerUp(e) {
+  if (!buffDrag || e.pointerId !== buffDrag.pointerId) return;
+  try { buffDrag.chip.releasePointerCapture(e.pointerId); } catch (_) {}
+  buffDrag.chip.classList.remove('dragging');
+  buffDrag = null;
+}
+
+function onBuffDoubleClick(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  const chip = e.currentTarget;
+  const side = chip.dataset.side;
+  const stat = chip.dataset.stat;
+  if (getBuff(side, stat) === 0) return;   // already 0; no-op
+  setBuff(side, stat, 0);
+  renderBuffChips(side);
   calculateDamage();
 }
 
@@ -2149,9 +2291,13 @@ function calculateDamage() {
   const defIVs    = getIVs('defender');
   const atkStatKey = isMagic ? 'matk' : 'atk';
   const defStatKey = isMagic ? 'mdef' : 'def';
-  const atkStat = getFinalStat(atk, atkStatKey, atkNature, atkIVs);
-  const defStat = getFinalStat(def, defStatKey, defNature, defIVs);
-  // Defender's max HP for HP bar / kill check uses final HP
+  // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
+  // nonsensical negative stats from extreme debuffs.
+  const atkBuffPct = getBuff('attacker', atkStatKey);
+  const defBuffPct = getBuff('defender', defStatKey);
+  const atkStat = Math.max(0, Math.round(getFinalStat(atk, atkStatKey, atkNature, atkIVs) * (1 + atkBuffPct / 100)));
+  const defStat = Math.max(0, Math.round(getFinalStat(def, defStatKey, defNature, defIVs) * (1 + defBuffPct / 100)));
+  // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
 
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
@@ -2190,7 +2336,8 @@ function calculateDamage() {
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
-    atkStat, defStat, isMagic, dyn
+    atkStat, defStat, isMagic, dyn,
+    atkBuffPct, defBuffPct
   });
   updateAtmosphere(hpPercent, isKill);
 }
@@ -2278,12 +2425,22 @@ function renderResult(data) {
         `<div style="padding-left:1.4em"><span class="multiplier">· ${n.source}: ${n.text}</span></div>`
       ).join('')
     : '';
+  // Buff adjustment line (shown once; atkStat/defStat are used for both skill and starfall)
+  const atkStatLabel = data.isMagic ? '魔攻' : '物攻';
+  const defStatLabel = data.isMagic ? '魔防' : '物防';
+  const buffBits = [];
+  if (data.atkBuffPct) buffBits.push(`${atkStatLabel} ${formatBuff(data.atkBuffPct)}`);
+  if (data.defBuffPct) buffBits.push(`${defStatLabel} ${formatBuff(data.defBuffPct)}`);
+  const buffLineHTML = buffBits.length
+    ? `<div><span class="label">buff 调整:</span> <span class="multiplier">${buffBits.join(' · ')}</span></div>`
+    : '';
   breakdownList.innerHTML = `
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
     <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
     <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span>${stabBadge}</div>
     <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
+    ${buffLineHTML}
     <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
     <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo > 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
     ${dynNotesHTML}
