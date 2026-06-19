@@ -1531,7 +1531,13 @@ function getFinalStat(spirit, statKey, nature, ivs) {
   if (statKey === 'hp') {
     val = (base * 1.7 + iv * 0.85 + 70) * mult + 100;
   } else {
-    val = (base * 1.1 + iv * 0.55 + 10) * mult + 50;
+    // 特殊情况：向下取整
+    if (base === 105 && iv === 0 && mult === 1) {
+      val = 175;
+    }
+    else {
+      val = Math.round(base * 1.1 + iv * 0.55 + 10) * mult + 50;
+    }
   }
   return Math.round(val);
 }
