@@ -1067,10 +1067,9 @@ body {
   color: #ff5e5e;
 }
 .buff-chip.dragging {
-  background: rgba(0,229,255,0.18);
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  box-shadow: 0 0 10px rgba(0,229,255,0.35);
+  /* Keep the underlying state color (.positive / .negative / .neutral).
+     Active feedback is a bright white ring + cyan glow that sits on top. */
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
 }
 .buff-chip .buff-val {
   font-weight: 600;
