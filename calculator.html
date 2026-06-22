@@ -604,9 +604,14 @@ body {
 }
 .result-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
+  align-items: center;
   gap: 6px;
+  /* Fixed row height so the kill chip appearing/disappearing does not
+     shift the damage ring above. */
+  min-height: 24px;
+  width: 100%;
 }
 .result-chip {
   padding: 2px 10px;
@@ -628,6 +633,11 @@ body {
   background: rgba(255,140,0,0.1);
   border-color: rgba(255,140,0,0.3);
   color: #ff8c00;
+}
+.result-chip.overflow {
+  background: rgba(255,59,59,0.15);
+  border-color: rgba(255,59,59,0.4);
+  color: var(--accent-red);
 }
 .result-dmg-line {
   font-size: 0.72rem;
@@ -2604,7 +2614,9 @@ function renderResult(data) {
   // --- Update the info section (below the ring) ---
   const infoEl = document.getElementById('result-info');
   if (infoEl) {
-    // Chips: 克制 / 幻系触发
+    // Chips: 克制 / 幻系触发 / 击杀溢出 (all share the same row; the row
+    // has a fixed min-height so toggling the kill chip does not reflow
+    // the damage ring above).
     let chipsHTML = '';
     if (data.skillEff > 1) {
       chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
@@ -2616,29 +2628,23 @@ function renderResult(data) {
         chipsHTML += `<span class="result-chip not-effective">幻系不触发</span>`;
       } else if (data.starEff !== 1) {
         const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
-        const label = data.starEff > 1 ? '星陨拔群' : '星陨不佳';
+        const label = data.starEff > 1 ? '星陨克制' : '星陨抵抗';
         chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
       }
     }
-    const chipsRow = chipsHTML
-      ? `<div class="result-chips">${chipsHTML}</div>`
-      : '';
+    if (data.isKill) {
+      chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
+    }
+    // Always render the chips row (even when empty) so its height is
+    // always the same — adding/removing chips does not push the ring.
+    const chipsRow = `<div class="result-chips">${chipsHTML}</div>`;
 
     // Damage lines
     const dmgLinesHTML = `
       <div class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></div>
     `;
 
-    // Kill banner (conditional)
-    const killHTML = data.isKill
-      ? `<div class="kill-banner show">☠️ 确认击杀!${
-          data.overflow > 0
-            ? `<div class="overflow-damage">溢出: ${data.overflow.toLocaleString()}</div>`
-            : ''
-        }</div>`
-      : '';
-
-    infoEl.innerHTML = chipsRow + dmgLinesHTML + killHTML;
+    infoEl.innerHTML = chipsRow + dmgLinesHTML;
   }
 
   // --- Show the breakdown section ---
