@@ -94,8 +94,8 @@ body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 24px;
-  align-items: start;
-  margin-bottom: 40px;
+  align-items: stretch;
+  margin-bottom: 24px;
 }
 
 /* ============ Glass Panel ============ */
@@ -378,8 +378,30 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding-top: 20px;
+  height: 100%;
+  min-width: 220px;
+  gap: 0;
+}
+.seal-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.seal-top {
+  flex: 1 1 0;
+  min-height: 220px;
+  padding: 8px 0 4px;
+}
+.seal-middle {
+  flex: 0 0 auto;
+  padding: 6px 0 8px;
+}
+.result-bottom {
+  flex: 1 1 0;
+  min-height: 240px;
+  padding: 4px 0 8px;
 }
 .seal-label {
   font-size: 0.75rem;
@@ -507,178 +529,189 @@ body {
   transition: all 0.3s;
 }
 
-/* ============ VS Badge ============ */
-.vs-connector {
-  display: none; /* hidden on desktop, the seal replaces it */
-}
-
-/* ============ Result Area ============ */
-.result-area {
-  margin-top: 10px;
-}
-.result-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid var(--glass-border);
-  border-radius: 20px;
-  padding: 32px;
-  text-align: center;
-  transition: all 0.6s ease;
-  position: relative;
-  overflow: hidden;
-}
-.result-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(ellipse at center, var(--atmosphere-color), transparent 70%);
-  opacity: 0.3;
-  pointer-events: none;
-  transition: all 0.8s;
-}
-
+/* ============ Result Ring (lower half, mirrors the seal ring) ============ */
 .result-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: var(--text-secondary);
-  margin-bottom: 12px;
-  position: relative;
+  margin-bottom: 4px;
 }
-
-/* The big percentage number */
-.result-percentage {
-  font-size: 4rem;
+.result-ring-wrap {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+.result-ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.result-ring-track {
+  fill: none;
+  stroke: rgba(255,255,255,0.06);
+  stroke-width: 8;
+}
+.result-ring-fill {
+  fill: none;
+  stroke: var(--hp-bar-color, var(--accent-green));
+  stroke-width: 8;
+  stroke-linecap: round;
+  /* 2 * pi * 80 = 502.65 — set in HTML, transitions in JS */
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              stroke 0.5s ease;
+  filter: drop-shadow(0 0 8px var(--hp-bar-color, var(--accent-green)));
+}
+.result-ring-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  width: 75%;
+}
+.result-pct {
+  font-size: 1.9rem;
   font-weight: 800;
   font-family: 'Courier New', monospace;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  margin-bottom: 16px;
-  position: relative;
-  transition: all 0.5s ease;
-  background: linear-gradient(135deg, var(--hp-bar-color), var(--accent-gold));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  text-shadow: 0 0 18px var(--hp-bar-color, var(--accent-green));
+  transition: text-shadow 0.5s ease;
 }
-.result-percentage .percent-sign {
-  font-size: 2rem;
-  font-weight: 400;
+.result-dmg {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
 }
 
-/* HP Bar */
-.hp-bar-container {
-  max-width: 500px;
-  margin: 0 auto 16px;
-  position: relative;
-}
-.hp-bar-bg {
+/* Result info (below the ring) */
+.result-info {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   width: 100%;
-  height: 28px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 14px;
-  overflow: hidden;
-  position: relative;
-  border: 1px solid rgba(255,255,255,0.08);
+  max-width: 220px;
+  min-height: 24px;
 }
-.hp-bar-fill {
-  height: 100%;
-  border-radius: 14px;
-  background: var(--hp-bar-color);
-  transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              background 0.5s ease;
-  position: relative;
-  box-shadow: 0 0 10px var(--hp-bar-color);
+.result-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
 }
-.hp-bar-fill::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 50%;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.2), transparent);
-  border-radius: 14px 14px 0 0;
-}
-.hp-bar-damage {
-  position: absolute;
-  top: 0; right: 0;
-  height: 100%;
-  background: rgba(255,60,60,0.3);
-  border-radius: 0 14px 14px 0;
-  transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s;
-}
-.hp-bar-text {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 0.75rem;
+.result-chip {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.65rem;
   font-weight: 600;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-  z-index: 2;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
   white-space: nowrap;
 }
-
-/* Result details */
-.result-numbers {
-  font-size: 1rem;
+.result-chip.super-effective {
+  background: rgba(0,230,118,0.12);
+  border-color: rgba(0,230,118,0.4);
+  color: #00e676;
+}
+.result-chip.not-effective {
+  background: rgba(255,140,0,0.1);
+  border-color: rgba(255,140,0,0.3);
+  color: #ff8c00;
+}
+.result-dmg-line {
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  position: relative;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
 }
-.result-numbers .damage-value {
-  font-weight: 700;
-  font-size: 1.3rem;
+.result-dmg-line strong {
   color: var(--text-primary);
-  font-family: 'Courier New', monospace;
+  font-weight: 700;
 }
-.result-numbers .hp-value {
-  font-family: 'Courier New', monospace;
+.result-dmg-line .star-val {
+  color: var(--accent-gold);
+}
+.result-waiting-mini {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  text-align: center;
+  padding: 4px 8px;
+  letter-spacing: 1px;
 }
 
-/* Kill confirmation */
+/* Kill confirmation (compact) */
 .kill-banner {
   display: none;
-  margin-top: 16px;
-  padding: 12px 24px;
+  margin-top: 4px;
+  padding: 5px 14px;
   background: rgba(255,59,59,0.15);
   border: 1px solid rgba(255,59,59,0.4);
   border-radius: 12px;
   color: var(--accent-red);
-  font-size: 1.1rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 2px;
-  position: relative;
+  text-align: center;
   animation: kill-flash 0.5s ease-out;
 }
 .kill-banner.show { display: block; }
 .kill-banner .overflow-damage {
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   font-weight: 400;
   color: var(--text-secondary);
-  margin-top: 4px;
+  margin-top: 2px;
+  letter-spacing: normal;
 }
 
-/* Waiting state */
-.result-waiting {
-  padding: 40px;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
+/* ============ Breakdown Section (below battle area) ============ */
+.breakdown-section {
+  margin: 24px auto 0;
+  max-width: 720px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 8px 18px;
+  position: relative;
+  overflow: hidden;
 }
-
-/* ============ Breakdown ============ */
+.breakdown-section::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, var(--atmosphere-color, transparent), transparent 70%);
+  opacity: 0.3;
+  pointer-events: none;
+  transition: all 0.8s;
+}
 .breakdown-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 16px;
-  padding: 10px;
+  padding: 12px;
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   cursor: pointer;
   transition: color 0.3s;
   width: 100%;
+  font-family: inherit;
+  letter-spacing: 1px;
+  position: relative;
 }
 .breakdown-toggle:hover { color: var(--text-primary); }
 .breakdown-toggle .arrow {
@@ -691,8 +724,9 @@ body {
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.4s ease;
+  position: relative;
 }
-.breakdown-content.open { max-height: 400px; }
+.breakdown-content.open { max-height: 400px; overflow-y: auto; }
 .breakdown-list {
   padding: 16px 24px;
   text-align: left;
@@ -701,6 +735,16 @@ body {
   color: var(--text-secondary);
   font-family: 'Courier New', monospace;
 }
+
+/* ============ VS Badge ============ */
+.vs-connector {
+  display: none; /* hidden on desktop, the seal replaces it */
+}
+
+/* (Old result-area / hp-bar / breakdown styles removed; replaced by Result Ring
+   and Breakdown Section above.) */
+
+/* Breakdown list children (kept — used by dynamic content) */
 .breakdown-list .label { color: var(--text-secondary); }
 .breakdown-list .value { color: var(--text-primary); font-weight: 600; }
 .breakdown-list .multiplier { color: var(--accent-gold); }
@@ -877,14 +921,27 @@ body {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .seal-container { padding-top: 0; }
+  .seal-container {
+    /* On mobile, drop the strict top/result flex split — content height */
+    height: auto;
+    min-width: 0;
+  }
+  .seal-top, .result-bottom {
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 4px 0;
+  }
+  .seal-middle { padding: 4px 0; }
   .spirit-panel { min-height: auto; }
-  .result-percentage { font-size: 3rem; }
+  .result-ring-wrap { width: 160px; height: 160px; }
+  .result-pct { font-size: 1.5rem; }
+  .result-dmg { font-size: 0.7rem; }
   .seal-wrapper { width: 160px; height: 160px; }
   .seal { width: 160px; height: 160px; }
   .seal-number { font-size: 2.2rem; }
   .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
   .container { padding: 20px 16px 40px; }
+  .breakdown-section { margin: 16px 0 0; }
   /* Skill list: single column on mobile, taller scroll area */
   .skill-list {
     grid-template-columns: 1fr;
@@ -1311,27 +1368,50 @@ body {
       </div>
     </section>
 
-    <section class="seal-container" aria-label="星陨印记控制">
-      <h2 class="seal-label">星陨层数</h2>
-      <div class="seal-wrapper" id="seal-wrapper" aria-hidden="true">
-        <canvas id="particle-canvas" width="280" height="280"></canvas>
-        <div class="seal" id="seal">
-          <svg viewBox="0 0 200 200" id="seal-svg">
-            <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-            <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
-            <g id="seal-ticks"></g>
-            <circle cx="100" cy="100" r="70" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
-            <g id="seal-runes" opacity="0.3"></g>
-            <circle cx="100" cy="100" r="45" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
-          </svg>
-          <span class="seal-number" id="seal-number">0</span>
+    <section class="seal-container" aria-label="星陨印记控制与伤害结果">
+      <div class="seal-section seal-top">
+        <h2 class="seal-label">星陨层数</h2>
+        <div class="seal-wrapper" id="seal-wrapper" aria-hidden="true">
+          <canvas id="particle-canvas" width="280" height="280"></canvas>
+          <div class="seal" id="seal">
+            <svg viewBox="0 0 200 200" id="seal-svg">
+              <circle cx="100" cy="100" r="95" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+              <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+              <g id="seal-ticks"></g>
+              <circle cx="100" cy="100" r="70" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+              <g id="seal-runes" opacity="0.3"></g>
+              <circle cx="100" cy="100" r="45" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+            </svg>
+            <span class="seal-number" id="seal-number">0</span>
+          </div>
         </div>
       </div>
-      <div class="seal-hint">↔ 拖拽 · 滚轮 · 或滑块调节</div>
-      <div class="seal-slider-container">
-        <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0"
-               aria-label="星陨层数（数值滑块）">
-        <div class="slider-labels" aria-hidden="true"><span>0</span><span>50</span><span>99</span></div>
+
+      <div class="seal-section seal-middle">
+        <div class="seal-hint">↔ 拖拽 · 滚轮 · 或滑块调节</div>
+        <div class="seal-slider-container">
+          <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0"
+                 aria-label="星陨层数（数值滑块）">
+          <div class="slider-labels" aria-hidden="true"><span>0</span><span>50</span><span>99</span></div>
+        </div>
+      </div>
+
+      <div class="seal-section result-bottom" aria-label="伤害结果">
+        <h2 class="result-label">伤害结果</h2>
+        <div class="result-ring-wrap">
+          <svg class="result-ring-svg" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="result-ring-track" cx="100" cy="100" r="80"/>
+            <circle class="result-ring-fill" id="result-ring-fill" cx="100" cy="100" r="80"
+                    stroke-dasharray="502.65" stroke-dashoffset="502.65"/>
+          </svg>
+          <div class="result-ring-content">
+            <div class="result-pct" id="result-pct">—</div>
+            <div class="result-dmg" id="result-dmg">—</div>
+          </div>
+        </div>
+        <div class="result-info" id="result-info" aria-live="polite" aria-atomic="true">
+          <div class="result-waiting-mini">选择双方精灵</div>
+        </div>
       </div>
     </section>
 
@@ -1354,16 +1434,8 @@ body {
     </section>
   </section>
 
-  <section class="result-area" id="result-area" aria-label="伤害计算结果">
-    <div class="result-card" id="result-card">
-      <div id="result-content" aria-live="polite" aria-atomic="true">
-        <div class="result-waiting">
-          选择双方精灵后开始计算
-        </div>
-      </div>
-    </div>
-
-    <button class="breakdown-toggle" id="breakdown-toggle" type="button" onclick="toggleBreakdown()" style="display:none" aria-expanded="false" aria-controls="breakdown-content">
+  <section class="breakdown-section" id="breakdown-section" style="display:none" aria-label="伤害计算明细">
+    <button class="breakdown-toggle" id="breakdown-toggle" type="button" onclick="toggleBreakdown()" aria-expanded="false" aria-controls="breakdown-content">
       <span>伤害计算明细</span>
       <span class="arrow" aria-hidden="true">▼</span>
     </button>
@@ -2483,75 +2555,108 @@ function calculateDamage() {
 }
 
 // ============================================================
-// RENDER RESULT
+// RENDER RESULT (Result Ring + Info + Breakdown)
 // ============================================================
+// SVG arc geometry: r=80, circumference = 2*pi*80 = 502.65
+const RESULT_RING_CIRC = 2 * Math.PI * 80;
+
+// Ring now visualises DAMAGE taken (more intuitive):
+// 0% damage = empty ring, 100% damage (kill) = full red ring.
+function ringBarColor(data) {
+  if (data.isKill) return '#ff3b3b';
+  const d = data.hpPercent;
+  if (d < 25) return '#00e676';   // low damage — safe
+  if (d < 50) return '#ffcc00';   // moderate
+  if (d < 75) return '#ff8c00';   // heavy
+  return '#ff3b3b';               // critical (≥75% or kill)
+}
+
 function renderResult(data) {
-  const content = document.getElementById('result-content');
-  const breakdownToggle = document.getElementById('breakdown-toggle');
-  const breakdownList = document.getElementById('breakdown-list');
-
-  let barColor;
-  if (data.isKill) barColor = '#ff3b3b';
-  else if (data.remainingPercent < 25) barColor = '#ff3b3b';
-  else if (data.remainingPercent < 50) barColor = '#ff8c00';
-  else if (data.remainingPercent < 75) barColor = '#ffcc00';
-  else barColor = '#00e676';
-
+  const barColor = ringBarColor(data);
   document.documentElement.style.setProperty('--hp-bar-color', barColor);
 
-  // Skill effectiveness badge
-  let effBadge = '';
-  if (data.skillEff > 1) {
-    effBadge = `<div class="effectiveness-badge super-effective">技能效果拔群! ×${data.skillEff}</div>`;
-  } else if (data.skillEff < 1) {
-    effBadge = `<div class="effectiveness-badge not-effective">技能效果不佳 ×${data.skillEff}</div>`;
-  }
-  // Star badge
-  let starBadge = '';
-  if (data.n > 0) {
-    if (data.isSkillIllusion) {
-      starBadge = `<div class="effectiveness-badge not-effective">幻系技能不触发星陨</div>`;
-    } else if (data.starEff !== 1) {
-      const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
-      const label = data.starEff > 1 ? '星陨效果拔群' : '星陨效果不佳';
-      starBadge = `<div class="effectiveness-badge ${cls}">${label} ×${data.starEff}</div>`;
-    }
+  // --- Update the HP ring (SVG arc) — shows damage %, fills as damage grows ---
+  const ringFill = document.getElementById('result-ring-fill');
+  if (ringFill) {
+    const damageRatio = Math.min(data.hpPercent, 100) / 100;   // 0 → empty, 1 → full
+    const offset = (1 - damageRatio) * RESULT_RING_CIRC;
+    ringFill.style.strokeDashoffset = String(offset);
+    ringFill.style.stroke = barColor;
+    ringFill.style.filter = `drop-shadow(0 0 8px ${barColor})`;
   }
 
+  // --- Update the center text ---
+  const pctEl = document.getElementById('result-pct');
+  const dmgEl = document.getElementById('result-dmg');
   const displayPercent = Math.min(data.hpPercent, 999.9);
+  if (pctEl) {
+    pctEl.textContent = displayPercent.toFixed(1) + '%';
+    pctEl.style.textShadow = `0 0 18px ${barColor}`;
+    pctEl.classList.remove('number-pop');
+    void pctEl.offsetWidth;
+    pctEl.classList.add('number-pop');
+  }
+  if (dmgEl) {
+    dmgEl.textContent = data.finalDamage.toLocaleString();
+  }
 
-  content.innerHTML = `
-    <div class="result-label">${data.isKill ? '伤害结果' : '伤害结果'}</div>
-    <div class="result-percentage" id="result-pct">
-      ${displayPercent.toFixed(1)}<span class="percent-sign">%</span>
-    </div>
-    ${effBadge}
-    ${starBadge}
-    <div class="hp-bar-container">
-      <div class="hp-bar-bg">
-        <div class="hp-bar-fill" style="width: ${data.remainingPercent}%; background: ${barColor};"></div>
-        ${!data.isKill ? `<div class="hp-bar-damage" style="width: ${Math.min(data.hpPercent, 100)}%;"></div>` : ''}
-        <div class="hp-bar-text">${data.remainingHP.toLocaleString()} / ${data.defHP.toLocaleString()} HP</div>
-      </div>
-    </div>
-    <div class="result-damage-rows">
-      <div class="item"><div class="label">技能伤害</div><div class="value">${data.skillDmg.toLocaleString()}</div></div>
-      <div class="item star"><div class="label">星陨伤害</div><div class="value">${data.starDmg.toLocaleString()}</div><div class="sub">${data.n}层${data.isSkillIllusion ? ' (幻系不触发)' : ''}</div></div>
-      <div class="item total"><div class="label">合计伤害</div><div class="value">${data.finalDamage.toLocaleString()}</div></div>
-    </div>
-    <div class="kill-banner ${data.isKill ? 'show' : ''}" id="kill-banner">
-      ☠️ 确认击杀!
-      ${data.overflow > 0 ? `<div class="overflow-damage">溢出伤害: ${data.overflow.toLocaleString()}</div>` : ''}
-    </div>
-  `;
+  // --- Update the info section (below the ring) ---
+  const infoEl = document.getElementById('result-info');
+  if (infoEl) {
+    // Chips: 克制 / 幻系触发
+    let chipsHTML = '';
+    if (data.skillEff > 1) {
+      chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
+    } else if (data.skillEff < 1) {
+      chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+    }
+    if (data.n > 0) {
+      if (data.isSkillIllusion) {
+        chipsHTML += `<span class="result-chip not-effective">幻系不触发</span>`;
+      } else if (data.starEff !== 1) {
+        const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
+        const label = data.starEff > 1 ? '星陨拔群' : '星陨不佳';
+        chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
+      }
+    }
+    const chipsRow = chipsHTML
+      ? `<div class="result-chips">${chipsHTML}</div>`
+      : '';
 
-  breakdownToggle.style.display = 'flex';
+    // Damage lines
+    const dmgLinesHTML = `
+      <div class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></div>
+    `;
+
+    // Kill banner (conditional)
+    const killHTML = data.isKill
+      ? `<div class="kill-banner show">☠️ 确认击杀!${
+          data.overflow > 0
+            ? `<div class="overflow-damage">溢出: ${data.overflow.toLocaleString()}</div>`
+            : ''
+        }</div>`
+      : '';
+
+    infoEl.innerHTML = chipsRow + dmgLinesHTML + killHTML;
+  }
+
+  // --- Show the breakdown section ---
+  const breakdownSection = document.getElementById('breakdown-section');
+  if (breakdownSection) breakdownSection.style.display = 'block';
+
+  // --- Build the breakdown list (full math) ---
+  const breakdownList = document.getElementById('breakdown-list');
+  if (breakdownList) renderBreakdownList(breakdownList, data);
+
+  if (data.isKill) triggerKillEffects();
+}
+
+function renderBreakdownList(breakdownList, data) {
   const skillNameEl = data.skill.element ? elOf(data.skill.element).name : '无';
   const stabBadge = data.stab > 1
     ? ' <span class="skill-badge stab">本系 ×1.25</span>'
     : '';
   const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
-  // Dynamic-modifier display: show effective power / combo and per-source notes
   const dynMods = data.dyn || { powerMult: 1, comboAdd: 0, notes: [] };
   const basePower = data.skill.power ?? 0;
   const effCombo  = (data.skill.combo ?? 1) + dynMods.comboAdd;
@@ -2565,7 +2670,6 @@ function renderResult(data) {
         `<div style="padding-left:1.4em"><span class="multiplier">· ${n.source}: ${n.text}</span></div>`
       ).join('')
     : '';
-  // Buff adjustment line (shown once; atkStat/defStat are used for both skill and starfall)
   const atkStatLabel = data.isMagic ? '魔攻' : '物攻';
   const defStatLabel = data.isMagic ? '魔防' : '物防';
   const buffBits = [];
@@ -2601,25 +2705,38 @@ function renderResult(data) {
     <div class="final-line"><span class="label">最终合计伤害:</span> <span class="value" style="color:var(--accent-cyan);font-size:1.1rem">${data.finalDamage.toLocaleString()}</span>
       <span class="label" style="font-size:0.7rem"> / ${data.defHP.toLocaleString()} HP (${data.hpPercent.toFixed(1)}%)</span></div>
   `;
-
-  const pctEl = document.getElementById('result-pct');
-  if (pctEl) {
-    pctEl.classList.remove('number-pop');
-    void pctEl.offsetWidth;
-    pctEl.classList.add('number-pop');
-  }
-  if (data.isKill) triggerKillEffects();
 }
 
 function renderWaiting() {
-  const content = document.getElementById('result-content');
-  let msg = '选择双方精灵后开始计算';
-  if (state.attacker && !state.defender) msg = '选择防御方精灵以计算伤害';
-  if (!state.attacker && state.defender) msg = '选择攻击方精灵以计算伤害';
+  let msg = '选择双方精灵开始计算';
+  if (state.attacker && !state.defender) msg = '选择防御方精灵';
+  if (!state.attacker && state.defender) msg = '选择攻击方精灵';
   if (state.attacker && state.defender && !state.attackSkill) msg = '该攻击方无可用攻击技能';
-  content.innerHTML = `<div class="result-waiting">${msg}</div>`;
-  document.getElementById('breakdown-toggle').style.display = 'none';
-  document.getElementById('breakdown-content').classList.remove('open');
+
+  // Reset ring
+  const ringFill = document.getElementById('result-ring-fill');
+  if (ringFill) {
+    ringFill.style.strokeDashoffset = String(RESULT_RING_CIRC);   // empty arc
+    ringFill.style.stroke = 'rgba(255,255,255,0.15)';
+    ringFill.style.filter = 'none';
+  }
+  // Reset center text
+  const pctEl = document.getElementById('result-pct');
+  if (pctEl) {
+    pctEl.textContent = '—';
+    pctEl.style.textShadow = 'none';
+    pctEl.classList.remove('number-pop');
+  }
+  const dmgEl = document.getElementById('result-dmg');
+  if (dmgEl) dmgEl.textContent = '—';
+  // Reset info
+  const infoEl = document.getElementById('result-info');
+  if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">${msg}</div>`;
+  // Hide breakdown
+  const breakdownSection = document.getElementById('breakdown-section');
+  if (breakdownSection) breakdownSection.style.display = 'none';
+  const breakdownContent = document.getElementById('breakdown-content');
+  if (breakdownContent) breakdownContent.classList.remove('open');
   updateAtmosphere(0, false);
 }
 
@@ -2642,45 +2759,31 @@ function resetKillEffects() { lastKillState = false; }
 
 function updateAtmosphere(damagePercent, isKill) {
   const root = document.documentElement;
-  const overlay = document.getElementById('atmosphere-overlay');
-  const card = document.getElementById('result-card');
   if (!state.attacker || !state.defender) {
     root.style.setProperty('--atmosphere-color', 'transparent');
     root.style.setProperty('--atmosphere-intensity', '0');
-    card.style.borderColor = 'var(--glass-border)';
-    card.style.boxShadow = 'none';
     resetKillEffects();
     return;
   }
   if (isKill) {
     root.style.setProperty('--atmosphere-color', 'rgba(255,30,30,0.15)');
     root.style.setProperty('--atmosphere-intensity', '1');
-    card.style.borderColor = 'rgba(255,59,59,0.5)';
-    card.style.boxShadow = '0 0 40px rgba(255,59,59,0.2), inset 0 0 40px rgba(255,59,59,0.05)';
     triggerKillEffects();
   } else if (damagePercent >= 75) {
     root.style.setProperty('--atmosphere-color', 'rgba(255,140,0,0.1)');
     root.style.setProperty('--atmosphere-intensity', '1');
-    card.style.borderColor = 'rgba(255,140,0,0.3)';
-    card.style.boxShadow = '0 0 30px rgba(255,140,0,0.1)';
     resetKillEffects();
   } else if (damagePercent >= 50) {
     root.style.setProperty('--atmosphere-color', 'rgba(255,200,0,0.06)');
     root.style.setProperty('--atmosphere-intensity', '1');
-    card.style.borderColor = 'rgba(255,200,0,0.2)';
-    card.style.boxShadow = '0 0 20px rgba(255,200,0,0.05)';
     resetKillEffects();
   } else if (damagePercent >= 25) {
     root.style.setProperty('--atmosphere-color', 'rgba(0,230,118,0.03)');
     root.style.setProperty('--atmosphere-intensity', '1');
-    card.style.borderColor = 'var(--glass-border)';
-    card.style.boxShadow = 'none';
     resetKillEffects();
   } else {
     root.style.setProperty('--atmosphere-color', 'transparent');
     root.style.setProperty('--atmosphere-intensity', '0');
-    card.style.borderColor = 'var(--glass-border)';
-    card.style.boxShadow = 'none';
     resetKillEffects();
   }
 }
@@ -2706,8 +2809,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     await loadData();
   } catch (e) {
-    const rc = document.getElementById('result-content');
-    if (rc) rc.innerHTML = '<div class="result-waiting">数据加载失败: ' + (e.message || e) + '<br><br>若用 file:// 打开，请先执行 <code>python build.py</code> 生成 calculator.built.html。</div>';
+    const info = document.getElementById('result-info');
+    if (info) info.innerHTML = '<div class="result-waiting-mini" style="color:#ff3b3b;max-width:260px;line-height:1.5">数据加载失败: ' + (e.message || e) + '<br><br>若用 file:// 打开，请先执行 <code>python build.py</code> 生成 calculator.built.html。</div>';
     return;
   }
   buildSkillIndices();
