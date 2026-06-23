@@ -384,7 +384,7 @@ body {
 /* 搜索框内的"常见"chip 仍然按文字内容呈现，保持胶囊状 */
 .spirit-picker-search .spirit-picker-chip.common {
   flex: 0 0 auto;
-  padding: 3px 8px;
+  padding: 9.6px;
   border-radius: 16px;
 }
 
@@ -403,7 +403,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 6.9px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 50%;
@@ -2252,8 +2252,8 @@ function renderPickerToolbar(side, filter) {
         <button type="button" class="spirit-picker-chip common${commonActive}"
                 onclick="togglePickerCommon('${side}')"
                 aria-pressed="${filter.common ? 'true' : 'false'}"
-                title="${filter.common ? '点击取消"常见"筛选' : '点击只显示常见精灵'}">
-          <span class="chip-text">常见</span>
+                title="${filter.common ? '取消"常见"筛选' : '只显示常见精灵'}">
+          <span class="chip-text">常</span>
         </button>
         <span id="${side}-picker-search-clear" class="search-clear ${filter.text ? '' : 'is-hidden'}"
               role="button" tabindex="${filter.text ? 0 : -1}" aria-label="清空搜索"
