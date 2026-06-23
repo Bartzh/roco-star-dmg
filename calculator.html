@@ -114,7 +114,7 @@ body {
 }
 
 /* ============ Spirit Panel ============ */
-.spirit-panel { min-height: 692px; }
+.spirit-panel { min-height: 692px; min-width: 0; }
 .spirit-panel .panel-label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -200,6 +200,11 @@ body {
   transition: all 0.2s ease;
   font-family: inherit;
 }
+/* 取消按钮无意义时（未选精灵）占位但不显示，避免排版跳动 */
+.spirit-picker-header .picker-btn.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
 .spirit-picker-header .picker-btn:hover {
   background: rgba(255,255,255,0.1);
   color: var(--text-primary);
@@ -222,6 +227,8 @@ body {
   transition: all 0.2s ease;
   text-align: center;
   position: relative;
+  min-width: 0;       /* allow grid track to shrink below content's min-size */
+  overflow: hidden;
 }
 .spirit-picker-option:hover {
   background: rgba(255,255,255,0.08);
@@ -292,23 +299,17 @@ body {
   width: 18px;
   height: 18px;
 }
-/* “未选择”伪选项：点击清除当前选择 */
-.spirit-picker-option.none-option {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 70px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  border-style: dashed;
+
+/* 卡片 ↔ 选择器 切换时的过渡动画 */
+@keyframes spiritAreaIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.spirit-picker-option.none-option:hover {
-  color: var(--accent-red);
-  border-color: var(--accent-red);
-  background: rgba(255, 59, 59, 0.05);
+.spirit-picker, .spirit-card {
+  animation: spiritAreaIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.spirit-picker-option.none-option.current {
-  color: var(--accent-cyan);
+@media (prefers-reduced-motion: reduce) {
+  .spirit-picker, .spirit-card { animation: none; }
 }
 
 /* Element colors */
@@ -719,10 +720,15 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   width: 100%;
   max-width: 220px;
-  min-height: 24px;
+  /* Reserved height so the waiting state (one short line) and the
+     calculation state (chips row + damage line) occupy the same
+     vertical space — prevents the damage ring from shifting up/down
+     when toggling between "等待选择" and "已计算" messages. */
+  min-height: 50px;
 }
 .result-chips {
   display: flex;
@@ -781,6 +787,12 @@ body {
   text-align: center;
   padding: 4px 8px;
   letter-spacing: 1px;
+  /* Keep the waiting message on a single line so all waiting
+     states occupy the same vertical space. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Kill confirmation (compact) */
@@ -811,23 +823,9 @@ body {
 .breakdown-section {
   margin: 24px auto 0;
   max-width: 720px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
   padding: 8px 18px;
   position: relative;
   overflow: hidden;
-}
-.breakdown-section::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(ellipse at center, var(--atmosphere-color, transparent), transparent 70%);
-  opacity: 0.3;
-  pointer-events: none;
-  transition: all 0.8s;
 }
 .breakdown-toggle {
   display: flex;
@@ -859,7 +857,7 @@ body {
   transition: max-height 0.4s ease;
   position: relative;
 }
-.breakdown-content.open { max-height: 400px; overflow-y: auto; }
+.breakdown-content.open { max-height: 500px; overflow: visible; }
 .breakdown-list {
   padding: 16px 24px;
   text-align: left;
@@ -1978,10 +1976,9 @@ function renderSpiritPicker(side) {
   statsSection.style.display = 'none';
 
   const titleText = side === 'attacker' ? '选择攻击方精灵' : '选择防御方精灵';
-  // 仅在已选精灵时才显示“取消”按钮（点击返回卡片，不改动）
-  const cancelBtn = spirit
-    ? `<button class="picker-btn" type="button" onclick="exitSpiritPicker('${side}')" aria-label="取消更换">取消</button>`
-    : '';
+  // 始终渲染“取消”按钮，未选精灵时用 is-hidden 保留占位，避免排版跳动
+  const cancelHiddenCls = spirit ? '' : ' is-hidden';
+  const cancelBtn = `<button class="picker-btn${cancelHiddenCls}" type="button" onclick="exitSpiritPicker('${side}')" aria-label="取消更换" tabindex="${spirit ? 0 : -1}">取消</button>`;
 
   // 构建所有精灵的选项
   const list = Object.entries(SPRITES);
@@ -2011,36 +2008,15 @@ function renderSpiritPicker(side) {
     `;
   }).join('');
 
-  // “未选择”伪选项：清除当前选择
-  const noneIsCurrent = !spirit;
-  const noneOption = `
-    <div class="spirit-picker-option none-option ${noneIsCurrent ? 'current' : ''}" role="button" tabindex="0"
-         aria-label="清除选择${noneIsCurrent ? '（当前）' : ''}"
-         onclick="clearSpirit('${side}')"
-         onkeydown="onSpiritPickerOptionKey(event, '${side}', '__clear__')">
-      <div class="picker-name">未选择</div>
-    </div>
-  `;
-
   selectArea.innerHTML = `
     <div class="spirit-picker">
       <div class="spirit-picker-header">
         <span class="picker-title">${titleText}</span>
         ${cancelBtn}
       </div>
-      <div class="spirit-picker-grid">${noneOption}${optionsHTML}</div>
+      <div class="spirit-picker-grid">${optionsHTML}</div>
     </div>
   `;
-
-  // 若有当前选中项，自动滚动到视图中央
-  if (spirit) {
-    const currentEl = selectArea.querySelector('.spirit-picker-option.current:not(.none-option)');
-    if (currentEl) {
-      requestAnimationFrame(() => {
-        currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      });
-    }
-  }
 }
 
 function renderSpiritCard(side) {
@@ -2116,31 +2092,6 @@ function selectSpirit(side, id) {
     state.spiritPicking.defender = false;
     renderSpiritArea('defender');
     // Defender changed → attacker's power-badge colors need to refresh
-    if (state.attacker) renderSkills('attacker');
-  }
-  calculateDamage();
-}
-
-// 清除选择：回到“未选择”状态（仍停留在选择器中）
-function clearSpirit(side) {
-  if (side === 'attacker') {
-    state.attacker = null;
-    state.attackSkill = null;
-    state.attackSkillIdx = -1;
-    state.attackerNature = { up: null, down: null };
-    state.attackerIVs = [];
-    state.attackerBuff = { atk: 0, matk: 0 };
-    state.spiritPicking.attacker = false;
-    renderSpiritArea('attacker');
-  } else if (side === 'defender') {
-    state.defender = null;
-    state.defenseSkill = null;
-    state.defenseSkillIdx = 0;
-    state.defenderNature = { up: null, down: null };
-    state.defenderIVs = [];
-    state.defenderBuff = { def: 0, mdef: 0 };
-    state.spiritPicking.defender = false;
-    renderSpiritArea('defender');
     if (state.attacker) renderSkills('attacker');
   }
   calculateDamage();
@@ -2373,12 +2324,11 @@ function onSpiritCardKey(e, side) {
   }
 }
 
-// Keyboard support for spirit-picker-option (Enter/Space to select / clear)
+// Keyboard support for spirit-picker-option (Enter/Space to select)
 function onSpiritPickerOptionKey(e, side, id) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
-    if (id === '__clear__') clearSpirit(side);
-    else                    selectSpirit(side, id);
+    selectSpirit(side, id);
   }
 }
 
