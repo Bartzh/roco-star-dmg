@@ -2730,7 +2730,21 @@ function onBuffWheel(e) {
 // Activated by attacker being one of the pets in POWER_BOOST_PETS.
 // Reuses the .buff-chip visual style; behaviour mirrors the buff
 // chips (press-and-drag horizontal, wheel, dblclick to reset) but
-// with pet-specific step value and a [0, +max] range.
+// with pet-specific step value and a [0, POWER_BOOST_MAX] range.
+//
+// Discrete-level model:
+//   The cap (POWER_BOOST_MAX = 990) is NOT a multiple of the pet's
+//   step (40 for 化劲, 20 for 羽化), so reaching the cap produces a
+//   "virtual" final level separate from the natural step sequence.
+//   To avoid off-step values like 950/910/970 (which would otherwise
+//   appear when decrementing from the cap), we operate on integer
+//   LEVEL INDICES and map back to values:
+//
+//     化劲 (step 40):  26 levels  → values 0, 40, …, 960, 990
+//     羽化 (step 20):  51 levels  → values 0, 20, …, 980, 990
+//
+//   Going up:   0 → 1 → … → k → (k+1)   (k+1 is the cap level)
+//   Going back from cap jumps to k   (not k·step − step).
 // ============================================================
 const POWER_BOOST_PETS = {
   'pet_000413': { label: '化劲', step: 40 },   // 落陨星兔
@@ -2740,13 +2754,41 @@ const POWER_BOOST_MAX = 990;
 const POWER_BOOST_DRAG_PX_PER_STEP = 8;
 let powerBoostDrag = null;
 
+// Largest level index. With step=40 and cap=990: k=24 (val 960), maxLevel=25.
+// With step=20 and cap=990: k=49 (val 980), maxLevel=50.
+function getMaxPowerBoostLevel(step) {
+  return Math.floor((POWER_BOOST_MAX - 1) / step) + 1;
+}
+// Map a level index to its displayed value.
+function getValueAtPowerBoostLevel(level, step) {
+  const maxLevel = getMaxPowerBoostLevel(step);
+  if (level <= 0) return 0;
+  if (level >= maxLevel) return POWER_BOOST_MAX;
+  return level * step;
+}
+// Map a value to the nearest level index (used when starting a drag or
+// when setPowerBoost is called with an off-step value).
+function getPowerBoostLevel(val, step) {
+  if (val <= 0) return 0;
+  if (val >= POWER_BOOST_MAX) return getMaxPowerBoostLevel(step);
+  const maxLevel = getMaxPowerBoostLevel(step);
+  const k = maxLevel - 1;          // index of the largest natural level
+  const kVal = k * step;           // value of the largest natural level
+  if (val < kVal) return Math.round(val / step);
+  // val ∈ [kVal, POWER_BOOST_MAX). Snap to kVal or the cap, whichever
+  // is closer (ties go to the cap for consistency with the going-up path).
+  return (val - kVal <= POWER_BOOST_MAX - val) ? k : maxLevel;
+}
+
 function getPowerBoost() { return state.attackerPowerBoost; }
 function setPowerBoost(val) {
-  // Clamp to [0, POWER_BOOST_MAX], snap to the current pet's step.
+  // Clamp to [0, POWER_BOOST_MAX] and snap to a valid level so the
+  // stored value is always one of the natural step values or the cap.
   const config = getPowerBoostConfig();
-  const step = config ? config.step : 1;
-  const snapped = Math.round(val / step) * step;
-  state.attackerPowerBoost = Math.max(0, Math.min(POWER_BOOST_MAX, snapped));
+  if (!config) { state.attackerPowerBoost = 0; return; }
+  const clamped = Math.max(0, Math.min(POWER_BOOST_MAX, val));
+  const level = getPowerBoostLevel(clamped, config.step);
+  state.attackerPowerBoost = getValueAtPowerBoostLevel(level, config.step);
 }
 function getPowerBoostConfig() {
   if (!state.attacker) return null;
@@ -2766,6 +2808,10 @@ function renderPowerBoostChip() {
     container.innerHTML = '';
     return;
   }
+  // Defensive: if a stale off-step value (e.g. 1000 from the old
+  // rounding bug) is in state, snap it down to a valid level before
+  // displaying.
+  setPowerBoost(getPowerBoost());
   const val = getPowerBoost();
   const cls = val > 0 ? 'positive' : 'neutral';
   container.innerHTML = `<div class="buff-chip ${cls}"
@@ -2783,10 +2829,15 @@ function onPowerBoostPointerDown(e) {
   const chip = e.currentTarget;
   e.preventDefault();
   e.stopPropagation();
+  const config = getPowerBoostConfig();
+  if (!config) return;
+  // Remember the start LEVEL (not the start value) so the drag moves
+  // through the discrete level sequence rather than continuous values.
   powerBoostDrag = {
     chip,
     startX: e.clientX,
-    startVal: getPowerBoost(),
+    startLevel: getPowerBoostLevel(getPowerBoost(), config.step),
+    maxLevel: getMaxPowerBoostLevel(config.step),
     pointerId: e.pointerId
   };
   try { chip.setPointerCapture(e.pointerId); } catch (_) {}
@@ -2799,10 +2850,10 @@ function onPowerBoostPointerMove(e) {
   const config = getPowerBoostConfig();
   if (!config) return;
   const dx = e.clientX - powerBoostDrag.startX;
-  const delta = Math.round(dx / POWER_BOOST_DRAG_PX_PER_STEP) * config.step;
-  const target = Math.max(0, Math.min(POWER_BOOST_MAX, powerBoostDrag.startVal + delta));
-  // Snap to the pet's step so the visible value is always a legal step.
-  const newVal = Math.round(target / config.step) * config.step;
+  const levelDelta = Math.round(dx / POWER_BOOST_DRAG_PX_PER_STEP);
+  const newLevel = Math.max(0, Math.min(powerBoostDrag.maxLevel,
+    powerBoostDrag.startLevel + levelDelta));
+  const newVal = getValueAtPowerBoostLevel(newLevel, config.step);
   if (newVal === getPowerBoost()) return;
   state.attackerPowerBoost = newVal;
   // Live update the chip text + color (without re-rendering the chip).
@@ -2829,17 +2880,21 @@ function onPowerBoostDoubleClick(e) {
   calculateDamage();
 }
 
-// Wheel: scroll up to increase, scroll down to decrease. Shift = larger step.
+// Wheel: scroll up to increase, scroll down to decrease. Shift = ×5 levels.
+// Operates on level indices so the value always lands on a valid level
+// (e.g. 化劲: 960 → 990 going up, 990 → 960 going back).
 function onPowerBoostWheel(e) {
   e.preventDefault();
   const config = getPowerBoostConfig();
   if (!config) return;
   const chip = e.currentTarget;
-  const cur = getPowerBoost();
-  const step = e.shiftKey ? config.step * 5 : config.step;
-  const newVal = Math.max(0, Math.min(POWER_BOOST_MAX,
-    cur + (e.deltaY < 0 ? step : -step)));
-  if (newVal === cur) return;
+  const curLevel = getPowerBoostLevel(getPowerBoost(), config.step);
+  const levelStep = e.shiftKey ? 5 : 1;
+  const maxLevel = getMaxPowerBoostLevel(config.step);
+  const newLevel = Math.max(0, Math.min(maxLevel,
+    curLevel + (e.deltaY < 0 ? levelStep : -levelStep)));
+  const newVal = getValueAtPowerBoostLevel(newLevel, config.step);
+  if (newVal === getPowerBoost()) return;
   state.attackerPowerBoost = newVal;
   const valSpan = chip.querySelector('.buff-val');
   if (valSpan) valSpan.textContent = formatPowerBoost(newVal);
