@@ -118,7 +118,7 @@ body {
 }
 
 /* ============ Spirit Panel ============ */
-.spirit-panel { min-height: 700px; min-width: 0; }
+.spirit-panel { min-height: 704px; min-width: 0; }
 .spirit-panel .panel-label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -218,10 +218,12 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  max-height: 452px;
+  max-height: 456px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
+  /* 避免动画遮挡边框 */
+  padding-top: 3px;
 }
 .spirit-picker-option {
   background: rgba(255,255,255,0.03);
@@ -513,6 +515,8 @@ body {
   overflow-y: auto;
   padding-right: 2px;
   align-content: start;
+  /* 避免动画遮挡边框 */
+  padding-top: 1px;
 }
 
 /* Skill card: 48px icon (fills card height) + right-side content (name + badges row) */
