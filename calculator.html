@@ -352,13 +352,10 @@ body {
   left: 7px;
   top: 50%;
   transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 16px;
+  height: 16px;
+  display: block;
   color: var(--text-secondary);
-  font-size: 0.9rem;
   pointer-events: none;
 }
 /* × 清空按钮改为 flex 元素，跟在常见 chip 之后 */
@@ -2243,7 +2240,9 @@ function renderPickerToolbar(side, filter) {
   return `
     <div class="spirit-picker-toolbar">
       <div class="spirit-picker-search">
-        <span class="search-icon" aria-hidden="true">🔍</span>
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+        </svg>
         <input id="${side}-picker-search" type="text" inputmode="search"
                value="${searchVal}"
                oninput="onPickerSearchInput('${side}', this.value)"
