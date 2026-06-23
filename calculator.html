@@ -2045,21 +2045,37 @@ function buildStarLayers() {
 }
 
 // 公开触发：可在高星陨层数等事件里主动调用以提升氛围。
-// layerT (0..1) 决定流星色温：低层=冷蓝白，高层=金红（与圆盘主题统一）。
+// 流星横向划过页面（不再竖直下落）。颜色与圆盘 seal-glow 严格同步。
 function spawnShootingStar(layerT) {
   if (shootingStars.length >= SHOOTING_STAR_MAX) return;
   if (!starCanvas) return;
   const t = (typeof layerT === 'number') ? layerT
            : ((typeof state !== 'undefined' && state.starLayer != null)
               ? state.starLayer / 99 : 0);
+  // 先确保颜色变量与层数同步（spawnShootingStar 可能在 updateStarTheme 之前被调用）
+  if (typeof sealR === 'number') {
+    if (t < 0.5) {
+      const p = t / 0.5;
+      sealR = Math.round(100 + 155 * p);
+      sealG = Math.round(140 + 75 * p);
+      sealB = Math.round(255 - 255 * p);
+    } else {
+      const p = (t - 0.5) / 0.5;
+      sealR = 255;
+      sealG = Math.round(215 + 40 * p);
+      sealB = Math.round(0 + 200 * p);
+    }
+  }
   const w = starCanvas.width, h = starCanvas.height;
-  const startX = Math.random() * w * 1.2 - w * 0.1;       // 含左侧外缘
-  const startY = -20;                                     // 从屏幕上方外开始
-  const angle = Math.PI * (0.4 + Math.random() * 0.2);    // 72°-108°（对角向下）
-  // 高层数时流星更快、更长、更亮
+  // 50/50 左右方向，y 起点在屏幕中部 10%~90%，制造横向划过的感觉
+  const dirX = Math.random() < 0.5 ? 1 : -1;
+  const startY = h * 0.1 + Math.random() * h * 0.8;
+  const startX = dirX === 1 ? -30 : w + 30;
+  // 角度贴近水平方向，加 ±0.25 弧度（约 ±14°）的轻微上下倾角
+  const tilt = (Math.random() - 0.5) * 0.5;
+  const angle = (dirX === 1 ? 0 : Math.PI) + tilt;
+  // 高层数时流星更快、更长
   const speed = (6 + Math.random() * 4) * (1 + t * 0.6);
-  // 颜色：冷蓝白 200° → 暖金 45°，与圆盘 discHue 共用同一映射
-  const hue = 200 - t * 155;
   shootingStars.push({
     x: startX, y: startY,
     vx: Math.cos(angle) * speed,
@@ -2067,7 +2083,7 @@ function spawnShootingStar(layerT) {
     life: 1,
     decay: 0.012 + Math.random() * 0.008,
     length: (60 + Math.random() * 60) * (1 + t * 0.5),
-    hue,
+    r: sealR, g: sealG, b: sealB,        // 直接复用圆盘主色
   });
 }
 
@@ -2145,7 +2161,8 @@ function drawStarCanvas() {
     m.x += m.vx;
     m.y += m.vy;
     m.life -= m.decay;
-    if (m.life <= 0 || m.x < -100 || m.x > w + 100 || m.y > h + 100) {
+    // 横向划出视野即销毁（左右两侧 + 上下各留 100px 余量）
+    if (m.life <= 0 || m.x < -100 || m.x > w + 100 || m.y < -100 || m.y > h + 100) {
       shootingStars.splice(i, 1);
       continue;
     }
@@ -2153,8 +2170,8 @@ function drawStarCanvas() {
     const tailX = m.x - m.vx * (m.length / speed);
     const tailY = m.y - m.vy * (m.length / speed);
     const grad = ctx.createLinearGradient(m.x, m.y, tailX, tailY);
-    grad.addColorStop(0, `hsla(${m.hue}, 100%, 82%, ${m.life * 0.9})`);
-    grad.addColorStop(1, `hsla(${m.hue}, 100%, 82%, 0)`);
+    grad.addColorStop(0, `rgba(${m.r},${m.g},${m.b},${m.life * 0.9})`);
+    grad.addColorStop(1, `rgba(${m.r},${m.g},${m.b},0)`);
     ctx.strokeStyle = grad;
     ctx.lineWidth = 1.5;
     ctx.lineCap = 'round';
@@ -2162,10 +2179,13 @@ function drawStarCanvas() {
     ctx.moveTo(m.x, m.y);
     ctx.lineTo(tailX, tailY);
     ctx.stroke();
-    // 亮头
+    // 亮头：每个通道 +25 提亮，模拟高温白热点
+    const hr = Math.min(255, m.r + 25);
+    const hg = Math.min(255, m.g + 25);
+    const hb = Math.min(255, m.b + 25);
     ctx.beginPath();
     ctx.arc(m.x, m.y, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${m.hue}, 100%, 92%, ${m.life})`;
+    ctx.fillStyle = `rgba(${hr},${hg},${hb},${m.life})`;
     ctx.fill();
   }
 
@@ -2180,8 +2200,8 @@ function drawStarCanvas() {
 //     · 在低层数（0..30）时，3 圈轨道粒子缓慢流转，像平静的星系；
 //     · 在中段（30..70）时，环境火花增多，冲击波涟漪频繁出现；
 //     · 在高层数（70..99）时，色彩由冷蓝转向金红，射出强列的"星陨冲击"。
-//   与星空背景共用 updateStarTheme() 的同一调色曲线（210°冷蓝 → 45°金红），
-//   让圆盘与远景星空像同一颗星的不同景深，形成视觉共振。
+//   与 updateSealGlow() 共享同一条 RGB 渐变曲线（冷蓝紫 → 金黄 → 乳白），
+//   让圆盘粒子、流星、星空都与圆盘中心主色严格同步，不再出现"蓝→绿→白"漂移。
 // ============================================================
 const DISC = {
   cx: 140, cy: 140,
@@ -2191,19 +2211,30 @@ const DISC = {
   shockwaves: [],     // 触发时扩散的环
   tick: 0,
 };
-let discHue = 210;          // 动态主色相 (HSL)
-let discLightness = 65;     // 动态明度
-let discIntensity = 0;      // 0..1，state.starLayer / 99
+// 与 updateSealGlow() 完全同构的 RGB 三元组（每帧由 updateStarTheme 刷新）
+//   t=0.0 → rgb(100,140,255)  冷蓝紫
+//   t=0.5 → rgb(255,215,  0)  金黄
+//   t=1.0 → rgb(255,255,200)  乳白
+let sealR = 100, sealG = 140, sealB = 255;
+let discIntensity = 0;
 
-// 计算与星空背景共享的色温。封装在函数里便于 setStarLayer 重新调用。
+// 计算与 seal-glow-color 严格同步的色温。setStarLayer 每次层数变化都会调用。
 function updateStarTheme() {
   const layer = (typeof state !== 'undefined' && state.starLayer != null)
     ? state.starLayer : 0;
   const t = layer / 99;
   discIntensity = t;
-  // 210°（冷蓝紫）→ 45°（金红）；过 0° 也要正常显示所以用 lerp，不绕远路
-  discHue = 210 - t * 165;
-  discLightness = 60 + t * 25;
+  if (t < 0.5) {
+    const p = t / 0.5;
+    sealR = Math.round(100 + 155 * p);
+    sealG = Math.round(140 + 75 * p);
+    sealB = Math.round(255 - 255 * p);
+  } else {
+    const p = (t - 0.5) / 0.5;
+    sealR = 255;
+    sealG = Math.round(215 + 40 * p);
+    sealB = Math.round(0 + 200 * p);
+  }
 }
 
 // 按当前星陨层数重建轨道粒子。层数变化时由 setStarLayer 调用。
@@ -2238,8 +2269,7 @@ function emitShockwave() {
     maxRadius: 130 + discIntensity * 20,
     life: 1,
     decay: 0.014 + Math.random() * 0.006,
-    hue: discHue,
-    lightness: discLightness,
+    r: sealR, g: sealG, b: sealB,        // 跟随 seal-glow 主色
   });
   // 限制同屏冲击波数量，避免连续操作刷屏
   if (DISC.shockwaves.length > 4) DISC.shockwaves.shift();
@@ -2279,9 +2309,10 @@ function animateParticles() {
     DISC.cx, DISC.cy, 8,
     DISC.cx, DISC.cy, 138
   );
-  haloGrad.addColorStop(0, `hsla(${discHue}, 80%, ${discLightness}%, ${0.04 + discIntensity * 0.18})`);
-  haloGrad.addColorStop(0.55, `hsla(${discHue}, 70%, 50%, ${0.02 + discIntensity * 0.07})`);
-  haloGrad.addColorStop(1, 'hsla(0, 0%, 0%, 0)');
+  haloGrad.addColorStop(0, `rgba(${sealR},${sealG},${sealB},${0.04 + discIntensity * 0.18})`);
+  // 中段稍暗一档，模拟径向衰减
+  haloGrad.addColorStop(0.55, `rgba(${Math.round(sealR*0.5)},${Math.round(sealG*0.5)},${Math.round(sealB*0.5)},${0.02 + discIntensity * 0.07})`);
+  haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = haloGrad;
   ctx.fillRect(0, 0, 280, 280);
 
@@ -2293,7 +2324,7 @@ function animateParticles() {
     if (s.life <= 0) { DISC.shockwaves.splice(i, 1); continue; }
     ctx.beginPath();
     ctx.arc(DISC.cx, DISC.cy, s.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = `hsla(${s.hue}, 90%, ${s.lightness}%, ${s.life * 0.35})`;
+    ctx.strokeStyle = `rgba(${s.r},${s.g},${s.b},${s.life * 0.35})`;
     ctx.lineWidth = 1.6 * s.life;
     ctx.stroke();
   }
@@ -2308,12 +2339,12 @@ function animateParticles() {
     if (o.size > 1.5) {
       ctx.beginPath();
       ctx.arc(x, y, o.size * 3.2, 0, Math.PI * 2);
-      ctx.fillStyle = `hsla(${discHue}, 90%, ${discLightness}%, ${0.10 * tw})`;
+      ctx.fillStyle = `rgba(${sealR},${sealG},${sealB},${0.10 * tw})`;
       ctx.fill();
     }
     ctx.beginPath();
     ctx.arc(x, y, o.size * (0.7 + 0.3 * tw), 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${discHue}, 90%, ${Math.min(95, discLightness + 12)}%, ${0.85 * tw})`;
+    ctx.fillStyle = `rgba(${sealR},${sealG},${sealB},${0.85 * tw})`;
     ctx.fill();
   }
 
@@ -2352,8 +2383,8 @@ function animateParticles() {
     const tx = p.x - (p.vx / speed) * tailLen;
     const ty = p.y - (p.vy / speed) * tailLen;
     const grad = ctx.createLinearGradient(p.x, p.y, tx, ty);
-    grad.addColorStop(0, `hsla(${discHue}, 90%, ${discLightness + 8}%, ${p.life * 0.85})`);
-    grad.addColorStop(1, `hsla(${discHue}, 90%, ${discLightness}%, 0)`);
+    grad.addColorStop(0, `rgba(${sealR},${sealG},${sealB},${p.life * 0.85})`);
+    grad.addColorStop(1, `rgba(${sealR},${sealG},${sealB},0)`);
     ctx.strokeStyle = grad;
     ctx.lineWidth = p.size * p.life;
     ctx.lineCap = 'round';
@@ -2378,7 +2409,11 @@ function animateParticles() {
     }
     ctx.beginPath();
     ctx.arc(j.x, j.y, j.size * (0.6 + 0.4 * j.life), 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${discHue}, 100%, ${Math.min(95, discLightness + 18)}%, ${j.life * 0.9})`;
+    // 喷射粒子稍亮：每个通道 +25 后封顶 255
+    const jr = Math.min(255, sealR + 25);
+    const jg = Math.min(255, sealG + 25);
+    const jb = Math.min(255, sealB + 25);
+    ctx.fillStyle = `rgba(${jr},${jg},${jb},${j.life * 0.9})`;
     ctx.fill();
   }
 
