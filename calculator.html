@@ -1945,7 +1945,7 @@ let starTargetParallax = { x: 0, y: 0 };
 
 const STAR_SEED = 0x5A7C0E;          // 固定种子：星空布局每次刷新都一致
 const PARALLAX_EASE = 0.06;          // 鼠标→视差平滑系数（越小越柔）
-const SHOOTING_STAR_MAX = 2;         // 同时存在的流星数上限
+const SHOOTING_STAR_MAX = 6;         // 同时存在的流星数上限（高层数时支持流星暴雨）
 
 // mulberry32：可种子化的伪随机生成器，确定性优于 Math.random。
 function mulberry32(seed) {
@@ -2045,22 +2045,29 @@ function buildStarLayers() {
 }
 
 // 公开触发：可在高星陨层数等事件里主动调用以提升氛围。
-function spawnShootingStar() {
+// layerT (0..1) 决定流星色温：低层=冷蓝白，高层=金红（与圆盘主题统一）。
+function spawnShootingStar(layerT) {
   if (shootingStars.length >= SHOOTING_STAR_MAX) return;
   if (!starCanvas) return;
+  const t = (typeof layerT === 'number') ? layerT
+           : ((typeof state !== 'undefined' && state.starLayer != null)
+              ? state.starLayer / 99 : 0);
   const w = starCanvas.width, h = starCanvas.height;
   const startX = Math.random() * w * 1.2 - w * 0.1;       // 含左侧外缘
   const startY = -20;                                     // 从屏幕上方外开始
   const angle = Math.PI * (0.4 + Math.random() * 0.2);    // 72°-108°（对角向下）
-  const speed = 6 + Math.random() * 4;
+  // 高层数时流星更快、更长、更亮
+  const speed = (6 + Math.random() * 4) * (1 + t * 0.6);
+  // 颜色：冷蓝白 200° → 暖金 45°，与圆盘 discHue 共用同一映射
+  const hue = 200 - t * 155;
   shootingStars.push({
     x: startX, y: startY,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     life: 1,
     decay: 0.012 + Math.random() * 0.008,
-    length: 60 + Math.random() * 60,
-    hue: 40 + Math.random() * 20,                         // 暖色，对应"星陨"
+    length: (60 + Math.random() * 60) * (1 + t * 0.5),
+    hue,
   });
 }
 
@@ -2074,6 +2081,16 @@ function drawStarCanvas() {
   mouseParallax.x += (starTargetParallax.x - mouseParallax.x) * PARALLAX_EASE;
   mouseParallax.y += (starTargetParallax.y - mouseParallax.y) * PARALLAX_EASE;
 
+  // 全局星陨强度（0..1），驱动背景星亮度 / 闪烁节奏 / 流星频率。
+  const layerT = (typeof state !== 'undefined' && state.starLayer != null)
+    ? state.starLayer / 99 : 0;
+  // 整体提亮 1.0 → 1.5（高层数时整片星空微微"燃烧"）
+  const globalGain = 1 + layerT * 0.5;
+  // 共振脉冲：高层数时整片星空以约 0.25Hz 做轻微呼吸（+0..0.18 振幅）
+  const pulse = layerT > 0.2
+    ? (0.09 * (1 + Math.sin(time * 1.6)) * layerT)
+    : 0;
+
   ctx.clearRect(0, 0, w, h);
 
   // 远 → 近顺序绘制（深景在下）。
@@ -2081,12 +2098,14 @@ function drawStarCanvas() {
     const layer = starLayers[i];
     const offsetX = -mouseParallax.x * layer.parallax;
     const offsetY = -mouseParallax.y * layer.parallax;
+    // 闪烁节奏在高层数时略微加快，避免长时间高数时画面"死板"
+    const twinkleBoost = 1 + layerT * 0.6;
 
     for (let j = 0; j < layer.stars.length; j++) {
       const s = layer.stars[j];
       // 闪烁 = 全局时间 × 每颗星独立速度 + 独立相位 → 不同步的呼吸。
-      const tw = 0.55 + 0.45 * Math.sin(time * s.twinkleSpeed + s.twinklePhase);
-      const a  = s.alpha * tw;
+      const tw = 0.55 + 0.45 * Math.sin(time * s.twinkleSpeed * twinkleBoost + s.twinklePhase);
+      const a  = Math.min(1, s.alpha * tw * globalGain + pulse);
 
       // 视差把星推出视区时做环形卷绕，避免边缘出现空缺。
       let px = s.x + offsetX;
@@ -2110,10 +2129,16 @@ function drawStarCanvas() {
     }
   }
 
-  // 流星：自然生成 + 高星陨层数时增频（state 可能在脚本初始化早期未定义，加保护）。
-  const baseRate   = 0.0008;
-  const layerBoost = (typeof state !== 'undefined' && state.starLayer > 30) ? 0.0015 : 0;
-  if (Math.random() < baseRate + layerBoost) spawnShootingStar();
+  // 流星：自然生成 + 频率与星陨层数 0..99 平滑挂钩 (state 可能未就绪，加保护)。
+  const baseRate = 0.0008;
+  // 线性：0 → 0，1 → 0.012 (约 15× 基础速率)，高层数时还能突破上限
+  const layerBoost = layerT * 0.012;
+  if (Math.random() < baseRate + layerBoost) spawnShootingStar(layerT);
+  // 高层数（>= 0.8）时偶发"流星暴雨"：一次生成 2..3 颗
+  if (layerT > 0.8 && Math.random() < (layerT - 0.8) * 0.25) {
+    const burst = 2 + Math.floor(Math.random() * 2);
+    for (let k = 0; k < burst; k++) spawnShootingStar(layerT);
+  }
 
   for (let i = shootingStars.length - 1; i >= 0; i--) {
     const m = shootingStars[i];
@@ -2147,46 +2172,216 @@ function drawStarCanvas() {
   requestAnimationFrame(drawStarCanvas);
 }
 
-let particles = [];
-let particleCanvas, particleCtx;
+// ============================================================
+// STAR METEORITE DISC (replaces the old "floating dots" particle system)
+//
+// 算法哲学：Stellar Resonance（星陨共振）
+//   圆盘 = 微型星核的取景窗。state.starLayer (0..99) 充当"共振强度"参数：
+//     · 在低层数（0..30）时，3 圈轨道粒子缓慢流转，像平静的星系；
+//     · 在中段（30..70）时，环境火花增多，冲击波涟漪频繁出现；
+//     · 在高层数（70..99）时，色彩由冷蓝转向金红，射出强列的"星陨冲击"。
+//   与星空背景共用 updateStarTheme() 的同一调色曲线（210°冷蓝 → 45°金红），
+//   让圆盘与远景星空像同一颗星的不同景深，形成视觉共振。
+// ============================================================
+const DISC = {
+  cx: 140, cy: 140,
+  orbitals: [],       // 8..32 颗粒，3 圈嵌套轨道
+  sparks: [],         // 偶发的环境火花（中心外缘起，向中心漂）
+  jets: [],           // 高层数时从中心径向射出的高速粒子
+  shockwaves: [],     // 触发时扩散的环
+  tick: 0,
+};
+let discHue = 210;          // 动态主色相 (HSL)
+let discLightness = 65;     // 动态明度
+let discIntensity = 0;      // 0..1，state.starLayer / 99
+
+// 计算与星空背景共享的色温。封装在函数里便于 setStarLayer 重新调用。
+function updateStarTheme() {
+  const layer = (typeof state !== 'undefined' && state.starLayer != null)
+    ? state.starLayer : 0;
+  const t = layer / 99;
+  discIntensity = t;
+  // 210°（冷蓝紫）→ 45°（金红）；过 0° 也要正常显示所以用 lerp，不绕远路
+  discHue = 210 - t * 165;
+  discLightness = 60 + t * 25;
+}
+
+// 按当前星陨层数重建轨道粒子。层数变化时由 setStarLayer 调用。
+function rebuildOrbitals() {
+  DISC.orbitals = [];
+  const t = discIntensity;
+  const count = 8 + Math.floor(t * 24);     // 8..32
+  for (let i = 0; i < count; i++) {
+    const ring = i % 3;                      // 三圈：66 / 82 / 98
+    const baseR = 66 + ring * 16;
+    const rJitter = (Math.random() - 0.5) * 8;
+    const radius = baseR + rJitter;
+    const size = ring === 0 ? 1.4 + Math.random() * 1.2
+                           : 0.8 + Math.random() * 1.0;
+    const speed = 0.0035 + ring * 0.0018 + Math.random() * 0.0015;
+    const dir = (i % 2 === 0) ? 1 : -1;       // 交替方向，避免整齐
+    DISC.orbitals.push({
+      angle: Math.random() * Math.PI * 2,
+      radius,
+      size,
+      speed: speed * dir,
+      twinklePhase: Math.random() * Math.PI * 2,
+      ring,
+    });
+  }
+}
+
+// 触发一次冲击波（setStarLayer 在跳跃变化时调用）
+function emitShockwave() {
+  DISC.shockwaves.push({
+    radius: 22,
+    maxRadius: 130 + discIntensity * 20,
+    life: 1,
+    decay: 0.014 + Math.random() * 0.006,
+    hue: discHue,
+    lightness: discLightness,
+  });
+  // 限制同屏冲击波数量，避免连续操作刷屏
+  if (DISC.shockwaves.length > 4) DISC.shockwaves.shift();
+}
+
+// 从中心径向射出一颗高速粒子（仅在高层数时）
+function spawnJet() {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 1.4 + Math.random() * 1.6;
+  DISC.jets.push({
+    x: DISC.cx, y: DISC.cy,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    life: 1,
+    decay: 0.012 + Math.random() * 0.01,
+    size: 1.2 + Math.random() * 1.4,
+  });
+  if (DISC.jets.length > 14) DISC.jets.shift();
+}
+
 function initParticles() {
   particleCanvas = document.getElementById('particle-canvas');
   particleCtx = particleCanvas.getContext('2d');
+  updateStarTheme();
+  rebuildOrbitals();
   animateParticles();
 }
-function spawnParticle() {
-  const cx = 140, cy = 140;
-  const angle = Math.random() * Math.PI * 2;
-  const dist = 80 + Math.random() * 30;
-  particles.push({
-    x: cx + Math.cos(angle) * dist,
-    y: cy + Math.sin(angle) * dist,
-    vx: (Math.random() - 0.5) * 0.5,
-    vy: (Math.random() - 0.5) * 0.5 - 0.3,
-    life: 1,
-    decay: 0.008 + Math.random() * 0.015,
-    size: Math.random() * 2.5 + 1,
-    hue: 40 + Math.random() * 20
-  });
-}
+
 function animateParticles() {
-  particleCtx.clearRect(0, 0, 280, 280);
-  const spawnRate = Math.floor(state.starLayer / 8);
-  for (let i = 0; i < spawnRate; i++) {
-    if (Math.random() < 0.3) spawnParticle();
+  const ctx = particleCtx;
+  ctx.clearRect(0, 0, 280, 280);
+  DISC.tick++;
+  const tick = DISC.tick;
+
+  // 1) 中心径向辉光：根据 discIntensity 渲染微弱光晕，给圆盘深度
+  const haloGrad = ctx.createRadialGradient(
+    DISC.cx, DISC.cy, 8,
+    DISC.cx, DISC.cy, 138
+  );
+  haloGrad.addColorStop(0, `hsla(${discHue}, 80%, ${discLightness}%, ${0.04 + discIntensity * 0.18})`);
+  haloGrad.addColorStop(0.55, `hsla(${discHue}, 70%, 50%, ${0.02 + discIntensity * 0.07})`);
+  haloGrad.addColorStop(1, 'hsla(0, 0%, 0%, 0)');
+  ctx.fillStyle = haloGrad;
+  ctx.fillRect(0, 0, 280, 280);
+
+  // 2) 冲击波（最底层，在轨道粒子之下）
+  for (let i = DISC.shockwaves.length - 1; i >= 0; i--) {
+    const s = DISC.shockwaves[i];
+    s.radius += (s.maxRadius - s.radius) * 0.055 + 0.4;
+    s.life -= s.decay;
+    if (s.life <= 0) { DISC.shockwaves.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(DISC.cx, DISC.cy, s.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${s.hue}, 90%, ${s.lightness}%, ${s.life * 0.35})`;
+    ctx.lineWidth = 1.6 * s.life;
+    ctx.stroke();
   }
-  particles.forEach((p, idx) => {
-    p.x += p.vx;
-    p.y += p.vy;
+
+  // 3) 轨道粒子
+  for (const o of DISC.orbitals) {
+    o.angle += o.speed;
+    const tw = 0.55 + 0.45 * Math.sin(tick * 0.045 + o.twinklePhase);
+    const x = DISC.cx + Math.cos(o.angle) * o.radius;
+    const y = DISC.cy + Math.sin(o.angle) * o.radius;
+    // 大粒子加柔光晕
+    if (o.size > 1.5) {
+      ctx.beginPath();
+      ctx.arc(x, y, o.size * 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${discHue}, 90%, ${discLightness}%, ${0.10 * tw})`;
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, o.size * (0.7 + 0.3 * tw), 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${discHue}, 90%, ${Math.min(95, discLightness + 12)}%, ${0.85 * tw})`;
+    ctx.fill();
+  }
+
+  // 4) 环境火花：在轨道边缘出现，缓慢向中心漂，体现"星尘被吸入"
+  //    生成数量随 discIntensity 提升。
+  const sparkSpawnRate = 0.04 + discIntensity * 0.32;
+  if (Math.random() < sparkSpawnRate) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = 100 + Math.random() * 32;
+    DISC.sparks.push({
+      x: DISC.cx + Math.cos(angle) * r,
+      y: DISC.cy + Math.sin(angle) * r,
+      vx: -Math.cos(angle) * (0.18 + Math.random() * 0.25),
+      vy: -Math.sin(angle) * (0.18 + Math.random() * 0.25),
+      life: 1,
+      decay: 0.008 + Math.random() * 0.012,
+      size: 0.8 + Math.random() * 1.6,
+    });
+    if (DISC.sparks.length > 60) DISC.sparks.shift();
+  }
+  for (let i = DISC.sparks.length - 1; i >= 0; i--) {
+    const p = DISC.sparks[i];
+    p.x += p.vx; p.y += p.vy;
+    // 越靠近中心速度越快（向心加速），模拟引力
+    const distToCenter = Math.hypot(p.x - DISC.cx, p.y - DISC.cy);
+    if (distToCenter > 6) {
+      const accel = 0.012 + (140 - Math.min(140, distToCenter)) * 0.0004;
+      p.vx += (-(p.x - DISC.cx) / distToCenter) * accel;
+      p.vy += (-(p.y - DISC.cy) / distToCenter) * accel;
+    }
     p.life -= p.decay;
-    if (p.life <= 0) { particles.splice(idx, 1); return; }
-    particleCtx.beginPath();
-    particleCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-    const lightness = state.starLayer > 70 ? 90 : 70;
-    particleCtx.fillStyle = `hsla(${p.hue}, 100%, ${lightness}%, ${p.life * 0.8})`;
-    particleCtx.fill();
-  });
-  if (particles.length > 80) particles.splice(0, particles.length - 80);
+    if (p.life <= 0 || distToCenter < 8) { DISC.sparks.splice(i, 1); continue; }
+    // 拖尾（用渐变短线代替模糊以节省性能）
+    const tailLen = 6;
+    const speed = Math.hypot(p.vx, p.vy) || 1;
+    const tx = p.x - (p.vx / speed) * tailLen;
+    const ty = p.y - (p.vy / speed) * tailLen;
+    const grad = ctx.createLinearGradient(p.x, p.y, tx, ty);
+    grad.addColorStop(0, `hsla(${discHue}, 90%, ${discLightness + 8}%, ${p.life * 0.85})`);
+    grad.addColorStop(1, `hsla(${discHue}, 90%, ${discLightness}%, 0)`);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = p.size * p.life;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+  }
+
+  // 5) 径向喷射（高层数时偶发）
+  if (discIntensity > 0.55 && Math.random() < (discIntensity - 0.55) * 0.45) {
+    spawnJet();
+  }
+  for (let i = DISC.jets.length - 1; i >= 0; i--) {
+    const j = DISC.jets[i];
+    j.x += j.vx; j.y += j.vy;
+    j.life -= j.decay;
+    if (j.life <= 0
+        || j.x < -10 || j.x > 290
+        || j.y < -10 || j.y > 290) {
+      DISC.jets.splice(i, 1); continue;
+    }
+    ctx.beginPath();
+    ctx.arc(j.x, j.y, j.size * (0.6 + 0.4 * j.life), 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${discHue}, 100%, ${Math.min(95, discLightness + 18)}%, ${j.life * 0.9})`;
+    ctx.fill();
+  }
+
   requestAnimationFrame(animateParticles);
 }
 
@@ -2275,10 +2470,24 @@ function setStarLayer(value) {
   animateNumber(numberEl, old, state.starLayer, 200);
   slider.value = state.starLayer;
   updateSealGlow();
+  // 同步星空 / 圆盘主题：色相、明度、轨道粒子数量都跟层数挂钩。
+  updateStarTheme();
+  rebuildOrbitals();
   if (old !== state.starLayer) {
     numberEl.classList.remove('number-pop');
     void numberEl.offsetWidth;
     numberEl.classList.add('number-pop');
+    // 一次操作内仅在跳跃幅度 ≥ 3 时触发冲击波 + 流星爆，避免拖拽时刷屏。
+    const jump = Math.abs(state.starLayer - old);
+    if (jump >= 3) {
+      emitShockwave();
+      if (typeof spawnShootingStar === 'function') {
+        // 高层数跳跃额外送 1 颗流星呼应"星陨"
+        if (state.starLayer > 50 && Math.random() < 0.55) {
+          spawnShootingStar(state.starLayer / 99);
+        }
+      }
+    }
   }
   calculateDamage();
 }
