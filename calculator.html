@@ -1278,7 +1278,8 @@ body {
 }
 .stats-section .section-title .icon { font-size: 1rem; }
 /* Buff chips (replaces old stat-counters: shows adjustable atk/matk | def/mdef %) */
-.stats-section .buff-chips {
+.stats-section .buff-chips,
+.skills-section .buff-chips {
   margin-left: auto;
   display: flex;
   gap: 4px;
@@ -1554,7 +1555,7 @@ body {
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
-        <h3 class="section-title">攻击技能</h3>
+        <h3 class="section-title">攻击技能<span class="buff-chips" id="attacker-power-boost-chip" aria-label="化劲/羽化 调节"></span></h3>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
     </section>
@@ -1783,7 +1784,11 @@ let state = {
   // Per-side adjustable buff (in %): attacker buffs attack stats; defender buffs defense stats
   // Range [-990, +990], step 10; default 0 (no modification)
   attackerBuff: { atk: 0, matk: 0 },
-  defenderBuff: { def: 0, mdef: 0 }
+  defenderBuff: { def: 0, mdef: 0 },
+  // Attacker's 化劲/羽化 bonus: flat addition to skill power. Range [0, 990].
+  // Step is per-pet (落陨星兔=40, 粉耳星兔=20). Only effective when the
+  // attacker is one of the pets listed in POWER_BOOST_PETS.
+  attackerPowerBoost: 0
 };
 
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
@@ -2448,6 +2453,7 @@ function renderSpiritCard(side) {
   skillsSection.style.display = 'block';
   renderSkills(side);
   renderStatsConfig(side);
+  if (side === 'attacker') renderPowerBoostChip();
 }
 
 // 进入/退出“选择中”状态
@@ -2478,6 +2484,8 @@ function selectSpirit(side, id) {
     state.attackerIVs    = DEFAULT_IVS.attacker.slice();
     // Reset attacker buffs on spirit change
     state.attackerBuff   = { atk: 0, matk: 0 };
+    // Reset 化劲/羽化 (may not even be applicable to the new attacker)
+    state.attackerPowerBoost = 0;
     state.spiritPicking.attacker = false;
     renderSpiritArea('attacker');
   } else if (side === 'defender') {
@@ -2712,6 +2720,129 @@ function onBuffWheel(e) {
   // Live update the chip text + class
   const valSpan = chip.querySelector('.buff-val');
   if (valSpan) valSpan.textContent = formatBuff(newVal);
+  chip.classList.remove('positive', 'negative', 'neutral');
+  chip.classList.add(_buffChipClass(newVal));
+  calculateDamage();
+}
+
+// ============================================================
+// POWER-BOOST CHIP: 化劲/羽化 — flat addition to skill power.
+// Activated by attacker being one of the pets in POWER_BOOST_PETS.
+// Reuses the .buff-chip visual style; behaviour mirrors the buff
+// chips (press-and-drag horizontal, wheel, dblclick to reset) but
+// with pet-specific step value and a [0, +max] range.
+// ============================================================
+const POWER_BOOST_PETS = {
+  'pet_000413': { label: '化劲', step: 40 },   // 落陨星兔
+  'pet_000287': { label: '羽化', step: 20 }    // 粉耳星兔
+};
+const POWER_BOOST_MAX = 990;
+const POWER_BOOST_DRAG_PX_PER_STEP = 8;
+let powerBoostDrag = null;
+
+function getPowerBoost() { return state.attackerPowerBoost; }
+function setPowerBoost(val) {
+  // Clamp to [0, POWER_BOOST_MAX], snap to the current pet's step.
+  const config = getPowerBoostConfig();
+  const step = config ? config.step : 1;
+  const snapped = Math.round(val / step) * step;
+  state.attackerPowerBoost = Math.max(0, Math.min(POWER_BOOST_MAX, snapped));
+}
+function getPowerBoostConfig() {
+  if (!state.attacker) return null;
+  return POWER_BOOST_PETS[state.attacker.id] || null;
+}
+function formatPowerBoost(val) {
+  // Always non-negative; always shown with a leading '+'.
+  return '+' + val;
+}
+
+function renderPowerBoostChip() {
+  const container = document.getElementById('attacker-power-boost-chip');
+  if (!container) return;
+  const config = getPowerBoostConfig();
+  if (!config) {
+    // No special attacker → hide the chip entirely.
+    container.innerHTML = '';
+    return;
+  }
+  const val = getPowerBoost();
+  const cls = val > 0 ? 'positive' : 'neutral';
+  container.innerHTML = `<div class="buff-chip ${cls}"
+                              aria-label="${config.label} 调整（当前 ${formatPowerBoost(val)}，拖动 / 滚轮 / 双击重置）"
+                              onpointerdown="onPowerBoostPointerDown(event)"
+                              onpointermove="onPowerBoostPointerMove(event)"
+                              onpointerup="onPowerBoostPointerUp(event)"
+                              onpointercancel="onPowerBoostPointerUp(event)"
+                              ondblclick="onPowerBoostDoubleClick(event)"
+                              onwheel="onPowerBoostWheel(event)"
+                              title="拖动 · 滚轮 · 双击重置">${config.label} <span class="buff-val">${formatPowerBoost(val)}</span></div>`;
+}
+
+function onPowerBoostPointerDown(e) {
+  const chip = e.currentTarget;
+  e.preventDefault();
+  e.stopPropagation();
+  powerBoostDrag = {
+    chip,
+    startX: e.clientX,
+    startVal: getPowerBoost(),
+    pointerId: e.pointerId
+  };
+  try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+  chip.classList.add('dragging');
+}
+
+function onPowerBoostPointerMove(e) {
+  if (!powerBoostDrag || e.pointerId !== powerBoostDrag.pointerId) return;
+  e.preventDefault();
+  const config = getPowerBoostConfig();
+  if (!config) return;
+  const dx = e.clientX - powerBoostDrag.startX;
+  const delta = Math.round(dx / POWER_BOOST_DRAG_PX_PER_STEP) * config.step;
+  const target = Math.max(0, Math.min(POWER_BOOST_MAX, powerBoostDrag.startVal + delta));
+  // Snap to the pet's step so the visible value is always a legal step.
+  const newVal = Math.round(target / config.step) * config.step;
+  if (newVal === getPowerBoost()) return;
+  state.attackerPowerBoost = newVal;
+  // Live update the chip text + color (without re-rendering the chip).
+  const valSpan = powerBoostDrag.chip.querySelector('.buff-val');
+  if (valSpan) valSpan.textContent = formatPowerBoost(newVal);
+  powerBoostDrag.chip.classList.remove('positive', 'negative', 'neutral');
+  powerBoostDrag.chip.classList.add(_buffChipClass(newVal));
+  calculateDamage();
+}
+
+function onPowerBoostPointerUp(e) {
+  if (!powerBoostDrag || e.pointerId !== powerBoostDrag.pointerId) return;
+  try { powerBoostDrag.chip.releasePointerCapture(e.pointerId); } catch (_) {}
+  powerBoostDrag.chip.classList.remove('dragging');
+  powerBoostDrag = null;
+}
+
+function onPowerBoostDoubleClick(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  if (getPowerBoost() === 0) return;   // already 0; no-op
+  state.attackerPowerBoost = 0;
+  renderPowerBoostChip();
+  calculateDamage();
+}
+
+// Wheel: scroll up to increase, scroll down to decrease. Shift = larger step.
+function onPowerBoostWheel(e) {
+  e.preventDefault();
+  const config = getPowerBoostConfig();
+  if (!config) return;
+  const chip = e.currentTarget;
+  const cur = getPowerBoost();
+  const step = e.shiftKey ? config.step * 5 : config.step;
+  const newVal = Math.max(0, Math.min(POWER_BOOST_MAX,
+    cur + (e.deltaY < 0 ? step : -step)));
+  if (newVal === cur) return;
+  state.attackerPowerBoost = newVal;
+  const valSpan = chip.querySelector('.buff-val');
+  if (valSpan) valSpan.textContent = formatPowerBoost(newVal);
   chip.classList.remove('positive', 'negative', 'neutral');
   chip.classList.add(_buffChipClass(newVal));
   calculateDamage();
@@ -2967,11 +3098,14 @@ function calculateDamage() {
 
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
   const dyn = computeSkillDynamicModifiers(atk, skill, n);
+  // 化劲/羽化 (attacker's pet-specific power boost) — flat addition to base power.
+  const powerBoost = getPowerBoost();
+  const powerBoostLabel = getPowerBoostConfig()?.label || null;
   // Skill damage (STAB applied BEFORE type effectiveness)
   const stab = getStabMultiplier(atk, skill);
   const skillEff = effectiveness(skill.element, def.types);
   const combo = (skill.combo ?? 1) + dyn.comboAdd;
-  const power = (skill.power ?? 0) * dyn.powerMult;
+  const power = ((skill.power ?? 0) + powerBoost) * dyn.powerMult;
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
   );
@@ -3002,7 +3136,8 @@ function calculateDamage() {
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic, dyn,
-    atkBuffPct, defBuffPct
+    atkBuffPct, defBuffPct,
+    powerBoost, powerBoostLabel
   });
   updateAtmosphere(hpPercent, isKill);
 }
@@ -3107,12 +3242,28 @@ function renderBreakdownList(breakdownList, data) {
     : '';
   const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
   const dynMods = data.dyn || { powerMult: 1, comboAdd: 0, notes: [] };
+  const powerBoost = data.powerBoost || 0;
+  const powerBoostLabel = data.powerBoostLabel || null;
   const basePower = data.skill.power ?? 0;
+  const basePowerWithBoost = basePower + powerBoost;
   const effCombo  = (data.skill.combo ?? 1) + dynMods.comboAdd;
-  const effPowerStr = (basePower * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
-  const powerText = dynMods.powerMult !== 1
-    ? `${basePower} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`
-    : `${basePower}`;
+  const effPowerStr = (basePowerWithBoost * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
+  // Compose the 威力 line so it reflects both the flat power boost and the
+  // dynamic multiplier, e.g.
+  //   100                                          (no boost, no mult)
+  //   100 × 1.20 = 120                             (mult only)
+  //   100 + 40（化劲） = 140                       (boost only)
+  //   100 + 40（化劲） = 140 × 1.20 = 168          (both)
+  let powerText;
+  if (powerBoost > 0 && dynMods.powerMult !== 1) {
+    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}） = ${basePowerWithBoost} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
+  } else if (powerBoost > 0) {
+    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}） = ${basePowerWithBoost}`;
+  } else if (dynMods.powerMult !== 1) {
+    powerText = `${basePower} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
+  } else {
+    powerText = `${basePower}`;
+  }
   const dynNotesHTML = dynMods.notes.length
     ? `<div><span class="label">动态修正:</span></div>` +
       dynMods.notes.map(n =>
@@ -3254,6 +3405,8 @@ function init() {
   // 初始即渲染两侧的内嵌选择器（未选精灵时直接显示）
   renderSpiritArea('attacker');
   renderSpiritArea('defender');
+  // 化劲/羽化 chip 占位（未选攻击方时为空）
+  renderPowerBoostChip();
   renderWaiting();
 }
 
