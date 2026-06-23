@@ -1928,45 +1928,223 @@ function effectiveness(skillElementRaw, defenderTypesRaw) {
 }
 
 // ============================================================
-// STAR BACKGROUND, PARTICLES, SEAL — original code preserved
+// STAR BACKGROUND, PARTICLES, SEAL
 // ============================================================
+// STAR BACKGROUND — multi-layer parallax + shooting stars
+// 概念：Stellar Stratigraphy — 星空按深度分三层（远/中/近），
+//   每层有独立的密度、大小、闪烁节奏与色彩温度。
+//   鼠标位置作为"视点"驱动每层以不同比例的偏移（视差）。
+//   偶发流星：自然概率出现；星陨层数升高时增频，呼应"星陨"主题。
+// 种子化随机：固定种子保证每次刷新星空布局可复现。
+// ============================================================
+let starLayers = [];
+let shootingStars = [];
+let starCanvas, starCtx;
+let mouseParallax = { x: 0, y: 0 };
+let starTargetParallax = { x: 0, y: 0 };
+
+const STAR_SEED = 0x5A7C0E;          // 固定种子：星空布局每次刷新都一致
+const PARALLAX_EASE = 0.06;          // 鼠标→视差平滑系数（越小越柔）
+const SHOOTING_STAR_MAX = 2;         // 同时存在的流星数上限
+
+// mulberry32：可种子化的伪随机生成器，确定性优于 Math.random。
+function mulberry32(seed) {
+  return function() {
+    let t = (seed += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function initStarCanvas() {
-  const canvas = document.getElementById('star-canvas');
-  const ctx = canvas.getContext('2d');
-  let stars = [];
-  function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    initStars();
+  starCanvas = document.getElementById('star-canvas');
+  starCtx = starCanvas.getContext('2d');
+
+  // 仅在有精细指针（鼠标）的设备上追踪移动 —— 触屏设备保持居中避免抖动。
+  if (window.matchMedia('(pointer: fine)').matches) {
+    window.addEventListener('mousemove', onStarMouseMove, { passive: true });
   }
-  function initStars() {
-    stars = [];
-    const count = Math.floor((canvas.width * canvas.height) / 4000);
-    for (let i = 0; i < count; i++) {
+  window.addEventListener('resize', resizeStarCanvas);
+  resizeStarCanvas();
+  requestAnimationFrame(drawStarCanvas);
+}
+
+function onStarMouseMove(e) {
+  // 归一化到 [-1, 1]：屏幕中心 = 0；左/上边缘 = -1；右/下边缘 = +1。
+  starTargetParallax.x = (e.clientX / window.innerWidth)  * 2 - 1;
+  starTargetParallax.y = (e.clientY / window.innerHeight) * 2 - 1;
+}
+
+function resizeStarCanvas() {
+  starCanvas.width  = window.innerWidth;
+  starCanvas.height = window.innerHeight;
+  buildStarLayers();
+}
+
+function buildStarLayers() {
+  const w = starCanvas.width;
+  const h = starCanvas.height;
+  const area = w * h;
+  starLayers = [];
+
+  // 三层配置：近层视差响应最强烈、远层几乎不动。
+  // 色彩温度随深度变化：远 = 冷蓝紫，近 = 偏白蓝 —— 呼应"近大远小"的视觉直觉。
+  const layerConfigs = [
+    {
+      name: 'far',                                       // 远景：密而小
+      count: Math.floor(area / 5500),
+      radiusMin: 0.3, radiusMax: 0.8,
+      alphaBase: 0.25, alphaVar: 0.4,
+      parallax: 6,                                       // 边缘最大偏移（像素）
+      twinkleSpeedMin: 0.4, twinkleSpeedMax: 1.0,
+      colorHueRange: [205, 245],                         // 冷蓝紫
+      glowThreshold: 0,                                  // 全部为无光晕的小点
+    },
+    {
+      name: 'mid',                                       // 中景
+      count: Math.floor(area / 12000),
+      radiusMin: 0.6, radiusMax: 1.4,
+      alphaBase: 0.4, alphaVar: 0.5,
+      parallax: 14,
+      twinkleSpeedMin: 0.8, twinkleSpeedMax: 1.6,
+      colorHueRange: [200, 235],
+      glowThreshold: 1.1,                                // 较亮的星有淡淡光晕
+    },
+    {
+      name: 'near',                                      // 近景：稀而亮
+      count: Math.floor(area / 30000),
+      radiusMin: 1.0, radiusMax: 2.2,
+      alphaBase: 0.5, alphaVar: 0.5,
+      parallax: 26,
+      twinkleSpeedMin: 1.2, twinkleSpeedMax: 2.2,
+      colorHueRange: [195, 220],
+      glowThreshold: 1.2,
+    },
+  ];
+
+  layerConfigs.forEach((cfg, layerIdx) => {
+    // 每层独立种子 → 布局确定但各层之间分布不同。
+    const rng = mulberry32(STAR_SEED + layerIdx * 1009);
+    const stars = [];
+    for (let i = 0; i < cfg.count; i++) {
       stars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        r: Math.random() * 1.5 + 0.3,
-        alpha: Math.random() * 0.8 + 0.2,
-        speed: Math.random() * 0.005 + 0.002
+        x: rng() * w,
+        y: rng() * h,
+        r: cfg.radiusMin + rng() * (cfg.radiusMax - cfg.radiusMin),
+        alpha: cfg.alphaBase + rng() * cfg.alphaVar,
+        twinkleSpeed: cfg.twinkleSpeedMin + rng() * (cfg.twinkleSpeedMax - cfg.twinkleSpeedMin),
+        twinklePhase: rng() * Math.PI * 2,
+        hue: cfg.colorHueRange[0] + rng() * (cfg.colorHueRange[1] - cfg.colorHueRange[0]),
       });
     }
-  }
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const time = Date.now() * 0.001;
-    stars.forEach(s => {
-      const a = s.alpha * (0.5 + 0.5 * Math.sin(time * s.speed * 100 + s.x));
+    starLayers.push({ ...cfg, stars });
+  });
+
+  shootingStars = [];
+}
+
+// 公开触发：可在高星陨层数等事件里主动调用以提升氛围。
+function spawnShootingStar() {
+  if (shootingStars.length >= SHOOTING_STAR_MAX) return;
+  if (!starCanvas) return;
+  const w = starCanvas.width, h = starCanvas.height;
+  const startX = Math.random() * w * 1.2 - w * 0.1;       // 含左侧外缘
+  const startY = -20;                                     // 从屏幕上方外开始
+  const angle = Math.PI * (0.4 + Math.random() * 0.2);    // 72°-108°（对角向下）
+  const speed = 6 + Math.random() * 4;
+  shootingStars.push({
+    x: startX, y: startY,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    life: 1,
+    decay: 0.012 + Math.random() * 0.008,
+    length: 60 + Math.random() * 60,
+    hue: 40 + Math.random() * 20,                         // 暖色，对应"星陨"
+  });
+}
+
+function drawStarCanvas() {
+  const ctx = starCtx;
+  const w = starCanvas.width;
+  const h = starCanvas.height;
+  const time = performance.now() * 0.001;
+
+  // 视差平滑跟随 —— 指数缓动，给出柔软的"凝望"感。
+  mouseParallax.x += (starTargetParallax.x - mouseParallax.x) * PARALLAX_EASE;
+  mouseParallax.y += (starTargetParallax.y - mouseParallax.y) * PARALLAX_EASE;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // 远 → 近顺序绘制（深景在下）。
+  for (let i = 0; i < starLayers.length; i++) {
+    const layer = starLayers[i];
+    const offsetX = -mouseParallax.x * layer.parallax;
+    const offsetY = -mouseParallax.y * layer.parallax;
+
+    for (let j = 0; j < layer.stars.length; j++) {
+      const s = layer.stars[j];
+      // 闪烁 = 全局时间 × 每颗星独立速度 + 独立相位 → 不同步的呼吸。
+      const tw = 0.55 + 0.45 * Math.sin(time * s.twinkleSpeed + s.twinklePhase);
+      const a  = s.alpha * tw;
+
+      // 视差把星推出视区时做环形卷绕，避免边缘出现空缺。
+      let px = s.x + offsetX;
+      let py = s.y + offsetY;
+      const wrapX = w + 80, wrapY = h + 80;
+      px = ((px % wrapX) + wrapX) % wrapX - 40;
+      py = ((py % wrapY) + wrapY) % wrapY - 40;
+
+      // 大星加一层柔光（径向光晕），强化"近大远小"的层次。
+      if (s.r > layer.glowThreshold) {
+        ctx.beginPath();
+        ctx.arc(px, py, s.r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${s.hue}, 70%, 90%, ${a * 0.18})`;
+        ctx.fill();
+      }
+
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(200,210,255,${a})`;
+      ctx.arc(px, py, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${s.hue}, 60%, 88%, ${a})`;
       ctx.fill();
-    });
-    requestAnimationFrame(draw);
+    }
   }
-  window.addEventListener('resize', resize);
-  resize();
-  draw();
+
+  // 流星：自然生成 + 高星陨层数时增频（state 可能在脚本初始化早期未定义，加保护）。
+  const baseRate   = 0.0008;
+  const layerBoost = (typeof state !== 'undefined' && state.starLayer > 30) ? 0.0015 : 0;
+  if (Math.random() < baseRate + layerBoost) spawnShootingStar();
+
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const m = shootingStars[i];
+    m.x += m.vx;
+    m.y += m.vy;
+    m.life -= m.decay;
+    if (m.life <= 0 || m.x < -100 || m.x > w + 100 || m.y > h + 100) {
+      shootingStars.splice(i, 1);
+      continue;
+    }
+    const speed = Math.hypot(m.vx, m.vy);
+    const tailX = m.x - m.vx * (m.length / speed);
+    const tailY = m.y - m.vy * (m.length / speed);
+    const grad = ctx.createLinearGradient(m.x, m.y, tailX, tailY);
+    grad.addColorStop(0, `hsla(${m.hue}, 100%, 82%, ${m.life * 0.9})`);
+    grad.addColorStop(1, `hsla(${m.hue}, 100%, 82%, 0)`);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(m.x, m.y);
+    ctx.lineTo(tailX, tailY);
+    ctx.stroke();
+    // 亮头
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${m.hue}, 100%, 92%, ${m.life})`;
+    ctx.fill();
+  }
+
+  requestAnimationFrame(drawStarCanvas);
 }
 
 let particles = [];
