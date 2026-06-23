@@ -216,7 +216,8 @@ body {
   gap: 8px;
   max-height: 560px;
   overflow-y: auto;
-  padding-right: 2px;
+  /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
+  scrollbar-gutter: stable;
 }
 .spirit-picker-option {
   background: rgba(255,255,255,0.03);
@@ -2181,9 +2182,10 @@ function _renderPickerOptionsHTML(side, list) {
 
 // 按当前 filter 过滤 SPRITES，返回 [id, sprite] 列表。
 //   - common   : 命中 PICKER_PRESETS 中对应侧的 id
-//   - elements : 精灵的系别与之有任一交集（OR 关系）
+//   - elements : 精灵必须同时包含所有选中的系别（AND 关系；选 2 个系别
+//                即可筛出"双系精灵"，单系精灵会被排除）
 //   - text     : 精灵名 / pinyin / pinyin_initials 三者任一 includes 命中
-// 三组筛选条件之间是 AND 关系（必须同时满足）。
+// common / elements / text 三组筛选条件之间也是 AND 关系（必须同时满足）。
 function filterSpirits(side, filter) {
   const text = (filter.text || '').trim().toLowerCase();
   const commonList = (side === 'attacker' ? PICKER_PRESETS.common_attackers : PICKER_PRESETS.common_defenders) || [];
@@ -2196,11 +2198,13 @@ function filterSpirits(side, filter) {
     if (filter.common && !commonSet.has(id)) continue;
     if (wantEls.size > 0) {
       const spiritEls = (s.types || []).map(t => stripXi(t));
-      let hit = false;
-      for (let j = 0; j < spiritEls.length; j++) {
-        if (wantEls.has(spiritEls[j])) { hit = true; break; }
+      // AND：精灵必须包含每一个被选中的系别。
+      // 例：选了"火"和"飞行"，只有同时是火系和飞行系的精灵才命中。
+      let allMatch = true;
+      for (const want of wantEls) {
+        if (!spiritEls.includes(want)) { allMatch = false; break; }
       }
-      if (!hit) continue;
+      if (!allMatch) continue;
     }
     if (text) {
       const name = (s.name || '').toLowerCase();
@@ -2321,6 +2325,38 @@ function refreshPickerGrid(side) {
   grid.innerHTML = _renderPickerOptionsHTML(side, filtered);
 }
 
+// 增量更新 toolbar 中各 chip 的 active 状态（不重建 DOM，因此 spirit-picker
+// 上的 spiritAreaIn 动画不会被重播）。搜索框 input 不在此处触碰。
+function refreshPickerToolbar(side) {
+  const toolbar = document.querySelector(`#${side}-select-area .spirit-picker-toolbar`);
+  if (!toolbar) return;
+  const filter = state.spiritPickerFilter[side];
+
+  // 常见 chip
+  const commonChip = toolbar.querySelector('.spirit-picker-chip.common');
+  if (commonChip) {
+    commonChip.classList.toggle('active', filter.common);
+    commonChip.setAttribute('aria-pressed', filter.common ? 'true' : 'false');
+    commonChip.title = filter.common
+      ? '点击取消"常见"筛选'
+      : '点击只显示常见精灵';
+  }
+
+  // 系别 chip
+  toolbar.querySelectorAll('.element-chip').forEach(chip => {
+    const key = chip.dataset.element;
+    const el = ELEMENTS[key];
+    if (!el) return;
+    const active = filter.elements.has(key);
+    chip.classList.toggle('active', active);
+    chip.setAttribute('aria-pressed', active ? 'true' : 'false');
+    const tip = active
+      ? '点击取消'
+      : (filter.elements.size >= 2 ? '最多选 2 个系别' : '点击筛选');
+    chip.title = `${el.name}（${tip}）`;
+  });
+}
+
 // --- Picker interactions (search + filter chips) ---
 
 function onPickerSearchInput(side, val) {
@@ -2344,9 +2380,12 @@ function clearPickerSearch(side) {
   refreshPickerGrid(side);
   if (input) input.focus();
 }
+// chip 切换和清除筛选全部走增量更新：仅刷新 chip 高亮 + grid，
+// 不重建 spirit-picker 容器，避免重播 spiritAreaIn 动画。
 function togglePickerCommon(side) {
   state.spiritPickerFilter[side].common = !state.spiritPickerFilter[side].common;
-  renderSpiritPicker(side);
+  refreshPickerToolbar(side);
+  refreshPickerGrid(side);
 }
 function togglePickerElement(side, elKey) {
   const filter = state.spiritPickerFilter[side];
@@ -2357,14 +2396,24 @@ function togglePickerElement(side, elKey) {
     if (filter.elements.size >= 2) return;
     filter.elements.add(elKey);
   }
-  renderSpiritPicker(side);
+  refreshPickerToolbar(side);
+  refreshPickerGrid(side);
 }
 function resetPickerFilter(side) {
   const f = state.spiritPickerFilter[side];
   f.text = '';
   f.common = false;
   f.elements = new Set();
-  renderSpiritPicker(side);
+  // 同步搜索框 UI（input value + 清除按钮的可见性）
+  const input = document.getElementById(`${side}-picker-search`);
+  if (input) input.value = '';
+  const clearBtn = document.getElementById(`${side}-picker-search-clear`);
+  if (clearBtn) {
+    clearBtn.classList.add('is-hidden');
+    clearBtn.setAttribute('tabindex', '-1');
+  }
+  refreshPickerToolbar(side);
+  refreshPickerGrid(side);
 }
 
 function renderSpiritCard(side) {
