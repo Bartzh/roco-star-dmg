@@ -32,6 +32,10 @@
 /* ============ Reset & Base ============ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 始终预留垂直滚动条 gutter，避免页面过长时滚动条出现/消失造成
+   横向布局位移（视觉上的整体左/右抖动）。 */
+html { overflow-y: scroll; }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg-primary);
