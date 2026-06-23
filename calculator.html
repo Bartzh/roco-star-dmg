@@ -85,12 +85,23 @@ body {
   color: var(--text-primary);
   text-shadow: 0 0 24px rgba(0,229,255,0.18);
 }
-.header h1 span { color: var(--accent-gold); font-weight: 600; }
 .header .subtitle {
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-top: 6px;
   letter-spacing: 1px;
+}
+.header .subtitle a {
+  color: #7be0ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(123,224,255,0.4);
+  padding-bottom: 1px;
+  transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
+}
+.header .subtitle a:hover {
+  color: #b8f0ff;
+  border-bottom-color: #b8f0ff;
+  text-shadow: 0 0 8px rgba(123,224,255,0.6);
 }
 
 /* ============ Battle Area ============ */
@@ -1541,8 +1552,8 @@ body {
 
 <div class="container" id="main-container">
   <header class="header">
-    <h1><span>星陨</span>伤害计算器</h1>
-    <p class="subtitle">选择精灵与技能，拖动星陨印记，实时计算伤害</p>
+    <h1>星陨伤害计算器</h1>
+    <p class="subtitle">数据来自<a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a></p>
   </header>
 
   <section class="battle-area" aria-label="对战配置区">
