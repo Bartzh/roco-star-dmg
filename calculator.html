@@ -127,25 +127,6 @@ body {
 }
 .spirit-panel .panel-label .icon { font-size: 1rem; }
 
-/* Spirit Select Button */
-.spirit-select {
-  width: 100%;
-  padding: 16px;
-  background: rgba(255,255,255,0.03);
-  border: 1px dashed rgba(255,255,255,0.15);
-  border-radius: 12px;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-align: center;
-}
-.spirit-select:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  background: rgba(0,229,255,0.05);
-}
-
 /* Spirit Card (selected) */
 .spirit-card {
   background: rgba(255,255,255,0.04);
@@ -188,6 +169,147 @@ body {
   transition: opacity 0.3s;
 }
 .spirit-card:hover .change-hint { opacity: 1; }
+
+/* ============ Inline Spirit Picker ============ */
+/* 精灵选择直接渲染在精灵面板中（替代原来的模态弹窗） */
+.spirit-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.spirit-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.spirit-picker-header .picker-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+}
+.spirit-picker-header .picker-btn {
+  padding: 4px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.spirit-picker-header .picker-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.22);
+}
+.spirit-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.spirit-picker-option {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  position: relative;
+}
+.spirit-picker-option:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+.spirit-picker-option.current {
+  border-color: var(--accent-cyan);
+  background: rgba(0,229,255,0.1);
+  box-shadow: 0 0 0 1px var(--accent-cyan);
+}
+.spirit-picker-option.current::after {
+  content: '✓';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  color: var(--accent-cyan);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.spirit-picker-option .picker-image {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  position: relative;
+  background: rgba(255,255,255,0.05);
+}
+.spirit-picker-option .picker-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.spirit-picker-option .picker-image .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  color: rgba(255,255,255,0.95);
+}
+.spirit-picker-option .picker-name {
+  font-weight: 600;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+.spirit-picker-option .picker-types {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.spirit-picker-option .picker-types .type-tag {
+  font-size: 0.6rem;
+  padding: 1px 5px;
+}
+.spirit-picker-option .picker-types .type-icon {
+  width: 18px;
+  height: 18px;
+}
+/* “未选择”伪选项：点击清除当前选择 */
+.spirit-picker-option.none-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  border-style: dashed;
+}
+.spirit-picker-option.none-option:hover {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+  background: rgba(255, 59, 59, 0.05);
+}
+.spirit-picker-option.none-option.current {
+  color: var(--accent-cyan);
+}
 
 /* Element colors */
 .el-fire { --el-color: #ff4444; --el-bg: rgba(255,68,68,0.15); }
@@ -792,85 +914,6 @@ body {
   display: none;
 }
 
-/* ============ Modal ============ */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 100;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-
-.modal {
-  background: var(--bg-secondary);
-  border: 1px solid var(--glass-border);
-  border-radius: 20px;
-  padding: 32px;
-  max-width: 700px;
-  width: 100%;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-.modal h2 {
-  font-size: 1.2rem;
-  font-weight: 500;
-  margin-bottom: 20px;
-  text-align: center;
-  letter-spacing: 2px;
-}
-
-.spirit-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-}
-.spirit-option {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  text-align: center;
-}
-.spirit-option:hover {
-  background: rgba(255,255,255,0.08);
-  border-color: var(--accent-cyan);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-.spirit-option .emoji { font-size: 2.2rem; display: block; margin-bottom: 6px; }
-.spirit-option .name { font-weight: 600; font-size: 0.95rem; margin-bottom: 2px; }
-.spirit-option .mini-stats {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  margin-top: 6px;
-}
-
-.modal-close {
-  display: block;
-  margin: 20px auto 0;
-  padding: 10px 32px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-.modal-close:hover {
-  background: rgba(255,255,255,0.1);
-  color: var(--text-primary);
-}
-
 /* ============ Animations ============ */
 @keyframes seal-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -982,6 +1025,12 @@ body {
     gap: 4px;
   }
   .iv-slot { min-width: 38px; font-size: 0.6rem; }
+  /* Spirit picker: 3 columns on mobile, taller scroll area */
+  .spirit-picker-grid {
+    grid-template-columns: repeat(3, 1fr);
+    max-height: 360px;
+  }
+  .spirit-picker-option .picker-name { font-size: 0.72rem; }
 }
 
 /* Scrollbar */
@@ -1020,33 +1069,6 @@ body {
   color: rgba(255,255,255,0.95);
   background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
   text-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-.modal-spirit-image {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 10px;
-  margin-bottom: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal-spirit-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.modal-spirit-image .placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: rgba(255,255,255,0.95);
-  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
 }
 
 /* Type tags wrapper */
@@ -1305,14 +1327,13 @@ body {
   border-radius: 6px;
 }
 .skill-btn:focus-visible,
-.spirit-option:focus-visible,
+.spirit-picker-option:focus-visible,
 .spirit-card:focus-visible,
 .buff-chip:focus-visible,
 .nature-slot:focus-visible,
 .iv-slot:focus-visible,
 .breakdown-toggle:focus-visible,
-.spirit-select:focus-visible,
-.modal-close:focus-visible {
+.picker-btn:focus-visible {
   outline: 2px solid var(--accent-cyan);
   outline-offset: 2px;
   box-shadow: 0 0 0 4px rgba(0,229,255,0.15);
@@ -1364,7 +1385,7 @@ body {
     <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方">
       <h2 class="panel-label">攻击方</h2>
       <div id="attacker-select-area">
-        <button class="spirit-select" type="button" onclick="openModal('attacker')" aria-label="选择攻击方精灵">+ 选择攻击方精灵</button>
+        <!-- 由 JS 渲染：未选时为内嵌选择器，选后为精灵卡 -->
       </div>
       <div class="stats-section" id="attacker-stats" style="display:none">
         <h3 class="section-title">
@@ -1429,7 +1450,7 @@ body {
     <section class="spirit-panel glass-panel" id="defender-panel" aria-label="防御方">
       <h2 class="panel-label">防御方</h2>
       <div id="defender-select-area">
-        <button class="spirit-select" type="button" onclick="openModal('defender')" aria-label="选择防御方精灵">+ 选择防御方精灵</button>
+        <!-- 由 JS 渲染：未选时为内嵌选择器，选后为精灵卡 -->
       </div>
       <div class="stats-section" id="defender-stats" style="display:none">
         <h3 class="section-title">
@@ -1454,14 +1475,6 @@ body {
       <div class="breakdown-list" id="breakdown-list"></div>
     </div>
   </section>
-</div>
-
-<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)" role="presentation">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <h2 id="modal-title">选择精灵</h2>
-    <div class="spirit-grid" id="spirit-grid"></div>
-    <button class="modal-close" type="button" onclick="closeModal()" aria-label="关闭选择面板">关闭</button>
-  </div>
 </div>
 
 <script>
@@ -1581,7 +1594,8 @@ let state = {
   defenseSkill: null,    // full skill object (SKILLS[id]) or null = "无"
   defenseSkillIdx: 0,    // 0 = "无"
   starLayer: 0,
-  modalTarget: null,
+  // 精灵面板是否处于“选择中”状态（true 时渲染内嵌选择器而非卡片）
+  spiritPicking: { attacker: false, defender: false },
   // Per-side nature { up: statKey|null, down: statKey|null } and IVs (array of statKeys)
   attackerNature: { up: null, down: null },
   defenderNature: { up: null, down: null },
@@ -1937,101 +1951,98 @@ function animateNumber(el, from, to, duration) {
 }
 
 // ============================================================
-// MODAL
+// INLINE SPIRIT PICKER
+// 精灵选择直接渲染在精灵面板中（不再使用模态弹窗）
+//   - 未选或进入“选择中”状态 → 渲染内嵌选择器
+//   - 选中后 → 渲染精灵卡，点击卡片可切回选择器
+//   - 选择器中有“取消”按钮（已选时显示）和“未选择”选项（清除当前选择）
 // ============================================================
-function openModal(target) {
-  state.modalTarget = target;
-  const overlay = document.getElementById('modal-overlay');
-  const title = document.getElementById('modal-title');
-  const grid = document.getElementById('spirit-grid');
-  title.textContent = target === 'attacker' ? '选择攻击方精灵' : '选择防御方精灵';
+function renderSpiritArea(side) {
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+  // 处于“选择中”或尚未选精灵 → 渲染选择器
+  if (state.spiritPicking[side] || !spirit) {
+    renderSpiritPicker(side);
+  } else {
+    renderSpiritCard(side);
+  }
+}
+
+function renderSpiritPicker(side) {
+  const selectArea = document.getElementById(`${side}-select-area`);
+  const skillsSection = document.getElementById(`${side}-skills`);
+  const statsSection = document.getElementById(`${side}-stats`);
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+
+  // 处于选择中时，属性配置与技能列表应隐藏（待新精灵确定后再渲染）
+  skillsSection.style.display = 'none';
+  statsSection.style.display = 'none';
+
+  const titleText = side === 'attacker' ? '选择攻击方精灵' : '选择防御方精灵';
+  // 仅在已选精灵时才显示“取消”按钮（点击返回卡片，不改动）
+  const cancelBtn = spirit
+    ? `<button class="picker-btn" type="button" onclick="exitSpiritPicker('${side}')" aria-label="取消更换">取消</button>`
+    : '';
+
+  // 构建所有精灵的选项
   const list = Object.entries(SPRITES);
-  grid.innerHTML = list.map(([id, s]) => {
+  const optionsHTML = list.map(([id, s]) => {
     const types = (s.types || []).map(t => elOf(t));
+    const primaryColor = types[0]?.color || '#888';
     const tagsHTML = types.map(t =>
       t.iconUrl
         ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
         : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
     ).join('');
     const illus = s.illustration_url
-      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${types[0]?.color || '#888'}'}))">`
-      : `<div class="placeholder" style="--el-color:${types[0]?.color || '#888'}">${(s.name||'').slice(0,1)}</div>`;
+      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
+      : `<div class="placeholder" style="--el-color:${primaryColor}">${(s.name||'').slice(0,1)}</div>`;
+    const isCurrent = !!(spirit && spirit.id === id);
     return `
-      <div class="spirit-option" role="button" tabindex="0"
-           aria-label="选择 ${s.name}"
-           style="--el-color:${types[0]?.color || '#888'}"
-           onclick="selectSpirit('${id}')"
-           onkeydown="onSpiritOptionKey(event, '${id}')">
-        <div class="modal-spirit-image">${illus}</div>
-        <div class="name">${s.name}</div>
-        <div class="type-tags">${tagsHTML}</div>
-        <div class="mini-stats">生命 ${s.hp} · 物攻 ${s.atk} · 魔攻 ${s.matk} · 物防 ${s.def} · 魔防 ${s.mdef} · 速度 ${s.spd ?? 0}</div>
+      <div class="spirit-picker-option ${isCurrent ? 'current' : ''}" role="button" tabindex="0"
+           aria-label="选择 ${s.name}${isCurrent ? '（当前）' : ''}"
+           data-spirit-id="${id}"
+           style="--el-color:${primaryColor}"
+           onclick="selectSpirit('${side}', '${id}')"
+           onkeydown="onSpiritPickerOptionKey(event, '${side}', '${id}')">
+        <div class="picker-image">${illus}</div>
+        <div class="picker-name">${s.name}</div>
+        <div class="picker-types">${tagsHTML}</div>
       </div>
     `;
   }).join('');
-  overlay.classList.add('show');
-  // Remember the trigger so we can restore focus on close
-  state._modalReturnFocus = document.activeElement;
-  // Move focus into the modal: first option
-  const firstOption = grid.querySelector('.spirit-option');
-  if (firstOption) firstOption.focus();
-}
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('show');
-  state.modalTarget = null;
-  // Restore focus to the element that opened the modal
-  if (state._modalReturnFocus && typeof state._modalReturnFocus.focus === 'function') {
-    try { state._modalReturnFocus.focus(); } catch (_) {}
+
+  // “未选择”伪选项：清除当前选择
+  const noneIsCurrent = !spirit;
+  const noneOption = `
+    <div class="spirit-picker-option none-option ${noneIsCurrent ? 'current' : ''}" role="button" tabindex="0"
+         aria-label="清除选择${noneIsCurrent ? '（当前）' : ''}"
+         onclick="clearSpirit('${side}')"
+         onkeydown="onSpiritPickerOptionKey(event, '${side}', '__clear__')">
+      <div class="picker-name">未选择</div>
+    </div>
+  `;
+
+  selectArea.innerHTML = `
+    <div class="spirit-picker">
+      <div class="spirit-picker-header">
+        <span class="picker-title">${titleText}</span>
+        ${cancelBtn}
+      </div>
+      <div class="spirit-picker-grid">${noneOption}${optionsHTML}</div>
+    </div>
+  `;
+
+  // 若有当前选中项，自动滚动到视图中央
+  if (spirit) {
+    const currentEl = selectArea.querySelector('.spirit-picker-option.current:not(.none-option)');
+    if (currentEl) {
+      requestAnimationFrame(() => {
+        currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    }
   }
-  state._modalReturnFocus = null;
-}
-function closeModalOutside(e) {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
 }
 
-// Global Esc-to-close-modal handler
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('modal-overlay').classList.contains('show')) {
-    e.preventDefault();
-    closeModal();
-  }
-});
-
-function selectSpirit(id) {
-  const s = SPRITES[id];
-  if (!s) return;
-  if (state.modalTarget === 'attacker') {
-    state.attacker = s;
-    const opts = getAttackSkillOptions(s);
-    state.attackSkill = opts[0] || null;
-    state.attackSkillIdx = state.attackSkill ? 0 : -1;
-    // Apply default nature/IVs for attacker
-    state.attackerNature = { ...DEFAULT_NATURE.attacker };
-    state.attackerIVs    = DEFAULT_IVS.attacker.slice();
-    // Reset attacker buffs on spirit change
-    state.attackerBuff   = { atk: 0, matk: 0 };
-    renderSpiritCard('attacker');
-  } else if (state.modalTarget === 'defender') {
-    state.defender = s;
-    const opts = getDefenseSkillOptions(s);
-    state.defenseSkill = opts[0]; // "无"
-    state.defenseSkillIdx = 0;
-    // Apply default nature/IVs for defender
-    state.defenderNature = { ...DEFAULT_NATURE.defender };
-    state.defenderIVs    = DEFAULT_IVS.defender.slice();
-    // Reset defender buffs on spirit change
-    state.defenderBuff   = { def: 0, mdef: 0 };
-    renderSpiritCard('defender');
-    // Defender changed → attacker's power-badge colors need to refresh
-    if (state.attacker) renderSkills('attacker');
-  }
-  closeModal();
-  calculateDamage();
-}
-
-// ============================================================
-// RENDER SPIRIT CARDS
-// ============================================================
 function renderSpiritCard(side) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   if (!spirit) return;
@@ -2050,7 +2061,7 @@ function renderSpiritCard(side) {
   selectArea.innerHTML = `
     <div class="spirit-card" role="button" tabindex="0"
          aria-label="更换${side === 'attacker' ? '攻击方' : '防御方'}精灵（当前：${spirit.name}）"
-         onclick="openModal('${side}')"
+         onclick="enterSpiritPicker('${side}')"
          onkeydown="onSpiritCardKey(event, '${side}')"
          style="--el-color:${primaryColor}">
       <div class="spirit-image">${illus}</div>
@@ -2062,6 +2073,77 @@ function renderSpiritCard(side) {
   skillsSection.style.display = 'block';
   renderSkills(side);
   renderStatsConfig(side);
+}
+
+// 进入/退出“选择中”状态
+function enterSpiritPicker(side) {
+  state.spiritPicking[side] = true;
+  renderSpiritArea(side);
+}
+function exitSpiritPicker(side) {
+  state.spiritPicking[side] = false;
+  renderSpiritArea(side);
+}
+
+// 选择一个精灵
+function selectSpirit(side, id) {
+  const s = SPRITES[id];
+  if (!s) return;
+  // 给精灵对象附带 id 字段（便于在选择器中识别当前选中项）
+  const spirit = { id, ...s };
+  if (side === 'attacker') {
+    state.attacker = spirit;
+    const opts = getAttackSkillOptions(spirit);
+    state.attackSkill = opts[0] || null;
+    state.attackSkillIdx = state.attackSkill ? 0 : -1;
+    // Apply default nature/IVs for attacker
+    state.attackerNature = { ...DEFAULT_NATURE.attacker };
+    state.attackerIVs    = DEFAULT_IVS.attacker.slice();
+    // Reset attacker buffs on spirit change
+    state.attackerBuff   = { atk: 0, matk: 0 };
+    state.spiritPicking.attacker = false;
+    renderSpiritArea('attacker');
+  } else if (side === 'defender') {
+    state.defender = spirit;
+    const opts = getDefenseSkillOptions(spirit);
+    state.defenseSkill = opts[0]; // "无"
+    state.defenseSkillIdx = 0;
+    // Apply default nature/IVs for defender
+    state.defenderNature = { ...DEFAULT_NATURE.defender };
+    state.defenderIVs    = DEFAULT_IVS.defender.slice();
+    // Reset defender buffs on spirit change
+    state.defenderBuff   = { def: 0, mdef: 0 };
+    state.spiritPicking.defender = false;
+    renderSpiritArea('defender');
+    // Defender changed → attacker's power-badge colors need to refresh
+    if (state.attacker) renderSkills('attacker');
+  }
+  calculateDamage();
+}
+
+// 清除选择：回到“未选择”状态（仍停留在选择器中）
+function clearSpirit(side) {
+  if (side === 'attacker') {
+    state.attacker = null;
+    state.attackSkill = null;
+    state.attackSkillIdx = -1;
+    state.attackerNature = { up: null, down: null };
+    state.attackerIVs = [];
+    state.attackerBuff = { atk: 0, matk: 0 };
+    state.spiritPicking.attacker = false;
+    renderSpiritArea('attacker');
+  } else if (side === 'defender') {
+    state.defender = null;
+    state.defenseSkill = null;
+    state.defenseSkillIdx = 0;
+    state.defenderNature = { up: null, down: null };
+    state.defenderIVs = [];
+    state.defenderBuff = { def: 0, mdef: 0 };
+    state.spiritPicking.defender = false;
+    renderSpiritArea('defender');
+    if (state.attacker) renderSkills('attacker');
+  }
+  calculateDamage();
 }
 
 // ============================================================
@@ -2287,15 +2369,16 @@ function onBuffWheel(e) {
 function onSpiritCardKey(e, side) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
-    openModal(side);
+    enterSpiritPicker(side);
   }
 }
 
-// Keyboard support for spirit-option in the modal (Enter/Space to select)
-function onSpiritOptionKey(e, id) {
+// Keyboard support for spirit-picker-option (Enter/Space to select / clear)
+function onSpiritPickerOptionKey(e, side, id) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
-    selectSpirit(id);
+    if (id === '__clear__') clearSpirit(side);
+    else                    selectSpirit(side, id);
   }
 }
 
@@ -2809,6 +2892,9 @@ function init() {
   initParticles();
   initSealInteraction();
   updateSealGlow();
+  // 初始即渲染两侧的内嵌选择器（未选精灵时直接显示）
+  renderSpiritArea('attacker');
+  renderSpiritArea('defender');
   renderWaiting();
 }
 
