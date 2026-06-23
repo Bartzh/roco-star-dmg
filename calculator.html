@@ -2886,6 +2886,14 @@ const SKILL_MODS = {
       notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
     };
   },
+  // 坠星：全技能威力每层星陨 +20%
+  skill_000218(_skill, ctx) {
+    const mult = 1 + 0.2 * ctx.starLayer;
+    return {
+      powerMult: mult,
+      notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
