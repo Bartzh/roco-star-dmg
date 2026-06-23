@@ -1930,22 +1930,20 @@ function effectiveness(skillElementRaw, defenderTypesRaw) {
 // ============================================================
 // STAR BACKGROUND, PARTICLES, SEAL
 // ============================================================
-// STAR BACKGROUND — multi-layer parallax + shooting stars
+// STAR BACKGROUND — multi-layer parallax
 // 概念：Stellar Stratigraphy — 星空按深度分三层（远/中/近），
 //   每层有独立的密度、大小、闪烁节奏与色彩温度。
 //   鼠标位置作为"视点"驱动每层以不同比例的偏移（视差）。
-//   偶发流星：自然概率出现；星陨层数升高时增频，呼应"星陨"主题。
+//   颜色与圆盘 seal-glow 严格同步，呼应"星陨"主题。
 // 种子化随机：固定种子保证每次刷新星空布局可复现。
 // ============================================================
 let starLayers = [];
-let shootingStars = [];
 let starCanvas, starCtx;
 let mouseParallax = { x: 0, y: 0 };
 let starTargetParallax = { x: 0, y: 0 };
 
 const STAR_SEED = 0x5A7C0E;          // 固定种子：星空布局每次刷新都一致
 const PARALLAX_EASE = 0.06;          // 鼠标→视差平滑系数（越小越柔）
-const SHOOTING_STAR_MAX = 6;         // 同时存在的流星数上限（高层数时支持流星暴雨）
 
 // mulberry32：可种子化的伪随机生成器，确定性优于 Math.random。
 function mulberry32(seed) {
@@ -2040,51 +2038,6 @@ function buildStarLayers() {
     }
     starLayers.push({ ...cfg, stars });
   });
-
-  shootingStars = [];
-}
-
-// 公开触发：可在高星陨层数等事件里主动调用以提升氛围。
-// 流星横向划过页面（不再竖直下落）。颜色与圆盘 seal-glow 严格同步。
-function spawnShootingStar(layerT) {
-  if (shootingStars.length >= SHOOTING_STAR_MAX) return;
-  if (!starCanvas) return;
-  const t = (typeof layerT === 'number') ? layerT
-           : ((typeof state !== 'undefined' && state.starLayer != null)
-              ? state.starLayer / 99 : 0);
-  // 先确保颜色变量与层数同步（spawnShootingStar 可能在 updateStarTheme 之前被调用）
-  if (typeof sealR === 'number') {
-    if (t < 0.5) {
-      const p = t / 0.5;
-      sealR = Math.round(100 + 155 * p);
-      sealG = Math.round(140 + 75 * p);
-      sealB = Math.round(255 - 255 * p);
-    } else {
-      const p = (t - 0.5) / 0.5;
-      sealR = 255;
-      sealG = Math.round(215 + 40 * p);
-      sealB = Math.round(0 + 200 * p);
-    }
-  }
-  const w = starCanvas.width, h = starCanvas.height;
-  // 50/50 左右方向，y 起点在屏幕中部 10%~90%，制造横向划过的感觉
-  const dirX = Math.random() < 0.5 ? 1 : -1;
-  const startY = h * 0.1 + Math.random() * h * 0.8;
-  const startX = dirX === 1 ? -30 : w + 30;
-  // 角度贴近水平方向，加 ±0.25 弧度（约 ±14°）的轻微上下倾角
-  const tilt = (Math.random() - 0.5) * 0.5;
-  const angle = (dirX === 1 ? 0 : Math.PI) + tilt;
-  // 高层数时流星更快、更长
-  const speed = (6 + Math.random() * 4) * (1 + t * 0.6);
-  shootingStars.push({
-    x: startX, y: startY,
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    life: 1,
-    decay: 0.012 + Math.random() * 0.008,
-    length: (60 + Math.random() * 60) * (1 + t * 0.5),
-    r: sealR, g: sealG, b: sealB,        // 直接复用圆盘主色
-  });
 }
 
 function drawStarCanvas() {
@@ -2097,7 +2050,7 @@ function drawStarCanvas() {
   mouseParallax.x += (starTargetParallax.x - mouseParallax.x) * PARALLAX_EASE;
   mouseParallax.y += (starTargetParallax.y - mouseParallax.y) * PARALLAX_EASE;
 
-  // 全局星陨强度（0..1），驱动背景星亮度 / 闪烁节奏 / 流星频率。
+  // 全局星陨强度（0..1），驱动背景星亮度 / 闪烁节奏。
   const layerT = (typeof state !== 'undefined' && state.starLayer != null)
     ? state.starLayer / 99 : 0;
   // 整体提亮 1.0 → 1.5（高层数时整片星空微微"燃烧"）
@@ -2145,50 +2098,6 @@ function drawStarCanvas() {
     }
   }
 
-  // 流星：自然生成 + 频率与星陨层数 0..99 平滑挂钩 (state 可能未就绪，加保护)。
-  const baseRate = 0.0008;
-  // 线性：0 → 0，1 → 0.012 (约 15× 基础速率)，高层数时还能突破上限
-  const layerBoost = layerT * 0.012;
-  if (Math.random() < baseRate + layerBoost) spawnShootingStar(layerT);
-  // 高层数（>= 0.8）时偶发"流星暴雨"：一次生成 2..3 颗
-  if (layerT > 0.8 && Math.random() < (layerT - 0.8) * 0.25) {
-    const burst = 2 + Math.floor(Math.random() * 2);
-    for (let k = 0; k < burst; k++) spawnShootingStar(layerT);
-  }
-
-  for (let i = shootingStars.length - 1; i >= 0; i--) {
-    const m = shootingStars[i];
-    m.x += m.vx;
-    m.y += m.vy;
-    m.life -= m.decay;
-    // 横向划出视野即销毁（左右两侧 + 上下各留 100px 余量）
-    if (m.life <= 0 || m.x < -100 || m.x > w + 100 || m.y < -100 || m.y > h + 100) {
-      shootingStars.splice(i, 1);
-      continue;
-    }
-    const speed = Math.hypot(m.vx, m.vy);
-    const tailX = m.x - m.vx * (m.length / speed);
-    const tailY = m.y - m.vy * (m.length / speed);
-    const grad = ctx.createLinearGradient(m.x, m.y, tailX, tailY);
-    grad.addColorStop(0, `rgba(${m.r},${m.g},${m.b},${m.life * 0.9})`);
-    grad.addColorStop(1, `rgba(${m.r},${m.g},${m.b},0)`);
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(m.x, m.y);
-    ctx.lineTo(tailX, tailY);
-    ctx.stroke();
-    // 亮头：每个通道 +25 提亮，模拟高温白热点
-    const hr = Math.min(255, m.r + 25);
-    const hg = Math.min(255, m.g + 25);
-    const hb = Math.min(255, m.b + 25);
-    ctx.beginPath();
-    ctx.arc(m.x, m.y, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${hr},${hg},${hb},${m.life})`;
-    ctx.fill();
-  }
-
   requestAnimationFrame(drawStarCanvas);
 }
 
@@ -2201,7 +2110,7 @@ function drawStarCanvas() {
 //     · 在中段（30..70）时，环境火花增多，冲击波涟漪频繁出现；
 //     · 在高层数（70..99）时，色彩由冷蓝转向金红，射出强列的"星陨冲击"。
 //   与 updateSealGlow() 共享同一条 RGB 渐变曲线（冷蓝紫 → 金黄 → 乳白），
-//   让圆盘粒子、流星、星空都与圆盘中心主色严格同步，不再出现"蓝→绿→白"漂移。
+//   让圆盘粒子和星空与圆盘中心主色严格同步，不再出现"蓝→绿→白"漂移。
 // ============================================================
 const DISC = {
   cx: 140, cy: 140,
@@ -2512,16 +2421,10 @@ function setStarLayer(value) {
     numberEl.classList.remove('number-pop');
     void numberEl.offsetWidth;
     numberEl.classList.add('number-pop');
-    // 一次操作内仅在跳跃幅度 ≥ 3 时触发冲击波 + 流星爆，避免拖拽时刷屏。
+    // 一次操作内仅在跳跃幅度 ≥ 3 时触发冲击波，避免拖拽时刷屏。
     const jump = Math.abs(state.starLayer - old);
     if (jump >= 3) {
       emitShockwave();
-      if (typeof spawnShootingStar === 'function') {
-        // 高层数跳跃额外送 1 颗流星呼应"星陨"
-        if (state.starLayer > 50 && Math.random() < 0.55) {
-          spawnShootingStar(state.starLayer / 99);
-        }
-      }
     }
   }
   calculateDamage();
