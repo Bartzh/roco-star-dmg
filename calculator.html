@@ -214,7 +214,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  max-height: 431px;
+  max-height: 451px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
@@ -326,10 +326,13 @@ body {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 .spirit-picker-search input {
   flex: 1;
-  padding: 6px 28px 6px 28px;
+  min-width: 0;
+  /* 左侧 28px 让出 🔍，右侧由 flex gap 撑开与 chip/× 的距离 */
+  padding: 6px 6px 6px 28px;
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
@@ -338,16 +341,17 @@ body {
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
-  min-width: 0;
 }
 .spirit-picker-search input::placeholder { color: var(--text-secondary); }
 .spirit-picker-search input:focus {
   border-color: var(--accent-cyan);
   background: rgba(0,229,255,0.06);
 }
-.spirit-picker-search .search-icon,
-.spirit-picker-search .search-clear {
+.spirit-picker-search .search-icon {
   position: absolute;
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 18px;
   height: 18px;
   display: flex;
@@ -357,11 +361,16 @@ body {
   font-size: 0.9rem;
   pointer-events: none;
 }
-.spirit-picker-search .search-icon { left: 7px; }
+/* × 清空按钮改为 flex 元素，跟在常见 chip 之后 */
 .spirit-picker-search .search-clear {
-  right: 5px;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
   cursor: pointer;
-  pointer-events: auto;
   border-radius: 50%;
   transition: background 0.15s ease, color 0.15s ease;
   font-size: 1rem;
@@ -372,6 +381,12 @@ body {
   color: var(--text-primary);
 }
 .spirit-picker-search .search-clear.is-hidden { display: none; }
+/* 搜索框内的"常见"chip 仍然按文字内容呈现，保持胶囊状 */
+.spirit-picker-search .spirit-picker-chip.common {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 16px;
+}
 
 .spirit-picker-chips {
   display: flex;
@@ -379,30 +394,25 @@ body {
   gap: 6px;
   align-items: center;
 }
-.spirit-picker-chips .chip-group-label {
-  font-size: 0.62rem;
-  color: var(--text-secondary);
-  letter-spacing: 1px;
-  margin-right: 2px;
-  text-transform: uppercase;
-  font-weight: 600;
-}
+/* "常用/系别" label 已移除，保留选择器占位 */
+.spirit-picker-chips .chip-group-label { display: none; }
+
+/* chip 默认是圆形：四边相同的 padding 配合 18x18 icon 形成正方形 + 50% 圆角。
+   .common 例外（见上方搜索框内的覆盖） */
 .spirit-picker-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 3px 8px;
+  padding: 6px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
+  border-radius: 50%;
   color: var(--text-secondary);
   font-size: 0.7rem;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
-  white-space: nowrap;
   line-height: 1;
 }
 .spirit-picker-chip:hover {
@@ -432,13 +442,6 @@ body {
   font-size: 0.95rem;
   line-height: 1;
 }
-.spirit-picker-chip .chip-count {
-  margin-left: 2px;
-  font-size: 0.6rem;
-  color: var(--text-secondary);
-  font-family: 'Courier New', monospace;
-}
-.spirit-picker-chip.active .chip-count { color: var(--accent-cyan); }
 .spirit-picker-chip.common .chip-text {
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -2216,11 +2219,10 @@ function filterSpirits(side, filter) {
   return out;
 }
 
-// 渲染 picker 顶部的 toolbar：搜索框 + 常见 chip + 系别 chip 行。
+// 渲染 picker 顶部的 toolbar：搜索框（内含"常见"chip + × 清空按钮）+ 系别 chip 行。
 function renderPickerToolbar(side, filter) {
   const commonActive = filter.common ? ' active' : '';
   const commonList = (side === 'attacker' ? PICKER_PRESETS.common_attackers : PICKER_PRESETS.common_defenders) || [];
-  const commonCount = commonList.length;
 
   const elementChips = PICKER_ELEMENT_KEYS.map(key => {
     const el = ELEMENTS[key];
@@ -2247,20 +2249,18 @@ function renderPickerToolbar(side, filter) {
                oninput="onPickerSearchInput('${side}', this.value)"
                placeholder="搜索：名称 / 拼音 / 首字母"
                aria-label="搜索精灵">
+        <button type="button" class="spirit-picker-chip common${commonActive}"
+                onclick="togglePickerCommon('${side}')"
+                aria-pressed="${filter.common ? 'true' : 'false'}"
+                title="${filter.common ? '点击取消"常见"筛选' : '点击只显示常见精灵'}">
+          <span class="chip-text">常见</span>
+        </button>
         <span id="${side}-picker-search-clear" class="search-clear ${filter.text ? '' : 'is-hidden'}"
               role="button" tabindex="${filter.text ? 0 : -1}" aria-label="清空搜索"
               onclick="clearPickerSearch('${side}')"
               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();clearPickerSearch('${side}')}">×</span>
       </div>
       <div class="spirit-picker-chips">
-        <span class="chip-group-label">常用</span>
-        <button type="button" class="spirit-picker-chip common${commonActive}"
-                onclick="togglePickerCommon('${side}')"
-                aria-pressed="${filter.common ? 'true' : 'false'}"
-                title="${filter.common ? '点击取消"常见"筛选' : '点击只显示常见精灵'}">
-          <span class="chip-text">常见</span><span class="chip-count">${commonCount}</span>
-        </button>
-        <span class="chip-group-label" style="margin-left:6px">系别</span>
         ${elementChips}
       </div>
     </div>
