@@ -312,6 +312,163 @@ body {
   .spirit-picker, .spirit-card { animation: none; }
 }
 
+/* ============ Spirit Picker Toolbar (search + filter chips) ============ */
+.spirit-picker-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+}
+.spirit-picker-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.spirit-picker-search input {
+  flex: 1;
+  padding: 6px 28px 6px 28px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  min-width: 0;
+}
+.spirit-picker-search input::placeholder { color: var(--text-secondary); }
+.spirit-picker-search input:focus {
+  border-color: var(--accent-cyan);
+  background: rgba(0,229,255,0.06);
+}
+.spirit-picker-search .search-icon,
+.spirit-picker-search .search-clear {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+.spirit-picker-search .search-icon { left: 7px; }
+.spirit-picker-search .search-clear {
+  right: 5px;
+  cursor: pointer;
+  pointer-events: auto;
+  border-radius: 50%;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 1rem;
+  line-height: 1;
+}
+.spirit-picker-search .search-clear:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+}
+.spirit-picker-search .search-clear.is-hidden { display: none; }
+
+.spirit-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.spirit-picker-chips .chip-group-label {
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  margin-right: 2px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.spirit-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1;
+}
+.spirit-picker-chip:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.22);
+}
+.spirit-picker-chip.active {
+  background: rgba(0,229,255,0.18);
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.25);
+}
+.spirit-picker-chip .chip-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,0.4));
+}
+.spirit-picker-chip .chip-emoji {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.spirit-picker-chip .chip-count {
+  margin-left: 2px;
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+.spirit-picker-chip.active .chip-count { color: var(--accent-cyan); }
+.spirit-picker-chip.common .chip-text {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.spirit-picker-empty {
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  grid-column: 1 / -1;
+}
+.spirit-picker-empty button {
+  display: block;
+  margin: 8px auto 0;
+  background: none;
+  border: 1px solid var(--glass-border);
+  color: var(--accent-cyan);
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px 12px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+.spirit-picker-empty button:hover {
+  background: rgba(0,229,255,0.1);
+  border-color: var(--accent-cyan);
+}
+
 /* Element colors */
 .el-fire { --el-color: #ff4444; --el-bg: rgba(255,68,68,0.15); }
 .el-water { --el-color: #4488ff; --el-bg: rgba(68,136,255,0.15); }
@@ -1520,6 +1677,10 @@ function elOf(rawName) {
 let SPRITES = {};
 let SKILLS = {};
 let TYPES = {};
+// Picker presets (硬编码的常见精灵列表等)。Loaded alongside the other
+// data files; defaults to empty lists if the file is missing so the
+// picker still works (the "common" chip just shows 0 and matches nothing).
+let PICKER_PRESETS = { common_attackers: [], common_defenders: [] };
 
 async function loadData() {
   const inlineSprites = document.getElementById('sprites-data');
@@ -1528,6 +1689,11 @@ async function loadData() {
     SPRITES = JSON.parse(inlineSprites.textContent);
     SKILLS  = JSON.parse(document.getElementById('skills-data').textContent);
     TYPES   = JSON.parse(document.getElementById('types-data').textContent);
+    const inlinePresets = document.getElementById('picker-presets');
+    if (inlinePresets) {
+      try { PICKER_PRESETS = JSON.parse(inlinePresets.textContent); }
+      catch (_) { /* keep defaults */ }
+    }
   } else {
     // Source version: fetch from the same directory
     const f = (p) => fetch(p).then(r => {
@@ -1539,6 +1705,8 @@ async function loadData() {
       f('skills.json'),
       f('types.json')
     ]);
+    try { PICKER_PRESETS = await f('picker_presets.json'); }
+    catch (_) { /* keep defaults */ }
   }
   augmentElementsWithTypes();
 }
@@ -1594,6 +1762,15 @@ let state = {
   starLayer: 0,
   // 精灵面板是否处于“选择中”状态（true 时渲染内嵌选择器而非卡片）
   spiritPicking: { attacker: false, defender: false },
+  // 精灵选择器内临时筛选/搜索状态。每次进入选择器时重置；
+  // 退出选择器（选中或取消）后丢弃。
+  //   text    : 搜索框原文（实时、原文大小写）
+  //   common  : 是否启用"常见"过滤
+  //   elements: 当前选中的系别 key 集合（最多 2 个；OR 关系）
+  spiritPickerFilter: {
+    attacker: { text: '', common: false, elements: new Set() },
+    defender: { text: '', common: false, elements: new Set() },
+  },
   // Per-side nature { up: statKey|null, down: statKey|null } and IVs (array of statKeys)
   attackerNature: { up: null, down: null },
   defenderNature: { up: null, down: null },
@@ -1953,8 +2130,140 @@ function animateNumber(el, from, to, duration) {
 // 精灵选择直接渲染在精灵面板中（不再使用模态弹窗）
 //   - 未选或进入“选择中”状态 → 渲染内嵌选择器
 //   - 选中后 → 渲染精灵卡，点击卡片可切回选择器
-//   - 选择器中有“取消”按钮（已选时显示）和“未选择”选项（清除当前选择）
+//   - 选择器中支持搜索（名称/拼音/首字母）和筛选（常见 + 系别）
 // ============================================================
+
+// Picker 中可作为筛选 chip 使用的系别 key 列表（按 ELEMENTS 声明顺序）。
+// 排除 FALLBACK_EL ("无")。
+const PICKER_ELEMENT_KEYS = Object.keys(ELEMENTS).filter(k => k !== FALLBACK_EL.name);
+
+// HTML attribute 简单转义。搜索框文本会原样写入 input 的 value 属性，
+// 用户输入的 < > & " ' 都需要转义，否则会破坏 HTML。
+function escapeAttr(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+// 把一组 [id, sprite] 列表渲染为 picker grid 内部 HTML（不含外层 grid 容器）。
+// 这样既能在 renderSpiritPicker 中复用，也能在 refreshPickerGrid 中增量更新。
+function _renderPickerOptionsHTML(side, list) {
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+  if (list.length === 0) {
+    return `<div class="spirit-picker-empty">没有匹配的精灵<button type="button" onclick="resetPickerFilter('${side}')">清除筛选</button></div>`;
+  }
+  return list.map(([id, s]) => {
+    const types = (s.types || []).map(t => elOf(t));
+    const primaryColor = types[0]?.color || '#888';
+    const tagsHTML = types.map(t =>
+      t.iconUrl
+        ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
+        : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+    ).join('');
+    const illus = s.illustration_url
+      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
+      : `<div class="placeholder" style="--el-color:${primaryColor}">${(s.name||'').slice(0,1)}</div>`;
+    const isCurrent = !!(spirit && spirit.id === id);
+    return `
+      <div class="spirit-picker-option ${isCurrent ? 'current' : ''}" role="button" tabindex="0"
+           aria-label="选择 ${s.name}${isCurrent ? '（当前）' : ''}"
+           data-spirit-id="${id}"
+           style="--el-color:${primaryColor}"
+           onclick="selectSpirit('${side}', '${id}')"
+           onkeydown="onSpiritPickerOptionKey(event, '${side}', '${id}')">
+        <div class="picker-image">${illus}</div>
+        <div class="picker-name">${s.name}</div>
+        <div class="picker-types">${tagsHTML}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 按当前 filter 过滤 SPRITES，返回 [id, sprite] 列表。
+//   - common   : 命中 PICKER_PRESETS 中对应侧的 id
+//   - elements : 精灵的系别与之有任一交集（OR 关系）
+//   - text     : 精灵名 / pinyin / pinyin_initials 三者任一 includes 命中
+// 三组筛选条件之间是 AND 关系（必须同时满足）。
+function filterSpirits(side, filter) {
+  const text = (filter.text || '').trim().toLowerCase();
+  const commonList = (side === 'attacker' ? PICKER_PRESETS.common_attackers : PICKER_PRESETS.common_defenders) || [];
+  const commonSet = new Set(commonList);
+  const wantEls = filter.elements;   // Set<string>
+  const all = Object.entries(SPRITES);
+  const out = [];
+  for (let i = 0; i < all.length; i++) {
+    const [id, s] = all[i];
+    if (filter.common && !commonSet.has(id)) continue;
+    if (wantEls.size > 0) {
+      const spiritEls = (s.types || []).map(t => stripXi(t));
+      let hit = false;
+      for (let j = 0; j < spiritEls.length; j++) {
+        if (wantEls.has(spiritEls[j])) { hit = true; break; }
+      }
+      if (!hit) continue;
+    }
+    if (text) {
+      const name = (s.name || '').toLowerCase();
+      const py = s.pinyin || '';
+      const ini = s.pinyin_initials || '';
+      if (!name.includes(text) && !py.includes(text) && !ini.includes(text)) continue;
+    }
+    out.push(all[i]);
+  }
+  return out;
+}
+
+// 渲染 picker 顶部的 toolbar：搜索框 + 常见 chip + 系别 chip 行。
+function renderPickerToolbar(side, filter) {
+  const commonActive = filter.common ? ' active' : '';
+  const commonList = (side === 'attacker' ? PICKER_PRESETS.common_attackers : PICKER_PRESETS.common_defenders) || [];
+  const commonCount = commonList.length;
+
+  const elementChips = PICKER_ELEMENT_KEYS.map(key => {
+    const el = ELEMENTS[key];
+    if (!el) return '';
+    const isActive = filter.elements.has(key);
+    const iconHTML = el.iconUrl
+      ? `<img class="chip-icon" src="${el.iconUrl}" loading="lazy" alt="${el.name}">`
+      : `<span class="chip-emoji" aria-hidden="true">${el.emoji}</span>`;
+    return `<button type="button" class="spirit-picker-chip element-chip${isActive ? ' active' : ''}"
+              data-element="${key}"
+              onclick="togglePickerElement('${side}', '${key}')"
+              aria-pressed="${isActive ? 'true' : 'false'}"
+              title="${el.name}（${filter.elements.has(key) ? '点击取消' : (filter.elements.size >= 2 ? '最多选 2 个系别' : '点击筛选')}）">${iconHTML}</button>`;
+  }).join('');
+
+  const searchVal = escapeAttr(filter.text || '');
+
+  return `
+    <div class="spirit-picker-toolbar">
+      <div class="spirit-picker-search">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input id="${side}-picker-search" type="text" inputmode="search"
+               value="${searchVal}"
+               oninput="onPickerSearchInput('${side}', this.value)"
+               placeholder="搜索：名称 / 拼音 / 首字母"
+               aria-label="搜索精灵">
+        <span id="${side}-picker-search-clear" class="search-clear ${filter.text ? '' : 'is-hidden'}"
+              role="button" tabindex="${filter.text ? 0 : -1}" aria-label="清空搜索"
+              onclick="clearPickerSearch('${side}')"
+              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();clearPickerSearch('${side}')}">×</span>
+      </div>
+      <div class="spirit-picker-chips">
+        <span class="chip-group-label">常用</span>
+        <button type="button" class="spirit-picker-chip common${commonActive}"
+                onclick="togglePickerCommon('${side}')"
+                aria-pressed="${filter.common ? 'true' : 'false'}"
+                title="${filter.common ? '点击取消"常见"筛选' : '点击只显示常见精灵'}">
+          <span class="chip-text">常见</span><span class="chip-count">${commonCount}</span>
+        </button>
+        <span class="chip-group-label" style="margin-left:6px">系别</span>
+        ${elementChips}
+      </div>
+    </div>
+  `;
+}
+
 function renderSpiritArea(side) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   // 处于“选择中”或尚未选精灵 → 渲染选择器
@@ -1980,33 +2289,10 @@ function renderSpiritPicker(side) {
   const cancelHiddenCls = spirit ? '' : ' is-hidden';
   const cancelBtn = `<button class="picker-btn${cancelHiddenCls}" type="button" onclick="exitSpiritPicker('${side}')" aria-label="取消更换" tabindex="${spirit ? 0 : -1}">取消</button>`;
 
-  // 构建所有精灵的选项
-  const list = Object.entries(SPRITES);
-  const optionsHTML = list.map(([id, s]) => {
-    const types = (s.types || []).map(t => elOf(t));
-    const primaryColor = types[0]?.color || '#888';
-    const tagsHTML = types.map(t =>
-      t.iconUrl
-        ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
-        : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
-    ).join('');
-    const illus = s.illustration_url
-      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
-      : `<div class="placeholder" style="--el-color:${primaryColor}">${(s.name||'').slice(0,1)}</div>`;
-    const isCurrent = !!(spirit && spirit.id === id);
-    return `
-      <div class="spirit-picker-option ${isCurrent ? 'current' : ''}" role="button" tabindex="0"
-           aria-label="选择 ${s.name}${isCurrent ? '（当前）' : ''}"
-           data-spirit-id="${id}"
-           style="--el-color:${primaryColor}"
-           onclick="selectSpirit('${side}', '${id}')"
-           onkeydown="onSpiritPickerOptionKey(event, '${side}', '${id}')">
-        <div class="picker-image">${illus}</div>
-        <div class="picker-name">${s.name}</div>
-        <div class="picker-types">${tagsHTML}</div>
-      </div>
-    `;
-  }).join('');
+  const filter = state.spiritPickerFilter[side];
+  const toolbarHTML = renderPickerToolbar(side, filter);
+  const filtered = filterSpirits(side, filter);
+  const optionsHTML = _renderPickerOptionsHTML(side, filtered);
 
   selectArea.innerHTML = `
     <div class="spirit-picker">
@@ -2014,9 +2300,71 @@ function renderSpiritPicker(side) {
         <span class="picker-title">${titleText}</span>
         ${cancelBtn}
       </div>
-      <div class="spirit-picker-grid">${optionsHTML}</div>
+      ${toolbarHTML}
+      <div class="spirit-picker-grid" id="${side}-picker-grid">${optionsHTML}</div>
     </div>
   `;
+
+  // 未选精灵时聚焦搜索框，让搜索成为首要操作；已选时保持当前行为
+  if (!spirit) {
+    const searchInput = document.getElementById(`${side}-picker-search`);
+    if (searchInput) searchInput.focus({ preventScroll: true });
+  }
+}
+
+// 增量更新 grid（仅在搜索/筛选输入变化时调用，避免重渲 toolbar 失去焦点）。
+function refreshPickerGrid(side) {
+  const grid = document.getElementById(`${side}-picker-grid`);
+  if (!grid) return;
+  const filter = state.spiritPickerFilter[side];
+  const filtered = filterSpirits(side, filter);
+  grid.innerHTML = _renderPickerOptionsHTML(side, filtered);
+}
+
+// --- Picker interactions (search + filter chips) ---
+
+function onPickerSearchInput(side, val) {
+  state.spiritPickerFilter[side].text = val;
+  const clearBtn = document.getElementById(`${side}-picker-search-clear`);
+  if (clearBtn) {
+    clearBtn.classList.toggle('is-hidden', !val);
+    clearBtn.setAttribute('tabindex', val ? '0' : '-1');
+  }
+  refreshPickerGrid(side);
+}
+function clearPickerSearch(side) {
+  state.spiritPickerFilter[side].text = '';
+  const input = document.getElementById(`${side}-picker-search`);
+  if (input) input.value = '';
+  const clearBtn = document.getElementById(`${side}-picker-search-clear`);
+  if (clearBtn) {
+    clearBtn.classList.add('is-hidden');
+    clearBtn.setAttribute('tabindex', '-1');
+  }
+  refreshPickerGrid(side);
+  if (input) input.focus();
+}
+function togglePickerCommon(side) {
+  state.spiritPickerFilter[side].common = !state.spiritPickerFilter[side].common;
+  renderSpiritPicker(side);
+}
+function togglePickerElement(side, elKey) {
+  const filter = state.spiritPickerFilter[side];
+  if (filter.elements.has(elKey)) {
+    filter.elements.delete(elKey);
+  } else {
+    // 最多选 2 个：第 3 次点击直接忽略（用户需先取消一个）
+    if (filter.elements.size >= 2) return;
+    filter.elements.add(elKey);
+  }
+  renderSpiritPicker(side);
+}
+function resetPickerFilter(side) {
+  const f = state.spiritPickerFilter[side];
+  f.text = '';
+  f.common = false;
+  f.elements = new Set();
+  renderSpiritPicker(side);
 }
 
 function renderSpiritCard(side) {
@@ -2054,6 +2402,8 @@ function renderSpiritCard(side) {
 // 进入/退出“选择中”状态
 function enterSpiritPicker(side) {
   state.spiritPicking[side] = true;
+  // 每次重新进入选择器时重置筛选/搜索状态（关闭时丢弃）
+  state.spiritPickerFilter[side] = { text: '', common: false, elements: new Set() };
   renderSpiritArea(side);
 }
 function exitSpiritPicker(side) {

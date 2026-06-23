@@ -18,9 +18,10 @@ SRC = os.path.join(ROOT, 'calculator.html')
 OUT = os.path.join(ROOT, 'calculator.built.html')
 
 DATA_FILES = [
-    ('sprites-data', 'sprites.json'),
-    ('skills-data',  'skills.json'),
-    ('types-data',   'types.json'),
+    ('sprites-data',      'sprites.json'),
+    ('skills-data',       'skills.json'),
+    ('types-data',        'types.json'),
+    ('picker-presets',    'picker_presets.json'),
 ]
 
 MARKER = '<!-- INJECT_DATA_HERE -->'
