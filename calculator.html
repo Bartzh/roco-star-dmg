@@ -1216,9 +1216,16 @@ body {
     width: 20px;
     height: 20px;
   }
-  .stats-section .buff-chips {
-    flex-direction: column;
-    align-items: flex-end;
+  /* Buff chips: keep them on a single horizontal line on mobile too
+     (no vertical stacking). Use flex-wrap + justify-content:flex-end so
+     that if two chips ever exceed the panel width they wrap neatly to
+     the right instead of falling under the section title. */
+  .stats-section .buff-chips,
+  .skills-section .buff-chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
     gap: 2px;
   }
   .stat-cell {
