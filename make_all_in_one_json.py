@@ -32,6 +32,7 @@ COMMON_ATTACKERS: list[str] = [
     'pet_000224', # 怖哭菇
     'pet_000372', # 噼啪鸟
     'pet_000068', # 锤头鹳
+    'pet_000203', # 翼龙
     'pet_000070', # 音速犬
 ]
 COMMON_DEFENDERS: list[str] = [
