@@ -1174,11 +1174,11 @@ body {
   .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
   .container { padding: 20px 16px 40px; }
   .breakdown-section { margin: 16px 0 0; }
-  /* Skill list: single column on mobile, taller scroll area */
+  /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills */
   .skill-list {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    max-height: 360px;
+    grid-template-columns: repeat(2, 1fr);
+    min-height: 125px;
+    max-height: 125px;
   }
   .skill-btn {
     min-height: 54px;
