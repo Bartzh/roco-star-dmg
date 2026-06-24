@@ -129,7 +129,7 @@ body {
 }
 
 /* ============ Spirit Panel ============ */
-.spirit-panel { min-height: 704px; min-width: 0; }
+.spirit-panel { min-height: 698px; min-width: 0; }
 .spirit-panel .panel-label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -227,14 +227,22 @@ body {
 }
 .spirit-picker-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0, 1fr) 显式将列最小宽度设为 0，
+     避免 `1fr` 默认的 `minmax(auto, 1fr)` 在子项内容坍缩时被 auto 拉成 0，
+     进而让整列塌陷、卡片叠成一团。 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  max-height: 456px;
+  max-height: 450px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
   /* 避免动画遮挡边框 */
   padding-top: 3px;
+  /* 行内卡片高度不一致时，让每张卡片都从顶部对齐，而不是被拉伸到同行最高那张。
+     同时减少 Safari 在重排时的不必要高度计算，提升移动端滚动流畅度。 */
+  align-items: start;
+  /* 让 grid 内部布局不影响外部，减少含 backdrop-filter 父级重排的范围。 */
+  contain: layout;
 }
 .spirit-picker-option {
   background: rgba(255,255,255,0.03);
@@ -242,10 +250,13 @@ body {
   border-radius: 10px;
   padding: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   text-align: center;
   position: relative;
   min-width: 0;       /* allow grid track to shrink below content's min-size */
+  /* 最小高度：图片 + 名称 + 类型 + 内边距的合理下限。
+     防止图片资源加载失败/极慢时整张卡片被压扁到只剩上边框。 */
+  min-height: 120px;
   overflow: hidden;
 }
 .spirit-picker-option:hover {
@@ -269,19 +280,31 @@ body {
 }
 .spirit-picker-option .picker-image {
   width: 100%;
-  aspect-ratio: 1;
+  /* 用 padding-top: 100% 实现 1:1 比例，兼容所有浏览器（包括 iOS Safari < 15）。
+     `aspect-ratio` 在旧版 Safari 上会失效导致图片高度坍缩为 0，引发整张卡片
+     退化为只剩上边框，几十张卡片堆叠后触发 Safari 重排崩溃。 */
+  padding-top: 100%;
+  height: 0;
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 6px;
   position: relative;
 }
 .spirit-picker-option .picker-image img {
+  /* 绝对定位以贴合 .picker-image 通过 padding-top: 100% 撑起的高度 */
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 .spirit-picker-option .picker-image .placeholder {
+  /* 同上，绝对定位以贴合容器尺寸 */
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
@@ -1203,11 +1226,14 @@ body {
     gap: 4px;
   }
   .iv-slot { min-width: 38px; font-size: 0.6rem; }
-  /* Spirit picker: 3 columns on mobile, taller scroll area */
+  /* Spirit picker: 3 columns on mobile, taller scroll area.
+     同样用 minmax(0, 1fr) 防止列塌陷；并把 max-height 调高一点，
+     让 3 列布局下能完整显示 2 行卡片（图片+名称+类型），避免视觉上"挤成一团"。 */
   .spirit-picker-grid {
-    grid-template-columns: repeat(3, 1fr);
-    max-height: 360px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 404px;
   }
+  .spirit-picker-option { min-height: 110px; padding: 6px; }
   .spirit-picker-option .picker-name { font-size: 0.72rem; }
 }
 
@@ -1221,7 +1247,8 @@ body {
 /* Spirit card image */
 .spirit-image {
   width: 160px;
-  aspect-ratio: 1;
+  /* 显式 height 替代 aspect-ratio: 1，避免 iOS Safari < 15 上高度坍缩为 0 */
+  height: 160px;
   border-radius: 10px;
   margin: 0 auto 12px;
   overflow: hidden;
@@ -1432,9 +1459,9 @@ body {
 
 /* IV slot (right) */
 .iv-slot {
-  min-width: 44px;
+  min-width: 38px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0px;
   border-radius: 4px;
   display: flex;
   align-items: center;
