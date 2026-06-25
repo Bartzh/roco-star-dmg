@@ -144,4 +144,4 @@ uv run build.py
 
 ## 致谢
 
-- 数据和图像来源：[B站洛克王国Wiki](https://wiki.biligame.com/rocom/)（CC BY-SA）
+- 数据和图像来源：[B站洛克王国Wiki](https://wiki.biligame.com/rocom/)（CC BY-NC-SA 4.0）
