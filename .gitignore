@@ -17,3 +17,6 @@ calculator.built.html
 
 # ide
 .trae
+
+# test files
+/test_*

@@ -3,17 +3,17 @@ import re
 
 from pypinyin import Style, lazy_pinyin
 
-with open('datas/core.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
-with open('datas/learnsets.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/learnsets.json', 'r', encoding='utf-8') as f:
     learnsets = json.load(f)
-with open('datas/learnset_catalog.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/learnset_catalog.json', 'r', encoding='utf-8') as f:
     learnset_catalog = json.load(f)
-with open('datas/skill_catalog.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
     skill_catalog = json.load(f)
-with open('datas/pet_illustration_urls.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/pet_illustration_urls.json', 'r', encoding='utf-8') as f:
     pet_illustration_urls = json.load(f)
-with open('datas/skill_icon_urls.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f:
     skill_icon_urls = json.load(f)
 
 
@@ -159,22 +159,21 @@ for skill_id, skill_info in skill_catalog.items():
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
 
 
-with open('sprites.json', 'w', encoding='utf-8') as f:
+with open('datas/final/sprites.json', 'w', encoding='utf-8') as f:
     json.dump(sprites, f, ensure_ascii=False)
-with open('skills.json', 'w', encoding='utf-8') as f:
+with open('datas/final/skills.json', 'w', encoding='utf-8') as f:
     json.dump(skill_catalog, f, ensure_ascii=False)
 
 
 # ============================================================
-# Picker presets — exported as a small JSON consumed by
-# calculator.html's spirit picker.  Currently just the two
-# "common" sprite lists; future per-side presets (e.g. starter
-# recommendations) can be added here without touching the
-# (much larger) sprites.json.
+# Others — exported as a small JSON consumed by calculator.html.
+# Currently just the two "common" sprite lists;
+# future per-side presets (e.g. starter recommendations)
+# can be added here without touching the (much larger) sprites.json.
 # ============================================================
-picker_presets = {
+others = {
     'common_attackers': COMMON_ATTACKERS,
     'common_defenders': COMMON_DEFENDERS,
 }
-with open('picker_presets.json', 'w', encoding='utf-8') as f:
-    json.dump(picker_presets, f, ensure_ascii=False, indent=2)
+with open('datas/final/others.json', 'w', encoding='utf-8') as f:
+    json.dump(others, f, ensure_ascii=False, indent=2)

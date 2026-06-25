@@ -11,7 +11,6 @@ Output:
 """
 import json
 import os
-import re
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, 'calculator.html')
@@ -21,7 +20,7 @@ DATA_FILES = [
     ('sprites-data',      'sprites.json'),
     ('skills-data',       'skills.json'),
     ('types-data',        'types.json'),
-    ('picker-presets',    'picker_presets.json'),
+    ('others-data',        'others.json'),
 ]
 
 MARKER = '<!-- INJECT_DATA_HERE -->'
@@ -36,7 +35,7 @@ def build_data_blocks():
     """Return a string with three <script type="application/json"> blocks."""
     out = []
     for elem_id, fname in DATA_FILES:
-        path = os.path.join(ROOT, fname)
+        path = os.path.join(ROOT, 'datas/final',fname)
         if not os.path.exists(path):
             raise FileNotFoundError(f'Missing data file: {path}')
         with open(path, 'r', encoding='utf-8') as f:

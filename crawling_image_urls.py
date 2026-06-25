@@ -59,26 +59,26 @@ def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
 
 
 
-with open('datas/core.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
 illustration_urls = get_image_urls(
     {p_id: f'文件:{p_info['img']['il']}.png' for p_id, p_info in core.items() if p_id != '_meta' and p_info.get('img')}
 )
-with open('datas/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
+with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
     json.dump(illustration_urls, f, indent=4, ensure_ascii=False)
 
 
-with open('datas/skill_catalog.json', 'r', encoding='utf-8') as f:
+with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
     skill_catalog = json.load(f)
 skill_urls = get_image_urls({s_id: f'文件:Skill_{s_info['icon_id']}.png' for s_id, s_info in skill_catalog.items() if s_id != '_meta'})
-with open('datas/skill_icon_urls.json', 'w', encoding='utf-8') as f:
+with open('datas/intermediate/skill_icon_urls.json', 'w', encoding='utf-8') as f:
     json.dump(skill_urls, f, indent=4, ensure_ascii=False)
 
 
-with open('types.json', 'r', encoding='utf-8') as f:
+with open('datas/output/types.json', 'r', encoding='utf-8') as f:
     types = json.load(f)
 element_icon_urls = get_image_urls({e_id: f'文件:图标_宠物_属性_{e_id}.png' for e_id in types.keys()})
 for e_id, icon_url in element_icon_urls.items():
     types[e_id]['iconUrl'] = icon_url
-with open('types.json', 'w', encoding='utf-8') as f:
+with open('datas/output/types.json', 'w', encoding='utf-8') as f:
     json.dump(types, f, indent=4, ensure_ascii=False)

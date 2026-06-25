@@ -1737,10 +1737,7 @@ function elOf(rawName) {
 let SPRITES = {};
 let SKILLS = {};
 let TYPES = {};
-// Picker presets (硬编码的常见精灵列表等)。Loaded alongside the other
-// data files; defaults to empty lists if the file is missing so the
-// picker still works (the "common" chip just shows 0 and matches nothing).
-let PICKER_PRESETS = { common_attackers: [], common_defenders: [] };
+let OTHERS = {};
 
 async function loadData() {
   const inlineSprites = document.getElementById('sprites-data');
@@ -1749,24 +1746,19 @@ async function loadData() {
     SPRITES = JSON.parse(inlineSprites.textContent);
     SKILLS  = JSON.parse(document.getElementById('skills-data').textContent);
     TYPES   = JSON.parse(document.getElementById('types-data').textContent);
-    const inlinePresets = document.getElementById('picker-presets');
-    if (inlinePresets) {
-      try { PICKER_PRESETS = JSON.parse(inlinePresets.textContent); }
-      catch (_) { /* keep defaults */ }
-    }
+    OTHERS  = JSON.parse(document.getElementById('others-data').textContent);
   } else {
     // Source version: fetch from the same directory
     const f = (p) => fetch(p).then(r => {
       if (!r.ok) throw new Error(p + ' -> HTTP ' + r.status);
       return r.json();
     });
-    [SPRITES, SKILLS, TYPES] = await Promise.all([
-      f('sprites.json'),
-      f('skills.json'),
-      f('types.json')
+    [SPRITES, SKILLS, TYPES, OTHERS] = await Promise.all([
+      f('datas/final/sprites.json'),
+      f('datas/final/skills.json'),
+      f('datas/final/types.json'),
+      f('datas/final/others.json')
     ]);
-    try { PICKER_PRESETS = await f('picker_presets.json'); }
-    catch (_) { /* keep defaults */ }
   }
   augmentElementsWithTypes();
 }
@@ -2569,14 +2561,14 @@ function _renderPickerOptionsHTML(side, list) {
 }
 
 // 按当前 filter 过滤 SPRITES，返回 [id, sprite] 列表。
-//   - common   : 命中 PICKER_PRESETS 中对应侧的 id
+//   - common   : 命中 OTHERS 中对应侧的 id
 //   - elements : 精灵必须同时包含所有选中的系别（AND 关系；选 2 个系别
 //                即可筛出"双系精灵"，单系精灵会被排除）
 //   - text     : 精灵名 / pinyin / pinyin_initials 三者任一 includes 命中
 // common / elements / text 三组筛选条件之间也是 AND 关系（必须同时满足）。
 function filterSpirits(side, filter) {
   const text = (filter.text || '').trim().toLowerCase();
-  const commonList = (side === 'attacker' ? PICKER_PRESETS.common_attackers : PICKER_PRESETS.common_defenders) || [];
+  const commonList = (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
   const commonSet = new Set(commonList);
   const wantEls = filter.elements;   // Set<string>
   const all = Object.entries(SPRITES);
@@ -2608,7 +2600,7 @@ function filterSpirits(side, filter) {
 // 渲染 picker 顶部的 toolbar：搜索框（内含"常见"chip + × 清空按钮）+ 系别 chip 行。
 function renderPickerToolbar(side, filter) {
   const commonActive = filter.common ? ' active' : '';
-  const commonList = (side === 'attacker' ? PICKER_PRESETS.common_attackers : PICKER_PRESETS.common_defenders) || [];
+  const commonList = (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
 
   const elementChips = PICKER_ELEMENT_KEYS.map(key => {
     const el = ELEMENTS[key];
