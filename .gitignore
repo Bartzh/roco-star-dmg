@@ -20,3 +20,6 @@ calculator.built.html
 
 # test files
 /test_*
+
+# dist
+dist/

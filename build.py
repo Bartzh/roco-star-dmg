@@ -15,6 +15,9 @@ import os
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, 'calculator.html')
 OUT = os.path.join(ROOT, 'calculator.built.html')
+if not os.path.exists(os.path.join(ROOT, 'dist')):
+    os.makedirs(os.path.join(ROOT, 'dist'))
+DIST = os.path.join(ROOT, 'dist', 'index.html')
 
 DATA_FILES = [
     ('sprites-data',      'sprites.json'),
@@ -62,6 +65,8 @@ def main():
     out_html = html.replace(MARKER, blocks, 1)
 
     with open(OUT, 'w', encoding='utf-8') as f:
+        f.write(out_html)
+    with open(DIST, 'w', encoding='utf-8') as f:
         f.write(out_html)
 
     src_size = os.path.getsize(SRC)

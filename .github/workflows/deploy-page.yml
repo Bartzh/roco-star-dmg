@@ -1,0 +1,35 @@
+name: 自动部署页面
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: 构建
+        run: python build.py
+      - name: 上传页面
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
