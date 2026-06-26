@@ -2,7 +2,7 @@
 
 一个专为星陨设计的《洛克王国：世界》精灵对战伤害计算器。基于 BWiki 的精灵 / 技能 / 属性数据，配合一条 Python 数据流水线，最终产物是一个**单文件 HTML**。
 
-在线试用 / 自行构建：见下方 [构建与运行](#构建与运行)。
+[点击浏览](https://bartzh.github.io/roco-star-dmg/)（等过几天上国内网站） / 自行构建：见下方 [构建与运行](#构建与运行)。
 
 ---
 
@@ -69,10 +69,16 @@ calculator.built.html   ← 双击即可使用
 
 ## 构建与运行
 
+### 克隆
+
+```bash
+git clone https://github.com/bartzh/roco-star-dmg.git
+git lfs pull
+```
+
 ### 环境
 
-- Python ≥ 3.13
-- 依赖由 [uv](https://docs.astral.sh/uv/) 管理（参见 `uv.lock`）
+- [uv](https://docs.astral.sh/uv/)（uv会自动安装所有依赖）
 
 ```bash
 # 安装依赖
