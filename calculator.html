@@ -354,27 +354,39 @@ body {
   .spirit-picker, .spirit-card { animation: none; }
 }
 
-/* ============ Spirit Picker Toolbar (search + filter chips) ============ */
+/* ============ Spirit Picker Toolbar (search + filter chips) ============
+   整块 toolbar 是一个 CSS Grid；列数 N 由 JS 根据容器宽度动态算出
+   （见 fitPickerToolbar），写进 --cols / --search-span。
+   网格列等宽 (`repeat(N, 1fr)`) → 容器宽度总能被 N 个 cell + (N-1) 个 gap 整除，
+   不会在右边缘留白；每个 chip 用 aspect-ratio: 1 强制正方形，
+   所有 chip 边长相等；搜索行 grid-column: span 跨 N-1 列。
+   18 个系别 chip 直接作为 toolbar 的 grid 子项，不再包一层 flex。 */
 .spirit-picker-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 9), 1fr);
+  grid-auto-rows: 1fr;
+  gap: var(--chip-gap, 6px);
   padding: 8px;
   background: rgba(0,0,0,0.18);
   border: 1px solid var(--glass-border);
   border-radius: 10px;
 }
+
+/* 搜索行：横跨 (N-1) 列，剩下 1 列给 "常" chip。高度由 grid-auto-rows: 1fr 决定。 */
 .spirit-picker-search {
+  grid-column: span var(--search-span, 8);
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  min-width: 0;
+  min-height: 0;
 }
 .spirit-picker-search input {
   flex: 1;
   min-width: 0;
-  /* 左侧 28px 让出 🔍，右侧由 flex gap 撑开与 chip/× 的距离 */
-  padding: 6px 6px 6px 28px;
+  /* 左侧 28px 让出 🔍；高与 cell 高度一致由 grid 决定 */
+  height: 100%;
+  padding: 0 10px 0 28px;
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--glass-border);
   border-radius: 8px;
@@ -395,7 +407,7 @@ body {
 }
 .spirit-picker-search .search-icon {
   position: absolute;
-  left: 7px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   width: 16px;
@@ -404,49 +416,16 @@ body {
   color: var(--text-secondary);
   pointer-events: none;
 }
-/* × 清空按钮改为 flex 元素，跟在常见 chip 之后 */
-.spirit-picker-search .search-clear {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 50%;
-  transition: background 0.15s ease, color 0.15s ease;
-  font-size: 1rem;
-  line-height: 1;
-}
-.spirit-picker-search .search-clear:hover {
-  background: rgba(255,255,255,0.08);
-  color: var(--text-primary);
-}
-.spirit-picker-search .search-clear.is-hidden { display: none; }
-/* 搜索框内的"常见"chip 仍然按文字内容呈现，保持胶囊状 */
-.spirit-picker-search .spirit-picker-chip.common {
-  flex: 0 0 auto;
-  padding: 9.6px;
-  border-radius: 16px;
-}
 
-.spirit-picker-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-/* "常用/系别" label 已移除，保留选择器占位 */
-.spirit-picker-chips .chip-group-label { display: none; }
-
-/* chip 默认是圆形：四边相同的 padding 配合 18x18 icon 形成正方形 + 50% 圆角。
-   .common 例外（见上方搜索框内的覆盖） */
+/* chip 默认是 grid 里的一个 cell：正方形、填满格子。圆角 50% 让其表现为圆形。
+   大小完全由 grid 决定（width/height = 100% cell），不再用 padding 凑。 */
 .spirit-picker-chip {
-  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6.9px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 50%;
@@ -469,25 +448,27 @@ body {
   color: var(--text-primary);
   box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.25);
 }
+/* chip 内的图标按格子尺寸的 56% 缩放，保持视觉一致 */
 .spirit-picker-chip .chip-icon {
-  width: 18px;
-  height: 18px;
+  width: 56%;
+  height: 56%;
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 0 1px rgba(0,0,0,0.4));
 }
 .spirit-picker-chip .chip-emoji {
-  width: 18px;
-  height: 18px;
+  width: 56%;
+  height: 56%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   line-height: 1;
 }
 .spirit-picker-chip.common .chip-text {
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.5px;
+  font-size: 0.85rem;
 }
 
 .spirit-picker-empty {
@@ -2629,22 +2610,144 @@ function renderPickerToolbar(side, filter) {
                oninput="onPickerSearchInput('${side}', this.value)"
                placeholder="搜索：名称 / 拼音 / 首字母"
                aria-label="搜索精灵">
-        <button type="button" class="spirit-picker-chip common${commonActive}"
-                onclick="togglePickerCommon('${side}')"
-                aria-pressed="${filter.common ? 'true' : 'false'}"
-                title="${filter.common ? '取消"常见"筛选' : '只显示常见精灵'}">
-          <span class="chip-text">常</span>
-        </button>
-        <span id="${side}-picker-search-clear" class="search-clear ${filter.text ? '' : 'is-hidden'}"
-              role="button" tabindex="${filter.text ? 0 : -1}" aria-label="清空搜索"
-              onclick="clearPickerSearch('${side}')"
-              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();clearPickerSearch('${side}')}">×</span>
       </div>
-      <div class="spirit-picker-chips">
-        ${elementChips}
-      </div>
+      <button type="button" class="spirit-picker-chip common${commonActive}"
+              onclick="togglePickerCommon('${side}')"
+              aria-pressed="${filter.common ? 'true' : 'false'}"
+              title="${filter.common ? '取消"常见"筛选' : '只显示常见精灵'}">
+        <span class="chip-text">常</span>
+      </button>
+      ${elementChips}
     </div>
   `;
+}
+
+// ============ Picker Toolbar 自适应布局 ============
+// 目标：让搜索行 + 18 个系别 chip（+ "常" chip = 20 个 grid item）
+// 在任意容器宽度下，元素等大且无右边缘留白，且 toolbar 背景/边框能
+// 完整包裹所有行（不溢出到下方内容）；同时避免"最后一行只塞 2 个徽章"
+// 这类视觉不平衡的残缺布局，强制选择行行填满的方案（3 行×9 或 4 行×6）。
+//
+// 实现要点：
+// - .spirit-picker-toolbar 是 `repeat(N, 1fr)` 的 grid，列数 N 由 JS 写入 --cols。
+// - 1fr 列在数学上必然填满容器宽度，所以 N 变化时不会出现"右边少一截"。
+// - 搜索行 grid-column: span (N-1) 跨多列，"常" chip 占 1 列。
+// - 每个 chip 内部用 width: 100% + aspect-ratio: 1 保证正方形。
+// - N 的选取：根据当前内宽 + gap 反算 chip 边长，在所有合法 N 中
+//   选"chip 边长最接近理想值、且最后一行无残留徽章"的那个：
+//     评分 = -|chip-理想| - uglinessPenalty*25 - rowPenalty*2
+//   uglinessPenalty = 最后一行缺格数 / N（0 表示 clean，越大越残缺），
+//   重罚使 N=8/7/5 等"残缺"方案被淘汰，只剩 N=9（3 行）或 N=6（4 行）。
+// - toolbar 高度 = (1 + ceil(18/N)) 行 × chip 边长 + 行间 gap + 上下 padding，
+//   这个高度必须严格覆盖所有 grid item，否则背景/边框不会包裹溢出的行。
+const PICKER_CHIP_IDEAL = 34;   // 理想 chip 边长
+const PICKER_CHIP_MIN   = 22;   // 最小可接受 chip 边长
+const PICKER_CHIP_TOTAL = 18;   // 系别 chip 总数（grid item 之一）
+
+function fitPickerToolbar(toolbar) {
+  if (!toolbar || !toolbar.isConnected) return;
+  const cs = getComputedStyle(toolbar);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  // CSS 里 grid 的 gap
+  const gap = parseFloat(cs.rowGap || cs.gap) || 6;
+  const innerW = toolbar.clientWidth - padX;
+  if (innerW <= 0) return;
+
+  // 遍历候选 N（从大到小），挑 chip 边长最接近理想值、
+  // 且最后一行无"残留徽章"（要么 0，要么满行）的那个。
+  //
+  // 为什么加"丑陋度"惩罚：N=8 会产生 4 行但最后一行只剩 2 个徽章的"残缺"布局
+  // （rows 2-3 = 8, row 4 = 2）。这种布局视觉上不平衡，用户偏好以下两种之一：
+  //   A. 3 行 × 9 列（chip 小一些，N=9），18 个徽章填满 2 行
+  //   B. 4 行 × 6 列（chip 大一些，N=6），18 个徽章填满 3 行
+  // 两者都"行行满"。N=8/7 等"残缺"方案重罚淘汰。
+  let bestN = 3, bestSize = 0, bestScore = -Infinity;
+  for (let n = 18; n >= 3; n--) {
+    const size = (innerW - (n - 1) * gap) / n;
+    if (size < PICKER_CHIP_MIN) continue;
+    // 行数 = 1（search+常）+ ceil(18/n)（18 个系别占的行数）
+    const elementRows = Math.ceil(PICKER_CHIP_TOTAL / n);
+    const totalRows = 1 + elementRows;
+    // 最后一行的"空缺"格数 = n*elementRows - 18
+    //   = 0  → 最后一行满（clean，例如 N=9→2×9=18，N=6→3×6=18）
+    //   > 0  → 最后一行不满，缺 (n - lastRowCount) 个徽章
+    const lastRowCount = n * elementRows - PICKER_CHIP_TOTAL;
+    // 丑陋度 = 缺格数 / n（0=clean, 越大越不平衡）
+    const ugliness = lastRowCount > 0 ? lastRowCount / n : 0;
+    // 丑陋惩罚：每缺 1% 的格子扣 40 分（重罚，让 clean 方案在 chip 大小相近时必胜）
+    const uglinessPenalty = ugliness * 40;
+    // 行数惩罚：每超出 3 行扣 2 分（轻微，避免 5+ 行布局）
+    const rowPenalty = Math.max(0, totalRows - 3) * 2;
+    // 越接近理想值越好；同等接近时偏好 N 大的
+    const score = -Math.abs(size - PICKER_CHIP_IDEAL) - uglinessPenalty - rowPenalty + n * 0.001;
+    if (score > bestScore) {
+      bestN = n;
+      bestSize = size;
+      bestScore = score;
+    }
+  }
+  // 兜底：若所有 N 都不满足最小边长（极端窄），用最小 N
+  if (bestSize === 0) {
+    bestN = 3;
+    bestSize = (innerW - (bestN - 1) * gap) / bestN;
+  }
+
+  toolbar.style.setProperty('--cols', String(bestN));
+  // search 跨 N-1 列，剩 1 列给 "常" chip。
+  toolbar.style.setProperty('--search-span', String(Math.max(1, bestN - 1)));
+
+  // 关键修复：行数必须 = 1（search+常）+ ceil(18/N)（系别占的行），
+  // 之前用 ceil(20/N) 算错，导致 N<=8 时高度少了 1 行，4 行的内容
+  // 溢出 toolbar 边界、背景不包裹、第 4 行 chip 落到下面的卡片上重叠。
+  const elementRows = Math.ceil(PICKER_CHIP_TOTAL / bestN);
+  const totalRows = 1 + elementRows;
+  const targetH = totalRows * bestSize + (totalRows - 1) * gap + padY;
+  toolbar.style.height = `${targetH}px`;
+}
+
+// 监听所有 toolbar 的尺寸变化；toolbar 是动态创建的（renderSpiritPicker 重建），
+// 所以用 MutationObserver 跟踪新增/移除的 toolbar。
+const _pickerToolbarSet = new Set();
+const _pickerToolbarRO = new ResizeObserver(entries => {
+  for (const e of entries) fitPickerToolbar(e.target);
+});
+const _pickerToolbarMO = new MutationObserver(() => {
+  document.querySelectorAll('.spirit-picker-toolbar').forEach(t => {
+    if (!_pickerToolbarSet.has(t)) {
+      _pickerToolbarSet.add(t);
+      _pickerToolbarRO.observe(t);
+      fitPickerToolbar(t);
+    }
+  });
+  // 清理已移除的
+  for (const t of _pickerToolbarSet) {
+    if (!t.isConnected) {
+      _pickerToolbarRO.unobserve(t);
+      _pickerToolbarSet.delete(t);
+    }
+  }
+});
+
+// 启动观察（DOMContentLoaded 后保证 body 已存在）
+function startPickerToolbarAutoFit() {
+  _pickerToolbarMO.observe(document.body, { childList: true, subtree: true });
+  // 兜底：立即跑一遍 + 监听 window resize
+  document.querySelectorAll('.spirit-picker-toolbar').forEach(t => {
+    if (!_pickerToolbarSet.has(t)) {
+      _pickerToolbarSet.add(t);
+      _pickerToolbarRO.observe(t);
+    }
+    fitPickerToolbar(t);
+  });
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('.spirit-picker-toolbar').forEach(fitPickerToolbar);
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startPickerToolbarAutoFit);
+} else {
+  startPickerToolbarAutoFit();
 }
 
 function renderSpiritArea(side) {
@@ -2687,6 +2790,9 @@ function renderSpiritPicker(side) {
       <div class="spirit-picker-grid" id="${side}-picker-grid">${optionsHTML}</div>
     </div>
   `;
+  // 立即算一次列数（避免 MutationObserver 异步触发导致的视觉跳动）
+  const tb = selectArea.querySelector('.spirit-picker-toolbar');
+  if (tb) fitPickerToolbar(tb);
 }
 
 // 增量更新 grid（仅在搜索/筛选输入变化时调用，避免重渲 toolbar 失去焦点）。
@@ -2734,24 +2840,7 @@ function refreshPickerToolbar(side) {
 
 function onPickerSearchInput(side, val) {
   state.spiritPickerFilter[side].text = val;
-  const clearBtn = document.getElementById(`${side}-picker-search-clear`);
-  if (clearBtn) {
-    clearBtn.classList.toggle('is-hidden', !val);
-    clearBtn.setAttribute('tabindex', val ? '0' : '-1');
-  }
   refreshPickerGrid(side);
-}
-function clearPickerSearch(side) {
-  state.spiritPickerFilter[side].text = '';
-  const input = document.getElementById(`${side}-picker-search`);
-  if (input) input.value = '';
-  const clearBtn = document.getElementById(`${side}-picker-search-clear`);
-  if (clearBtn) {
-    clearBtn.classList.add('is-hidden');
-    clearBtn.setAttribute('tabindex', '-1');
-  }
-  refreshPickerGrid(side);
-  if (input) input.focus();
 }
 // chip 切换和清除筛选全部走增量更新：仅刷新 chip 高亮 + grid，
 // 不重建 spirit-picker 容器，避免重播 spiritAreaIn 动画。
@@ -2777,14 +2866,9 @@ function resetPickerFilter(side) {
   f.text = '';
   f.common = false;
   f.elements = new Set();
-  // 同步搜索框 UI（input value + 清除按钮的可见性）
+  // 同步搜索框 UI
   const input = document.getElementById(`${side}-picker-search`);
   if (input) input.value = '';
-  const clearBtn = document.getElementById(`${side}-picker-search-clear`);
-  if (clearBtn) {
-    clearBtn.classList.add('is-hidden');
-    clearBtn.setAttribute('tabindex', '-1');
-  }
   refreshPickerToolbar(side);
   refreshPickerGrid(side);
 }
