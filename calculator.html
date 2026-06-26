@@ -465,11 +465,6 @@ body {
   font-size: 1.05rem;
   line-height: 1;
 }
-.spirit-picker-chip.common .chip-text {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  font-size: 0.85rem;
-}
 
 .spirit-picker-empty {
   padding: 28px 8px;
@@ -2615,7 +2610,7 @@ function renderPickerToolbar(side, filter) {
               onclick="togglePickerCommon('${side}')"
               aria-pressed="${filter.common ? 'true' : 'false'}"
               title="${filter.common ? '取消"常见"筛选' : '只显示常见精灵'}">
-        <span class="chip-text">常</span>
+        <svg class="chip-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"></path></svg>
       </button>
       ${elementChips}
     </div>
