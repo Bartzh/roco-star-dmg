@@ -2687,12 +2687,6 @@ function renderSpiritPicker(side) {
       <div class="spirit-picker-grid" id="${side}-picker-grid">${optionsHTML}</div>
     </div>
   `;
-
-  // 未选精灵时聚焦搜索框，让搜索成为首要操作；已选时保持当前行为
-  if (!spirit) {
-    const searchInput = document.getElementById(`${side}-picker-search`);
-    if (searchInput) searchInput.focus({ preventScroll: true });
-  }
 }
 
 // 增量更新 grid（仅在搜索/筛选输入变化时调用，避免重渲 toolbar 失去焦点）。
