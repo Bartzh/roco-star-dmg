@@ -302,6 +302,10 @@ body {
   object-fit: cover;
   display: block;
 }
+/* 攻击方立绘水平翻转：默认朝左 → 朝右（仅作用于攻击方选择区） */
+#attacker-select-area .picker-image img {
+  transform: scaleX(-1);
+}
 .spirit-picker-option .picker-image .placeholder {
   /* 同上，绝对定位以贴合容器尺寸 */
   position: absolute;
@@ -1247,6 +1251,10 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+/* 攻击方立绘水平翻转：默认朝左 → 朝右 */
+#attacker-select-area .spirit-image img {
+  transform: scaleX(-1);
 }
 .spirit-image .placeholder {
   width: 100%;
