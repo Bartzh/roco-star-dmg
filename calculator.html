@@ -425,7 +425,6 @@ body {
    大小完全由 grid 决定（width/height = 100% cell），不再用 padding 凑。 */
 .spirit-picker-chip {
   width: 100%;
-  height: 100%;
   aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
@@ -1052,11 +1051,6 @@ body {
   font-family: 'Courier New', monospace;
 }
 
-/* ============ VS Badge ============ */
-.vs-connector {
-  display: none; /* hidden on desktop, the seal replaces it */
-}
-
 /* (Old result-area / hp-bar / breakdown styles removed; replaced by Result Ring
    and Breakdown Section above.) */
 
@@ -1489,37 +1483,9 @@ body {
 
 /* Skill badges (damage class + power / reduction) — shown in a row below the skill name */
 
-/* Result damage rows */
-.result-damage-rows {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 12px;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  position: relative;
-}
-.result-damage-rows .item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.result-damage-rows .item .label { font-size: 0.7rem; color: var(--text-secondary); }
-.result-damage-rows .item .value { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); font-family: 'Courier New', monospace; }
-.result-damage-rows .item.total .value { color: var(--accent-cyan); font-size: 1.3rem; }
-.result-damage-rows .item.star .value { color: var(--accent-gold); }
-.result-damage-rows .item .sub { font-size: 0.6rem; color: var(--text-secondary); }
-
-.badge-starnone {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 0.6rem;
-  color: #ff8c00;
-  background: rgba(255,140,0,0.1);
-  border: 1px solid rgba(255,140,0,0.3);
-}
 
 /* ============ Accessibility: focus rings ============ */
-:focus { outline: none; }
+:focus:not(:focus-visible) { outline: none; }
 :focus-visible {
   outline: 2px solid var(--accent-cyan);
   outline-offset: 2px;
@@ -1533,8 +1499,6 @@ body {
 .iv-slot:focus-visible,
 .breakdown-toggle:focus-visible,
 .picker-btn:focus-visible {
-  outline: 2px solid var(--accent-cyan);
-  outline-offset: 2px;
   box-shadow: 0 0 0 4px rgba(0,229,255,0.15);
 }
 .buff-chip:focus-visible { outline-offset: 3px; }
