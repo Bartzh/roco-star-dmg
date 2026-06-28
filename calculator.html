@@ -3494,15 +3494,23 @@ const SKILL_MODS = {
       notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
     };
   },
+  // 天体吸积：每 1 层星陨印记，技能威力 +20
+  skill_000742(_skill, ctx) {
+    const add = 20 * ctx.starLayer;
+    return {
+      powerAdd: add,
+      notes: [`威力 +${add}（星陨 ${ctx.starLayer} 层 ×20）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
-// Returns { powerMult, comboAdd, notes: [{source, text}, ...] }.
+// Returns { powerMult, powerAdd, comboAdd, notes: [{source, text}, ...] }.
 // Iterates the attacker's skills (category === '特性') to collect
 // passive characteristics; no positional assumption is made.
 function computeSkillDynamicModifiers(attacker, activeSkill, starLayer) {
   const ctx = { starLayer, activeSkill, attacker };
-  const result = { powerMult: 1, comboAdd: 0, notes: [] };
+  const result = { powerMult: 1, powerAdd: 0, comboAdd: 0, notes: [] };
 
   const apply = (skill) => {
     const fn = SKILL_MODS[skill?.id];
@@ -3510,6 +3518,7 @@ function computeSkillDynamicModifiers(attacker, activeSkill, starLayer) {
     const mod = fn(skill, ctx);
     if (!mod) return;
     if (mod.comboAdd)  result.comboAdd  += mod.comboAdd;
+    if (mod.powerAdd)  result.powerAdd  += mod.powerAdd;
     if (mod.powerMult) result.powerMult *= mod.powerMult;
     for (const text of (mod.notes || [])) {
       result.notes.push({ source: skill.name, text });
@@ -3574,7 +3583,7 @@ function calculateDamage() {
   const stab = getStabMultiplier(atk, skill);
   const skillEff = effectiveness(skill.element, def.types);
   const combo = (skill.combo ?? 1) + dyn.comboAdd;
-  const power = ((skill.power ?? 0) + powerBoost) * dyn.powerMult;
+  const power = ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult;
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
   );
@@ -3717,24 +3726,28 @@ function renderBreakdownList(breakdownList, data) {
     ? ' <span class="skill-badge stab">本系 ×1.25</span>'
     : '';
   const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
-  const dynMods = data.dyn || { powerMult: 1, comboAdd: 0, notes: [] };
+  const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, notes: [] };
   const powerBoost = data.powerBoost || 0;
   const powerBoostLabel = data.powerBoostLabel || null;
   const basePower = data.skill.power ?? 0;
-  const basePowerWithBoost = basePower + powerBoost;
+  const dynAdd = dynMods.powerAdd || 0;
+  const basePowerWithBoost = basePower + powerBoost + dynAdd;
   const effCombo  = (data.skill.combo ?? 1) + dynMods.comboAdd;
   const effPowerStr = (basePowerWithBoost * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
-  // Compose the 威力 line so it reflects both the flat power boost and the
-  // dynamic multiplier, e.g.
-  //   100                                          (no boost, no mult)
+  // Compose the 威力 line so it reflects the flat power boost, the dynamic
+  // additive bonus, and the dynamic multiplier, e.g.
+  //   100                                          (no boost, no add, no mult)
   //   100 × 1.20 = 120                             (mult only)
   //   100 + 40（化劲） = 140                       (boost only)
-  //   100 + 40（化劲） = 140 × 1.20 = 168          (both)
+  //   100 + 40（化劲） + 60（天体吸积） = 200      (boost + add)
+  //   100 + 40（化劲） = 140 × 1.20 = 168          (boost + mult)
+  //   100 + 40（化劲） + 60（天体吸积） = 200 × 1.20 = 240 (all three)
+  const dynAddText = dynAdd > 0 ? ` + ${dynAdd}（${dynMods.notes.find(n => n.text.startsWith('威力 +'))?.source || '动态加成'}）` : '';
   let powerText;
   if (powerBoost > 0 && dynMods.powerMult !== 1) {
-    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}） = ${basePowerWithBoost} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
-  } else if (powerBoost > 0) {
-    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}） = ${basePowerWithBoost}`;
+    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}）${dynAddText} = ${basePowerWithBoost} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
+  } else if (powerBoost > 0 || dynAdd > 0) {
+    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}）${dynAddText} = ${basePowerWithBoost}`;
   } else if (dynMods.powerMult !== 1) {
     powerText = `${basePower} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
   } else {
