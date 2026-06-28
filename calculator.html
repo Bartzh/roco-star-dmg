@@ -3059,6 +3059,89 @@ function onIVSlotClick(side, statKey, ev) {
 }
 
 // ============================================================
+// CHIP DRAG INFRA: shared press-and-drag horizontal adjust +
+// wheel + dblclick-reset for `.buff-chip` elements. Pure glue —
+// the factory owns event wiring, pointer capture, the
+// "dragging" class, and live DOM updates (text +
+// positive/negative/neutral class). The caller supplies the
+// value model: how a drag delta or wheel tick maps to a new
+// value, plus the read/write/format hooks.
+//
+// Two callers in this file:
+//   - BUFF CHIP:        continuous pct, range [-990, 990], step 10
+//   - POWER-BOOST CHIP: discrete-level step (40 or 20), range [0, 990]
+// ============================================================
+function attachChipDrag(chip, opts) {
+  const {
+    shiftMultiplier,   // wheel: shift+wheel = ×N of one tick
+    getVal,            // () => currentValue
+    setVal,            // (newVal) => void  (writes to state)
+    formatVal,         // (val) => string
+    prepareDrag,       // () => startExtra object | null | false (false = abort)
+    dragValue,         // (dx, startVal, startExtra) => newVal | null
+    wheelValue,        // (curVal, dirMult) => newVal | null
+    reset,             // () => void  (writes 0, full re-render)
+    onChange,          // () => void  (e.g. calculateDamage)
+  } = opts;
+  let drag = null;
+
+  function applyLive(newVal) {
+    const span = chip.querySelector('.buff-val');
+    if (span) span.textContent = formatVal(newVal);
+    chip.classList.remove('positive', 'negative', 'neutral');
+    chip.classList.add(_buffChipClass(newVal));
+  }
+
+  function onDown(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startExtra = prepareDrag ? prepareDrag() : null;
+    if (startExtra === false) return;   // caller aborted (e.g. no config)
+    drag = { startX: e.clientX, startVal: getVal(), pointerId: e.pointerId, startExtra };
+    try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+    chip.classList.add('dragging');
+  }
+  function onMove(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    e.preventDefault();
+    const newVal = dragValue(e.clientX - drag.startX, drag.startVal, drag.startExtra);
+    if (newVal == null || newVal === getVal()) return;
+    setVal(newVal);
+    applyLive(newVal);
+    onChange && onChange();
+  }
+  function onUp(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    try { chip.releasePointerCapture(e.pointerId); } catch (_) {}
+    chip.classList.remove('dragging');
+    drag = null;
+  }
+  function onWheel(e) {
+    e.preventDefault();
+    const dirMult = (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? shiftMultiplier : 1);
+    const newVal = wheelValue(getVal(), dirMult);
+    if (newVal == null || newVal === getVal()) return;
+    setVal(newVal);
+    applyLive(newVal);
+    onChange && onChange();
+  }
+  function onDbl(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (getVal() === 0) return;
+    reset();
+    onChange && onChange();
+  }
+
+  chip.addEventListener('pointerdown',   onDown);
+  chip.addEventListener('pointermove',   onMove);
+  chip.addEventListener('pointerup',     onUp);
+  chip.addEventListener('pointercancel', onUp);
+  chip.addEventListener('wheel',         onWheel, { passive: false });
+  chip.addEventListener('dblclick',      onDbl);
+}
+
+// ============================================================
 // BUFF CHIPS: press-and-drag horizontal to adjust the atk/matk
 // (or def/mdef) stat by ±10% per 8px; double-click to reset.
 // ============================================================
@@ -3069,7 +3152,10 @@ const BUFF_STAT_CONFIGS = {
 const BUFF_DRAG_PX_PER_STEP = 8;   // 8px → 10% step
 const BUFF_STEP_PCT = 10;
 const BUFF_MAX_PCT = 990;
-let buffDrag = null;  // { chip, side, stat, startX, startVal, pointerId }
+
+function _buffChipClass(val) {
+  return val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
+}
 
 function renderBuffChips(side) {
   const container = document.getElementById(`${side}-buff-chips`);
@@ -3081,93 +3167,27 @@ function renderBuffChips(side) {
     return `<div class="buff-chip ${cls}"
                  aria-label="${c.label} 调整（当前 ${formatBuff(val)}，拖动 / 滚轮 / 双击重置）"
                  data-side="${side}" data-stat="${c.key}"
-                 onpointerdown="onBuffPointerDown(event)"
-                 onpointermove="onBuffPointerMove(event)"
-                 onpointerup="onBuffPointerUp(event)"
-                 onpointercancel="onBuffPointerUp(event)"
-                 ondblclick="onBuffDoubleClick(event)"
-                 onwheel="onBuffWheel(event)"
                  title="拖动 · 滚轮 · 双击重置">${c.label} <span class="buff-val">${formatBuff(val)}</span></div>`;
   }).join('');
-}
-
-function _buffChipClass(val) {
-  return val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
-}
-
-function onBuffPointerDown(e) {
-  const chip = e.currentTarget;
-  e.preventDefault();
-  e.stopPropagation();
-  const side = chip.dataset.side;
-  const stat = chip.dataset.stat;
-  buffDrag = {
-    chip,
-    side,
-    stat,
-    startX: e.clientX,
-    startVal: getBuff(side, stat),
-    pointerId: e.pointerId
-  };
-  try { chip.setPointerCapture(e.pointerId); } catch (_) {}
-  chip.classList.add('dragging');
-}
-
-function onBuffPointerMove(e) {
-  if (!buffDrag || e.pointerId !== buffDrag.pointerId) return;
-  e.preventDefault();
-  const dx = e.clientX - buffDrag.startX;
-  const delta = Math.round(dx / BUFF_DRAG_PX_PER_STEP) * BUFF_STEP_PCT;
-  const newVal = Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT, buffDrag.startVal + delta));
-  if (newVal === getBuff(buffDrag.side, buffDrag.stat)) return;
-  setBuff(buffDrag.side, buffDrag.stat, newVal);
-  // Live update the chip text + color (without re-rendering the whole stats config)
-  const valSpan = buffDrag.chip.querySelector('.buff-val');
-  if (valSpan) valSpan.textContent = formatBuff(newVal);
-  buffDrag.chip.classList.remove('positive', 'negative', 'neutral');
-  buffDrag.chip.classList.add(_buffChipClass(newVal));
-  calculateDamage();
-}
-
-function onBuffPointerUp(e) {
-  if (!buffDrag || e.pointerId !== buffDrag.pointerId) return;
-  try { buffDrag.chip.releasePointerCapture(e.pointerId); } catch (_) {}
-  buffDrag.chip.classList.remove('dragging');
-  buffDrag = null;
-}
-
-function onBuffDoubleClick(e) {
-  e.stopPropagation();
-  e.preventDefault();
-  const chip = e.currentTarget;
-  const side = chip.dataset.side;
-  const stat = chip.dataset.stat;
-  if (getBuff(side, stat) === 0) return;   // already 0; no-op
-  setBuff(side, stat, 0);
-  renderBuffChips(side);
-  calculateDamage();
-}
-
-// Wheel support for buff chips: scroll up to increase, scroll down to decrease.
-// Shift = larger step (×5). preventDefault stops the page from scrolling.
-function onBuffWheel(e) {
-  e.preventDefault();
-  const chip = e.currentTarget;
-  const side = chip.dataset.side;
-  const stat = chip.dataset.stat;
-  const cur = getBuff(side, stat);
-  const step = e.shiftKey ? BUFF_STEP_PCT * 5 : BUFF_STEP_PCT;
-  // deltaY < 0 means user is scrolling up → increase; deltaY > 0 → decrease
-  const newVal = Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT,
-    cur + (e.deltaY < 0 ? step : -step)));
-  if (newVal === cur) return;
-  setBuff(side, stat, newVal);
-  // Live update the chip text + class
-  const valSpan = chip.querySelector('.buff-val');
-  if (valSpan) valSpan.textContent = formatBuff(newVal);
-  chip.classList.remove('positive', 'negative', 'neutral');
-  chip.classList.add(_buffChipClass(newVal));
-  calculateDamage();
+  for (const c of configs) {
+    const chip = container.querySelector(`.buff-chip[data-stat="${c.key}"]`);
+    if (!chip) continue;
+    attachChipDrag(chip, {
+      shiftMultiplier: 5,
+      getVal: () => getBuff(side, c.key),
+      setVal: (v) => setBuff(side, c.key, v),
+      formatVal: formatBuff,
+      dragValue: (dx, startVal) => {
+        const delta = Math.round(dx / BUFF_DRAG_PX_PER_STEP) * BUFF_STEP_PCT;
+        return Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT, startVal + delta));
+      },
+      wheelValue: (cur, dirMult) => {
+        return Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT, cur + dirMult * BUFF_STEP_PCT));
+      },
+      reset: () => { setBuff(side, c.key, 0); renderBuffChips(side); },
+      onChange: calculateDamage,
+    });
+  }
 }
 
 // ============================================================
@@ -3197,7 +3217,6 @@ const POWER_BOOST_PETS = {
 };
 const POWER_BOOST_MAX = 990;
 const POWER_BOOST_DRAG_PX_PER_STEP = 8;
-let powerBoostDrag = null;
 
 // Largest level index. With step=40 and cap=990: k=24 (val 960), maxLevel=25.
 // With step=20 and cap=990: k=49 (val 980), maxLevel=50.
@@ -3261,91 +3280,41 @@ function renderPowerBoostChip() {
   const cls = val > 0 ? 'positive' : 'neutral';
   container.innerHTML = `<div class="buff-chip ${cls}"
                               aria-label="${config.label} 调整（当前 ${formatPowerBoost(val)}，拖动 / 滚轮 / 双击重置）"
-                              onpointerdown="onPowerBoostPointerDown(event)"
-                              onpointermove="onPowerBoostPointerMove(event)"
-                              onpointerup="onPowerBoostPointerUp(event)"
-                              onpointercancel="onPowerBoostPointerUp(event)"
-                              ondblclick="onPowerBoostDoubleClick(event)"
-                              onwheel="onPowerBoostWheel(event)"
                               title="拖动 · 滚轮 · 双击重置">${config.label} <span class="buff-val">${formatPowerBoost(val)}</span></div>`;
-}
-
-function onPowerBoostPointerDown(e) {
-  const chip = e.currentTarget;
-  e.preventDefault();
-  e.stopPropagation();
-  const config = getPowerBoostConfig();
-  if (!config) return;
-  // Remember the start LEVEL (not the start value) so the drag moves
-  // through the discrete level sequence rather than continuous values.
-  powerBoostDrag = {
-    chip,
-    startX: e.clientX,
-    startLevel: getPowerBoostLevel(getPowerBoost(), config.step),
-    maxLevel: getMaxPowerBoostLevel(config.step),
-    pointerId: e.pointerId
-  };
-  try { chip.setPointerCapture(e.pointerId); } catch (_) {}
-  chip.classList.add('dragging');
-}
-
-function onPowerBoostPointerMove(e) {
-  if (!powerBoostDrag || e.pointerId !== powerBoostDrag.pointerId) return;
-  e.preventDefault();
-  const config = getPowerBoostConfig();
-  if (!config) return;
-  const dx = e.clientX - powerBoostDrag.startX;
-  const levelDelta = Math.round(dx / POWER_BOOST_DRAG_PX_PER_STEP);
-  const newLevel = Math.max(0, Math.min(powerBoostDrag.maxLevel,
-    powerBoostDrag.startLevel + levelDelta));
-  const newVal = getValueAtPowerBoostLevel(newLevel, config.step);
-  if (newVal === getPowerBoost()) return;
-  state.attackerPowerBoost = newVal;
-  // Live update the chip text + color (without re-rendering the chip).
-  const valSpan = powerBoostDrag.chip.querySelector('.buff-val');
-  if (valSpan) valSpan.textContent = formatPowerBoost(newVal);
-  powerBoostDrag.chip.classList.remove('positive', 'negative', 'neutral');
-  powerBoostDrag.chip.classList.add(_buffChipClass(newVal));
-  calculateDamage();
-}
-
-function onPowerBoostPointerUp(e) {
-  if (!powerBoostDrag || e.pointerId !== powerBoostDrag.pointerId) return;
-  try { powerBoostDrag.chip.releasePointerCapture(e.pointerId); } catch (_) {}
-  powerBoostDrag.chip.classList.remove('dragging');
-  powerBoostDrag = null;
-}
-
-function onPowerBoostDoubleClick(e) {
-  e.stopPropagation();
-  e.preventDefault();
-  if (getPowerBoost() === 0) return;   // already 0; no-op
-  state.attackerPowerBoost = 0;
-  renderPowerBoostChip();
-  calculateDamage();
-}
-
-// Wheel: scroll up to increase, scroll down to decrease. Shift = ×5 levels.
-// Operates on level indices so the value always lands on a valid level
-// (e.g. 化劲: 960 → 990 going up, 990 → 960 going back).
-function onPowerBoostWheel(e) {
-  e.preventDefault();
-  const config = getPowerBoostConfig();
-  if (!config) return;
-  const chip = e.currentTarget;
-  const curLevel = getPowerBoostLevel(getPowerBoost(), config.step);
-  const levelStep = e.shiftKey ? 5 : 1;
-  const maxLevel = getMaxPowerBoostLevel(config.step);
-  const newLevel = Math.max(0, Math.min(maxLevel,
-    curLevel + (e.deltaY < 0 ? levelStep : -levelStep)));
-  const newVal = getValueAtPowerBoostLevel(newLevel, config.step);
-  if (newVal === getPowerBoost()) return;
-  state.attackerPowerBoost = newVal;
-  const valSpan = chip.querySelector('.buff-val');
-  if (valSpan) valSpan.textContent = formatPowerBoost(newVal);
-  chip.classList.remove('positive', 'negative', 'neutral');
-  chip.classList.add(_buffChipClass(newVal));
-  calculateDamage();
+  const chip = container.querySelector('.buff-chip');
+  if (!chip) return;
+  attachChipDrag(chip, {
+    shiftMultiplier: 5,
+    getVal: getPowerBoost,
+    setVal: (v) => { state.attackerPowerBoost = v; },
+    formatVal: formatPowerBoost,
+    // Remember the start LEVEL (not the start value) so the drag moves
+    // through the discrete level sequence rather than continuous values.
+    prepareDrag: () => {
+      const cfg = getPowerBoostConfig();
+      if (!cfg) return false;   // no longer eligible (race) → abort
+      return { step: cfg.step, maxLevel: getMaxPowerBoostLevel(cfg.step) };
+    },
+    dragValue: (dx, startVal, startExtra) => {
+      const levelDelta = Math.round(dx / POWER_BOOST_DRAG_PX_PER_STEP);
+      const startLevel = getPowerBoostLevel(startVal, startExtra.step);
+      const newLevel = Math.max(0, Math.min(startExtra.maxLevel, startLevel + levelDelta));
+      return getValueAtPowerBoostLevel(newLevel, startExtra.step);
+    },
+    // dirMult is in "levels" (1 = 1 level, 5 = 5 levels via shift). We
+    // map back to a value so the stored value is always on a valid
+    // level (e.g. 化劲: 960 → 990 going up, 990 → 960 going back).
+    wheelValue: (cur, dirMult) => {
+      const cfg = getPowerBoostConfig();
+      if (!cfg) return null;
+      const curLevel = getPowerBoostLevel(cur, cfg.step);
+      const maxLevel = getMaxPowerBoostLevel(cfg.step);
+      const newLevel = Math.max(0, Math.min(maxLevel, curLevel + dirMult));
+      return getValueAtPowerBoostLevel(newLevel, cfg.step);
+    },
+    reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
+    onChange: calculateDamage,
+  });
 }
 
 // Keyboard support for spirit-card (Enter/Space to open the picker)
