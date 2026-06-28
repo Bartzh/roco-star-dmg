@@ -2125,6 +2125,10 @@ const DISC = {
 //   t=1.0 → rgb(255,255,200)  乳白
 let sealR = 100, sealG = 140, sealB = 255;
 let discIntensity = 0;
+// 轨道粒子的"数量桶"哨兵：仅在 count = 8 + floor(t*24) 跨桶时重建，避免
+// 拖拽期间每像素用新 Math.random() 重洗已有粒子的 angle/radius/size/speed/twinkle。
+// 初始值 -1 保证 initParticles 的首次调用一定会重建。
+let orbitalBucket = -1;
 
 // 计算与 seal-glow-color 严格同步的色温。setStarLayer 每次层数变化都会调用。
 function updateStarTheme() {
@@ -2146,7 +2150,12 @@ function updateStarTheme() {
 }
 
 // 按当前星陨层数重建轨道粒子。层数变化时由 setStarLayer 调用。
+// 仅在 count 桶变化时真正执行：拖拽中同一桶内 layer 连续变化会保持粒子实例
+// 稳定（不再每像素重洗），消除闪烁；只在跨桶（约每 4 层）时生成新一组。
 function rebuildOrbitals() {
+  const bucket = Math.floor(discIntensity * 24);
+  if (bucket === orbitalBucket) return;
+  orbitalBucket = bucket;
   DISC.orbitals = [];
   const t = discIntensity;
   const count = 8 + Math.floor(t * 24);     // 8..32
