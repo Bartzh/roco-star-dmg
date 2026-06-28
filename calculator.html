@@ -1667,15 +1667,28 @@ const ELEMENTS = {
 };
 const FALLBACK_EL = { name: '无', emoji: '❔', color: '#666666' };
 
+// elOf 的预计算查找表：把 rawName 直接映射到元素对象。
+// 预填：每个 ELEMENTS key 的 "X" 和 "X系" 两种写法 + 3 个会回落到 FALLBACK_EL 的特殊输入。
+// 存的是对象引用，augmentElementsWithTypes 后续追加的 iconUrl 也能透出。
+const ELEMENT_BY_RAW = new Map();
+(function buildElementAliasMap() {
+  for (const key of Object.keys(ELEMENTS)) {
+    ELEMENT_BY_RAW.set(key, ELEMENTS[key]);
+    ELEMENT_BY_RAW.set(key + '系', ELEMENTS[key]);
+  }
+  ELEMENT_BY_RAW.set('无系别', FALLBACK_EL);
+  ELEMENT_BY_RAW.set('空', FALLBACK_EL);
+  ELEMENT_BY_RAW.set('', FALLBACK_EL);
+})();
+
 // Strip trailing 系 (e.g. "草系" -> "草")
 function stripXi(name) {
   if (!name) return '';
   return name.endsWith('系') ? name.slice(0, -1) : name;
 }
 function elOf(rawName) {
-  if (!rawName || rawName === '无系别' || rawName === '空') return FALLBACK_EL;
-  const key = stripXi(rawName);
-  return ELEMENTS[key] || FALLBACK_EL;
+  if (rawName == null) return FALLBACK_EL;
+  return ELEMENT_BY_RAW.get(rawName) || FALLBACK_EL;
 }
 
 // ============================================================
@@ -1686,6 +1699,10 @@ let SPRITES = {};
 let SKILLS = {};
 let TYPES = {};
 let OTHERS = {};
+
+// 预计算的 sprite 列表。filterSpirits 在每次按键/筛选时遍历。
+// 一次性 Object.entries 即可避免每次按键都重新分配临时数组。
+let SPRITES_ENTRIES = [];
 
 async function loadData() {
   const inlineSprites = document.getElementById('sprites-data');
@@ -1709,6 +1726,8 @@ async function loadData() {
     ]);
   }
   augmentElementsWithTypes();
+  // 此时 SPRITES 已是最终值，预计算 entries 供 filterSpirits 复用。
+  SPRITES_ENTRIES = Object.entries(SPRITES);
 }
 
 // Merge iconUrl from TYPES into ELEMENTS (so elOf(...).iconUrl works for skill-card overlays)
@@ -2519,7 +2538,7 @@ function filterSpirits(side, filter) {
   const commonList = (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
   const commonSet = new Set(commonList);
   const wantEls = filter.elements;   // Set<string>
-  const all = Object.entries(SPRITES);
+  const all = SPRITES_ENTRIES;        // loadData 末尾预计算，避免每次按键重新分配
   const out = [];
   for (let i = 0; i < all.length; i++) {
     const [id, s] = all[i];
@@ -3701,8 +3720,15 @@ function renderResult(data) {
   if (breakdownSection) breakdownSection.style.display = 'block';
 
   // --- Build the breakdown list (full math) ---
+  // 折叠（max-height: 0）时不重写 innerHTML —— 拖动星层时折叠的 DOM 是不可见的，
+  // 反复拼接/解析字符串完全是浪费。展开时由 toggleBreakdown 用最新 data 兜底渲染。
   const breakdownList = document.getElementById('breakdown-list');
-  if (breakdownList) renderBreakdownList(breakdownList, data);
+  _lastBreakdownData = data;
+  const breakdownContent = document.getElementById('breakdown-content');
+  const breakdownOpen = breakdownContent && breakdownContent.classList.contains('open');
+  if (breakdownList && breakdownOpen) {
+    renderBreakdownList(breakdownList, data);
+  }
 
   if (data.isKill) triggerKillEffects();
 }
@@ -3815,6 +3841,9 @@ function renderWaiting() {
 // ============================================================
 // KILL EFFECTS, ATMOSPHERE, BREAKDOWN TOGGLE
 // ============================================================
+// 折叠期间 renderBreakdownList 被跳过；为保证下次展开时内容是最新的，
+// 在 renderResult 里把 data 存到这里，toggleBreakdown 展开时兜底重渲染。
+let _lastBreakdownData = null;
 let lastKillState = false;
 function triggerKillEffects() {
   if (lastKillState) return;
@@ -3866,6 +3895,12 @@ function toggleBreakdown() {
   const isOpen = content.classList.toggle('open');
   toggle.classList.toggle('open', isOpen);
   toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  // 刚展开：用最新 data 兜底渲染。折叠期间 renderBreakdownList 被跳过，
+  // 这里确保用户能看到当前最新的计算结果而不是旧的 DOM。
+  if (isOpen && _lastBreakdownData) {
+    const breakdownList = document.getElementById('breakdown-list');
+    if (breakdownList) renderBreakdownList(breakdownList, _lastBreakdownData);
+  }
 }
 
 function init() {
