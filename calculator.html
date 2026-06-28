@@ -3742,17 +3742,28 @@ function renderBreakdownList(breakdownList, data) {
   //   100 + 40（化劲） + 60（天体吸积） = 200      (boost + add)
   //   100 + 40（化劲） = 140 × 1.20 = 168          (boost + mult)
   //   100 + 40（化劲） + 60（天体吸积） = 200 × 1.20 = 240 (all three)
-  const dynAddText = dynAdd > 0 ? ` + ${dynAdd}（${dynMods.notes.find(n => n.text.startsWith('威力 +'))?.source || '动态加成'}）` : '';
-  let powerText;
-  if (powerBoost > 0 && dynMods.powerMult !== 1) {
-    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}）${dynAddText} = ${basePowerWithBoost} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
-  } else if (powerBoost > 0 || dynAdd > 0) {
-    powerText = `${basePower} + ${powerBoost}（${powerBoostLabel || '化劲/羽化'}）${dynAddText} = ${basePowerWithBoost}`;
-  } else if (dynMods.powerMult !== 1) {
-    powerText = `${basePower} × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
-  } else {
-    powerText = `${basePower}`;
+  //   100 + 60（天体吸积） = 160                    (add only — no powerBoost)
+  // Build the additive step "<base> + <term1> + <term2> = <sum>", or null
+  // when there's no additive term (so we don't render a stray " + 0" line).
+  const addTerms = [];
+  if (powerBoost > 0) addTerms.push(`${powerBoost}（${powerBoostLabel || '化劲/羽化'}）`);
+  if (dynAdd > 0) {
+    const src = dynMods.notes.find(n => n.text.startsWith('威力 +'))?.source || '动态加成';
+    addTerms.push(`${dynAdd}（${src}）`);
   }
+  const additiveExpr = addTerms.length
+    ? `${basePower} + ${addTerms.join(' + ')} = ${basePowerWithBoost}`
+    : null;
+  let multExpr;
+  if (dynMods.powerMult !== 1) {
+    const src = dynMods.notes.find(n => n.text.startsWith('威力 ×'))?.source || '动态加成';
+    multExpr = ` × ${dynMods.powerMult.toFixed(2)}（${src}） = ${effPowerStr}`;
+  }
+  let powerText;
+  if (additiveExpr && multExpr)      powerText = `${additiveExpr}${multExpr}`;
+  else if (additiveExpr)             powerText = additiveExpr;
+  else if (multExpr)                 powerText = `${basePower}${multExpr}`;
+  else                               powerText = String(basePower);
   const dynNotesHTML = dynMods.notes.length
     ? `<div><span class="label">动态修正:</span></div>` +
       dynMods.notes.map(n =>
