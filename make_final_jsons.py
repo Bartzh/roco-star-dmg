@@ -116,13 +116,19 @@ for pet_id, pet_info in core.items():
     if not skills:
         no_skills.append(pet_id)
         continue
-    pinyin_full, pinyin_initials = make_search_keys(pet_info['t'])
+    name = pet_info['t']
+    if name == '落陨星兔（信使精灵）':
+        name = '落陨星兔'
+        print(f'出现"落陨星兔（信使精灵）"，重命名为"{name}"')
+    elif name == '落陨星兔':
+        print(f'出现"落陨星兔"，可能不再需要重命名代码')
+    pinyin_full, pinyin_initials = make_search_keys(name)
     sprites[pet_id] = {
         # 用于排序，随后删除
         'hb': pet_info['hb'],
 
         'id': pet_id,
-        'name': pet_info['t'], # str: 精灵的名字。
+        'name': name, # str: 精灵的名字。
         'types': pet_info['tp'], # list[str]: 精灵所属系别，如“水系”（任何系别都会带一个“系”字），部分精灵有两个系别。
         'hp': pet_info['st']['hp'], # int: 精灵的生命值。
         'atk': pet_info['st']['at'], # int: 精灵的物攻。
