@@ -2543,7 +2543,9 @@ function _renderPickerOptionsHTML(side, list) {
 //   - text     : 精灵名 / pinyin / pinyin_initials 三者任一 includes 命中
 // common / elements / text 三组筛选条件之间也是 AND 关系（必须同时满足）。
 function filterSpirits(side, filter) {
-  const text = (filter.text || '').trim().toLowerCase();
+  // 兼容中文/英文括号：把"（）"统一为"()"，避免用户用半角括号搜不到数据
+  const normParens = str => (str || '').replace(/[（）]/g, ch => ch === '（' ? '(' : ')');
+  const text = normParens((filter.text || '').trim()).toLowerCase();
   const commonList = (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
   const commonSet = new Set(commonList);
   const wantEls = filter.elements;   // Set<string>
@@ -2563,9 +2565,9 @@ function filterSpirits(side, filter) {
       if (!allMatch) continue;
     }
     if (text) {
-      const name = (s.name || '').toLowerCase();
-      const py = s.pinyin || '';
-      const ini = s.pinyin_initials || '';
+      const name = normParens(s.name || '').toLowerCase();
+      const py = normParens(s.pinyin || '');
+      const ini = normParens(s.pinyin_initials || '');
       let matched = name.includes(text) || py.includes(text) || ini.includes(text);
       // 纯数字输入时，也按图鉴 id (hbid) 搜索
       if (!matched && /^\d+$/.test(text)) {
