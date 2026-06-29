@@ -139,6 +139,12 @@ for pet_id, pet_info in core.items():
         sprites[pet_id]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
+# 排除剩下的一些精灵
+del sprites['pet_000617'] # 幽影树（突变的样子）
+del sprites["pet_000645"] # 圣光迪莫（第1阶段）
+del sprites["pet_000646"] # 圣草迪莫（第1阶段）
+del sprites["pet_000647"] # 圣火迪莫（第1阶段）
+del sprites["pet_000648"] # 圣水迪莫（第1阶段）
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
