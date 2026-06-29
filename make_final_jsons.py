@@ -120,7 +120,6 @@ for pet_id, pet_info in core.items():
     sprites[pet_id] = {
         # 用于排序，随后删除
         'hb': pet_info['hb'],
-        'sg': pet_info['sg'],
 
         'id': pet_id,
         'name': pet_info['t'], # str: 精灵的名字。
@@ -152,17 +151,15 @@ del sprites["pet_000648"] # 圣水迪莫（第1阶段）
 # 按图鉴id排序
 def hb_id(item: tuple[str, dict]) -> int:
     sprite = item[1]
-    result = int(sprite['hb']['i'][9:])*10 + sprite['sg']
+    result = int(sprite['hb']['i'][9:])*10
     # 目前用这种方法判断是否为首领是有效的
-    # 若为首领，值加3，保证其排在最后（烈火战神的sg竟然是1，应该是搞错了）
     if sprite['hb']['hen'] == False and sprite['hb']['stp'] == False:
-        result += 3
+        result += 1
     return result
 sprites = dict(sorted(sprites.items(), key=hb_id))
-# 删除hbi和sg
+# 删除hb
 for s in sprites:
     del sprites[s]['hb']
-    del sprites[s]['sg']
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
