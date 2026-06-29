@@ -2566,7 +2566,12 @@ function filterSpirits(side, filter) {
       const name = (s.name || '').toLowerCase();
       const py = s.pinyin || '';
       const ini = s.pinyin_initials || '';
-      if (!name.includes(text) && !py.includes(text) && !ini.includes(text)) continue;
+      let matched = name.includes(text) || py.includes(text) || ini.includes(text);
+      // 纯数字输入时，也按图鉴 id (hbid) 搜索
+      if (!matched && /^\d+$/.test(text)) {
+        matched = String(s.hbid ?? '').includes(text);
+      }
+      if (!matched) continue;
     }
     out.push(all[i]);
   }
@@ -2603,7 +2608,7 @@ function renderPickerToolbar(side, filter) {
         <input id="${side}-picker-search" type="text" inputmode="search"
                value="${searchVal}"
                oninput="onPickerSearchInput('${side}', this.value)"
-               placeholder="搜索：名称 / 拼音 / 首字母"
+               placeholder="搜索：名称 / 拼音 / 首字母 / 图鉴编号"
                aria-label="搜索精灵">
       </div>
       <button type="button" class="spirit-picker-chip common${commonActive}"

@@ -137,6 +137,7 @@ for pet_id, pet_info in core.items():
         # letters, digits) are kept verbatim in both fields.
         'pinyin': pinyin_full,
         'pinyin_initials': pinyin_initials,
+        'hbid': int(pet_info['hb']['i'][9:]),
     }
     if il_url := pet_illustration_urls.get(pet_id):
         sprites[pet_id]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
@@ -151,7 +152,7 @@ del sprites["pet_000648"] # 圣水迪莫（第1阶段）
 # 按图鉴id排序
 def hb_id(item: tuple[str, dict]) -> int:
     sprite = item[1]
-    result = int(sprite['hb']['i'][9:])*10
+    result = sprite['hbid']*10
     # 目前用这种方法判断是否为首领是有效的
     if sprite['hb']['hen'] == False and sprite['hb']['stp'] == False:
         result += 1
