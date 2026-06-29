@@ -118,6 +118,10 @@ for pet_id, pet_info in core.items():
         continue
     pinyin_full, pinyin_initials = make_search_keys(pet_info['t'])
     sprites[pet_id] = {
+        # 用于排序，随后删除
+        'hbi': pet_info['hb']['i'],
+        'sg': pet_info['sg'],
+
         'id': pet_id,
         'name': pet_info['t'], # str: 精灵的名字。
         'types': pet_info['tp'], # list[str]: 精灵所属系别，如“水系”（任何系别都会带一个“系”字），部分精灵有两个系别。
@@ -145,6 +149,12 @@ del sprites["pet_000645"] # 圣光迪莫（第1阶段）
 del sprites["pet_000646"] # 圣草迪莫（第1阶段）
 del sprites["pet_000647"] # 圣火迪莫（第1阶段）
 del sprites["pet_000648"] # 圣水迪莫（第1阶段）
+# 按图鉴id排序
+sprites = dict(sorted(sprites.items(), key=lambda item: int(item[1]['hbi'][9:])*10 + item[1]['sg']))
+# 删除hbi和sg
+for s in sprites:
+    del sprites[s]['hbi']
+    del sprites[s]['sg']
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
