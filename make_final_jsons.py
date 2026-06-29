@@ -95,6 +95,9 @@ sprites = {}
 no_skills = []
 no_stats = []
 for pet_id, pet_info in core.items():
+    # 没有图鉴，说明是未上线精灵
+    if not pet_info.get('hb'):
+        continue
     if not pet_info.get('st'):
         no_stats.append(pet_id)
         continue
