@@ -11,6 +11,7 @@ Output:
 """
 import json
 import os
+import shutil
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, 'calculator.html')
@@ -68,6 +69,14 @@ def main():
         f.write(out_html)
     with open(DIST, 'w', encoding='utf-8') as f:
         f.write(out_html)
+    # 复制 favicon.ico 到 dist 目录
+    favicon_src = os.path.join(ROOT, 'favicon.ico')
+    favicon_dst = os.path.join(ROOT, 'dist', 'favicon.ico')
+    if os.path.exists(favicon_src):
+        shutil.copy2(favicon_src, favicon_dst)
+        print(f'Copied favicon.ico to dist/')
+    else:
+        print(f'Warning: favicon.ico not found in root directory')
 
     src_size = os.path.getsize(SRC)
     out_size = os.path.getsize(OUT)
