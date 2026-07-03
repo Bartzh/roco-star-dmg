@@ -167,6 +167,21 @@ sprites = dict(sorted(sprites.items(), key=hb_id))
 # 删除hb
 for s in sprites:
     del sprites[s]['hb']
+sprites['pet_789987'] = {
+    'id': 'pet_789987',
+    'name': '拼图',
+    'types': ['幻系'],
+    'hp': 290,
+    'atk': 200,
+    'matk': 192,
+    'def': 183,
+    'mdef': 183,
+    'spd': 145,
+    'skills': ['skill_000633', 'skill_000304', 'skill_000727', 'skill_000742', 'skill_000725'],
+    'pinyin': 'pin tu',
+    'pinyin_initials': 'pt',
+    'hbid': 789987,
+}
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
