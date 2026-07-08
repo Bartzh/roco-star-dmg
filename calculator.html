@@ -1840,7 +1840,7 @@ function formatBuff(val) {
 function getDefenseSkillOptions(defender) {
   const opts = [
     { id: '__none__', name: '无', reduction: 1, _pseudo: true },
-    { id: '__state__', name: '聚能', category: '状态' }
+    { id: '__state__', name: '聚能', category: '状态', icon_url: './images/聚能.png' }
   ];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
