@@ -3605,7 +3605,7 @@ const SKILL_MODS = {
   // 观星：地系技能威力每层星陨 +20%
   skill_000031(_skill, ctx) {
     if (stripXi(ctx.activeSkill.element) !== '地') return null;
-    const mult = 1 + 0.2 * ctx.starLayer;
+    const mult = 0.2 * ctx.starLayer;
     return {
       powerMult: mult,
       notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
@@ -3613,7 +3613,7 @@ const SKILL_MODS = {
   },
   // 坠星：全技能威力每层星陨 +20%
   skill_000218(_skill, ctx) {
-    const mult = 1 + 0.2 * ctx.starLayer;
+    const mult = 0.2 * ctx.starLayer;
     return {
       powerMult: mult,
       notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
@@ -3631,7 +3631,7 @@ const SKILL_MODS = {
   skill_000200(_skill, ctx) {
     if (effectiveness(ctx.activeSkill.element, ctx.defender.types) <= 1) return null;
     return {
-      powerMult: 1.25,
+      powerMult: 0.25,
       notes: [`威力 ×${1.25.toFixed(2)}（克制伤害 +25%）`],
     };
   },
@@ -3649,7 +3649,7 @@ const SKILL_MODS = {
       ? `先手技能 ${ctx.attackSkill.name}`
       : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
     return {
-      powerMult: 1.5,
+      powerMult: 0.5,
       notes: [`威力 ×1.50（顺风：先于敌方攻击 · ${reason}）`],
     };
   },
@@ -3662,7 +3662,7 @@ const SKILL_MODS = {
       ? `先手技能 ${ctx.attackSkill.name}`
       : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
     return {
-      powerMult: 1.75,
+      powerMult: 0.75,
       notes: [`威力 ×1.75（破空：先于敌方攻击 · ${reason}）`],
     };
   },
@@ -3712,7 +3712,7 @@ function computeSkillDynamicModifiers(
     if (!mod) return;
     if (mod.comboAdd)  result.comboAdd  += mod.comboAdd;
     if (mod.powerAdd)  result.powerAdd  += mod.powerAdd;
-    if (mod.powerMult) result.powerMult *= mod.powerMult;
+    if (mod.powerMult) result.powerMult += mod.powerMult;
     for (const text of (mod.notes || [])) {
       result.notes.push({ source: skill.name, text });
     }
