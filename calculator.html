@@ -3395,9 +3395,22 @@ function renderPowerBoostChip() {
 // is stored so that future features can read it.
 // ============================================================
 const SPEED_BOOST_PETS = {
-  'pet_000259': true,   // 岚鸟（秋天的样子）
+  'pet_000028': true,   // 冬羽雀（本来的样子）
+  'pet_000254': true,   // 冬羽雀（春天的样子）
+  'pet_000255': true,   // 冬羽雀（夏天的样子）
+  'pet_000256': true,   // 冬羽雀（秋天的样子）
+  'pet_000455': true,   // 雪绒鸟（本来的样子）
+  'pet_000251': true,   // 雪绒鸟（春天的样子）
+  'pet_000252': true,   // 雪绒鸟（夏天的样子）
+  'pet_000253': true,   // 雪绒鸟（秋天的样子）
+  'pet_000037': true,   // 岚鸟（本来的样子）
   'pet_000257': true,   // 岚鸟（春天的样子）
-  'pet_000037': true    // 岚鸟（本来的样子）
+  'pet_000258': true,   // 岚鸟（夏天的样子）
+  'pet_000259': true,   // 岚鸟（秋天的样子）
+  'pet_000634': true,   // 霜翼领主（本来的样子）
+  'pet_000650': true,   // 霜翼领主（春天的样子）
+  'pet_000651': true,   // 霜翼领主（夏天的样子）
+  'pet_000652': true,   // 霜翼领主（秋天的样子）
 };
 const SPEED_LABEL = '速度';
 const SPEED_MIN = -990;
@@ -3640,14 +3653,28 @@ const SKILL_MODS = {
       notes: [`威力 ×1.50（顺风：先于敌方攻击 · ${reason}）`],
     };
   },
+  // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
+  skill_000230(_skill, ctx) {
+    const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
+    if (!ctx.defenseSkill._pseudo || (!firstStrike && !faster)) return null;
+    const reason = firstStrike
+      ? `先手技能 ${ctx.attackSkill.name}`
+      : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    return {
+      powerMult: 1.75,
+      notes: [`威力 ×1.75（破空：先于敌方攻击 · ${reason}）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
 // 必先手技能：使用这些技能时无视双方速度差，必定先于敌方行动。
 // 与 skill_000049（顺风）配合：先手技能让顺风必定触发威力 +50%。
 const FIRST_STRIKE_SKILLS = {
-  'skill_000654': true,   // 俯冲（先手+1）
-  'skill_000304': true    // 先发制人（先手+1）
+  'skill_000654': true, // 俯冲
+  'skill_000304': true, // 先发制人
+  'skill_000305': true, // 天旋地转
 };
 
 // Returns { powerMult, powerAdd, comboAdd, notes: [{source, text}, ...] }.
