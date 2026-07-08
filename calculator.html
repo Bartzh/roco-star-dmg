@@ -3573,6 +3573,13 @@ function selectDefenseSkill(idx) {
 // Each entry takes (skill, ctx) and returns either null or
 //   { comboAdd?: number, powerMult?: number, notes?: string[] }.
 // The aggregator (computeSkillDynamicModifiers) merges them.
+//
+// The ctx object always carries:
+//   starLayer, activeSkill, attacker, defender
+//   attackerNature, defenderNature, attackerIVs, defenderIVs
+//   attackerSpeedBonus, defenderSpeedBonus
+//   attackerEffectiveSpeed, defenderEffectiveSpeed
+// (effective speed = finalSpeed(stat-block) + speedChip bonus)
 // ============================================================
 const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
@@ -3615,14 +3622,60 @@ const SKILL_MODS = {
       notes: [`威力 ×${1.25.toFixed(2)}（克制伤害 +25%）`],
     };
   },
+  // 顺风（岚鸟特性）：若先于敌方攻击，本次技能威力 +50%。
+  // 判定"先于敌方攻击"的条件（任一满足即触发）：
+  //   (a) 攻击技能本身是必先手技能（FIRST_STRIKE_SKILLS）
+  //   (b) 攻击方有效速度严格大于防御方有效速度
+  //   (c) 防御方没有使用防御技能（应对成功必定先手）
+  // 有效速度 = 性格/个体修正后的最终速度 + 速度 chip 调整。
+  skill_000049(_skill, ctx) {
+    const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
+    if (!ctx.defenseSkill._pseudo || (!firstStrike && !faster)) return null;
+    const reason = firstStrike
+      ? `先手技能 ${ctx.attackSkill.name}`
+      : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    return {
+      powerMult: 1.5,
+      notes: [`威力 ×1.50（顺风：先于敌方攻击 · ${reason}）`],
+    };
+  },
   // Add more skills here as they're introduced.
+};
+
+// 必先手技能：使用这些技能时无视双方速度差，必定先于敌方行动。
+// 与 skill_000049（顺风）配合：先手技能让顺风必定触发威力 +50%。
+const FIRST_STRIKE_SKILLS = {
+  'skill_000654': true,   // 俯冲（先手+1）
+  'skill_000304': true    // 先发制人（先手+1）
 };
 
 // Returns { powerMult, powerAdd, comboAdd, notes: [{source, text}, ...] }.
 // Iterates the attacker's skills (category === '特性') to collect
 // passive characteristics; no positional assumption is made.
-function computeSkillDynamicModifiers(attacker, activeSkill, starLayer, defender) {
-  const ctx = { starLayer, activeSkill, attacker, defender };
+//
+// The ctx object passed to each SKILL_MODS function carries:
+//   - starLayer, attackSkill, attacker, defender, defenseSkill
+//   - attackerNature, defenderNature, attackerIVs, defenderIVs
+//   - attackerSpeedBonus, defenderSpeedBonus   (the 速度 chip values)
+//   - attackerEffectiveSpeed, defenderEffectiveSpeed
+//     (finalSpeed from stat-block + speed chip; this is the value
+//      used by 顺风 / FIRST_STRIKE logic to decide who moves first)
+function computeSkillDynamicModifiers(
+  attacker, attackSkill,  attackerNature, attackerIVs,
+  defender, defenseSkill, defenderNature, defenderIVs,
+  starLayer
+) {
+  const atkSpeedBonus = state.attackerSpeed;
+  const defSpeedBonus = state.defenderSpeed;
+  const atkEffectiveSpeed = getFinalStat(attacker, 'spd', attackerNature, attackerIVs) + atkSpeedBonus;
+  const defEffectiveSpeed = getFinalStat(defender, 'spd', defenderNature, defenderIVs) + defSpeedBonus;
+  const ctx = {
+    starLayer, attackSkill, attacker, defender, defenseSkill,
+    attackerNature, defenderNature, attackerIVs, defenderIVs,
+    attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
+    attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
+  };
   const result = { powerMult: 1, powerAdd: 0, comboAdd: 0, notes: [] };
 
   const apply = (skill) => {
@@ -3639,7 +3692,7 @@ function computeSkillDynamicModifiers(attacker, activeSkill, starLayer, defender
   };
 
   // (1) Active skill self-modifier.
-  apply(activeSkill);
+  apply(attackSkill);
 
   // (2) Attacker's 特性 (characteristics).
   for (const sid of (attacker.skills || [])) {
@@ -3695,7 +3748,7 @@ function calculateDamage() {
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
 
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
-  const dyn = computeSkillDynamicModifiers(atk, skill, n, def);
+  const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
   // 化劲/羽化 (attacker's pet-specific power boost) — flat addition to base power.
   const powerBoost = getPowerBoost();
   const powerBoostLabel = getPowerBoostConfig()?.label || null;
