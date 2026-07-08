@@ -3652,7 +3652,7 @@ const SKILL_MODS = {
   // 顺风（岚鸟特性）：若先于敌方攻击，本次技能威力 +50%。
   // 判定"先于敌方攻击"的条件（任一满足即触发）：
   //   (a) 攻击技能本身是必先手技能（FIRST_STRIKE_SKILLS）
-  //   (b) 攻击方有效速度严格大于防御方有效速度
+  //   (b) 攻击方有效速度严格大于防御方有效速度（平速在游戏内会拼速，在这里直接不算）
   //   (c) 防御方没有使用防御技能（应对成功必定先手）
   // 有效速度 = 性格/个体修正后的最终速度 + 速度 chip 调整。
   skill_000049(ctx, fromAttacker) {
@@ -3697,6 +3697,17 @@ const SKILL_MODS = {
     return {
       powerMult: 0.5,
       notes: [`威力 ×1.50（扇风：先于敌方攻击 · ${reason}）`],
+    };
+  },
+  // 疾风刺：若先于敌方攻击，改为3连击
+  skill_000634(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
+    if (ctx.defenseSkill.category === '防御' || !faster) return null;
+    const reason = `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    return {
+      comboAdd: 2,
+      notes: [`变为3连击（疾风刺：先于敌方攻击 · ${reason}）`],
     };
   },
   // 铁蒺藜：应对状态：本次伤害翻倍
