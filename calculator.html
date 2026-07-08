@@ -2547,7 +2547,10 @@ function _renderPickerOptionsHTML(side, list) {
 function filterSpirits(side, filter) {
   // 兼容中文/英文括号：把"（）"统一为"()"，避免用户用半角括号搜不到数据
   const normParens = str => (str || '').replace(/[（）]/g, ch => ch === '（' ? '(' : ')');
-  const text = normParens((filter.text || '').trim()).toLowerCase();
+  // 精灵名/拼音/首字母/图鉴 id 都不含空格，因此搜索时同时去掉查询与字段
+  // 中的所有空格，避免用户误打/复制时多一个空格导致搜不到。
+  const stripSpaces = str => (str || '').replace(/\s+/g, '');
+  const text = stripSpaces(normParens((filter.text || '').trim())).toLowerCase();
   const commonList = (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
   const commonSet = new Set(commonList);
   const wantEls = filter.elements;   // Set<string>
@@ -2567,9 +2570,9 @@ function filterSpirits(side, filter) {
       if (!allMatch) continue;
     }
     if (text) {
-      const name = normParens(s.name || '').toLowerCase();
-      const py = normParens(s.pinyin || '');
-      const ini = normParens(s.pinyin_initials || '');
+      const name = stripSpaces(normParens(s.name || '')).toLowerCase();
+      const py = stripSpaces(normParens(s.pinyin || ''));
+      const ini = stripSpaces(normParens(s.pinyin_initials || ''));
       let matched = name.includes(text) || py.includes(text) || ini.includes(text);
       // 纯数字输入时，也按图鉴 id (hbid) 搜索
       if (!matched && /^\d+$/.test(text)) {
