@@ -1804,7 +1804,12 @@ let state = {
   // Attacker's 化劲/羽化 bonus: flat addition to skill power. Range [0, 990].
   // Step is per-pet (落陨星兔=40, 粉耳星兔=20). Only effective when the
   // attacker is one of the pets listed in POWER_BOOST_PETS.
-  attackerPowerBoost: 0
+  attackerPowerBoost: 0,
+  // Per-side 速度 (speed) bonus: flat addition to the pet's speed stat.
+  // Range [-990, +990], step 10; default 0. Only shown when the attacker
+  // is one of the pets listed in SPEED_BOOST_PETS (e.g. 岚鸟).
+  attackerSpeed: 0,
+  defenderSpeed: 0
 };
 
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
@@ -2943,8 +2948,16 @@ function selectSpirit(side, id) {
     state.attackerBuff   = { atk: 0, matk: 0 };
     // Reset 化劲/羽化 (may not even be applicable to the new attacker)
     state.attackerPowerBoost = 0;
+    // Reset 速度 (may not even be applicable to the new attacker);
+    // also reset the defender side since the speed chip's visibility
+    // on the defender panel is gated by the attacker's identity.
+    state.attackerSpeed = 0;
+    state.defenderSpeed = 0;
     state.spiritPicking.attacker = false;
     renderSpiritArea('attacker');
+    // Speed chip visibility on the defender side depends on the
+    // attacker's identity, so re-render the defender's chips too.
+    renderBuffChips('defender');
   } else if (side === 'defender') {
     state.defender = spirit;
     const opts = getDefenseSkillOptions(spirit);
@@ -2955,6 +2968,9 @@ function selectSpirit(side, id) {
     state.defenderIVs    = DEFAULT_IVS.defender.slice();
     // Reset defender buffs on spirit change
     state.defenderBuff   = { def: 0, mdef: 0 };
+    // Reset defender 速度 (visibility is unchanged since it depends on
+    // the attacker, but the value should not carry over to a new pet).
+    state.defenderSpeed = 0;
     state.spiritPicking.defender = false;
     renderSpiritArea('defender');
     // Defender changed → attacker's power-badge colors need to refresh
@@ -3173,14 +3189,52 @@ function renderBuffChips(side) {
   const container = document.getElementById(`${side}-buff-chips`);
   if (!container) return;
   const configs = BUFF_STAT_CONFIGS[side] || [];
-  container.innerHTML = configs.map(c => {
+  const speedActive = isSpeedBoostActive();
+
+  // Speed chip comes FIRST so it visually appears on the left of the
+  // atk/matk (or def/mdef) chips. Only present when the attacker is
+  // one of the SPEED_BOOST_PETS (e.g. 岚鸟).
+  const speedHTML = speedActive ? (() => {
+    const val = getSpeed(side);
+    const cls = _buffChipClass(val);
+    return `<div class="buff-chip ${cls}"
+                 aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，拖动 / 滚轮 / 双击重置）"
+                 data-side="${side}" data-stat="speed"
+                 title="拖动 · 滚轮 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
+  })() : '';
+
+  const buffsHTML = configs.map(c => {
     const val = getBuff(side, c.key);
-    const cls = val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
+    const cls = _buffChipClass(val);
     return `<div class="buff-chip ${cls}"
                  aria-label="${c.label} 调整（当前 ${formatBuff(val)}，拖动 / 滚轮 / 双击重置）"
                  data-side="${side}" data-stat="${c.key}"
                  title="拖动 · 滚轮 · 双击重置">${c.label} <span class="buff-val">${formatBuff(val)}</span></div>`;
   }).join('');
+
+  container.innerHTML = speedHTML + buffsHTML;
+
+  if (speedActive) {
+    const speedChip = container.querySelector(`.buff-chip[data-stat="speed"]`);
+    if (speedChip) {
+      attachChipDrag(speedChip, {
+        shiftMultiplier: 5,
+        getVal: () => getSpeed(side),
+        setVal: (v) => setSpeed(side, v),
+        formatVal: formatSpeed,
+        dragValue: (dx, startVal) => {
+          const delta = Math.round(dx / SPEED_DRAG_PX_PER_STEP) * SPEED_STEP;
+          return Math.max(SPEED_MIN, Math.min(SPEED_MAX, startVal + delta));
+        },
+        wheelValue: (cur, dirMult) => {
+          return Math.max(SPEED_MIN, Math.min(SPEED_MAX, cur + dirMult * SPEED_STEP));
+        },
+        reset: () => { setSpeed(side, 0); renderBuffChips(side); },
+        onChange: calculateDamage,
+      });
+    }
+  }
+
   for (const c of configs) {
     const chip = container.querySelector(`.buff-chip[data-stat="${c.key}"]`);
     if (!chip) continue;
@@ -3327,6 +3381,45 @@ function renderPowerBoostChip() {
     reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
     onChange: calculateDamage,
   });
+}
+
+// ============================================================
+// SPEED CHIP: 速度 — flat addition to the pet's speed stat.
+// Activated by attacker being one of the pets in SPEED_BOOST_PETS
+// (e.g. 岚鸟). Shown on BOTH attacker and defender sides (each
+// side stores its own value). Reuses the .buff-chip visual style;
+// behaviour mirrors the buff chips (press-and-drag horizontal,
+// wheel, dblclick to reset). Range [-990, +990], step 10.
+//
+// The speed value is currently NOT used in damage calculation; it
+// is stored so that future features can read it.
+// ============================================================
+const SPEED_BOOST_PETS = {
+  'pet_000259': true,   // 岚鸟（秋天的样子）
+  'pet_000257': true,   // 岚鸟（春天的样子）
+  'pet_000037': true    // 岚鸟（本来的样子）
+};
+const SPEED_LABEL = '速度';
+const SPEED_MIN = -990;
+const SPEED_MAX = 990;
+const SPEED_STEP = 10;
+const SPEED_DRAG_PX_PER_STEP = 8;
+
+function isSpeedBoostActive() {
+  return !!(state.attacker && SPEED_BOOST_PETS[state.attacker.id]);
+}
+function getSpeed(side) {
+  return side === 'attacker' ? state.attackerSpeed : state.defenderSpeed;
+}
+function setSpeed(side, val) {
+  const clamped = Math.max(SPEED_MIN, Math.min(SPEED_MAX, Math.round(val / SPEED_STEP) * SPEED_STEP));
+  if (side === 'attacker') state.attackerSpeed = clamped;
+  else                     state.defenderSpeed = clamped;
+}
+function formatSpeed(val) {
+  if (val > 0) return '+' + val;
+  if (val < 0) return String(val);   // already has minus sign
+  return '+0';
 }
 
 // Keyboard support for spirit-card (Enter/Space to open the picker)
