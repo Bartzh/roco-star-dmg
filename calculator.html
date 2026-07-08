@@ -1839,7 +1839,10 @@ function formatBuff(val) {
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
-  const opts = [{ id: '__none__', name: '无', reduction: 1, _pseudo: true }];
+  const opts = [
+    { id: '__none__', name: '无', reduction: 1, _pseudo: true },
+    { id: '__state__', name: '聚能', category: '状态' }
+  ];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
     const s = SKILLS[sid];
@@ -3689,6 +3692,178 @@ const SKILL_MODS = {
       powerMult: 0.5,
       notes: [`威力 ×1.50（扇风：先于敌方攻击 · ${reason}）`],
     };
+  },
+  // 铁蒺藜：应对状态：本次伤害翻倍
+  skill_000453(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力翻倍（铁棘藜：应对状态）`],
+    };
+  },
+  // 龙卷风：应对状态：本次技能威力变为1.5倍
+  skill_000635(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 0.5,
+      notes: [`威力 ×1.5（龙卷风：应对状态）`],
+    };
+  },
+  // 追打：应对状态：本技能变为3连击
+  skill_000249(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      comboAdd: 2,
+      notes: [`技能变为3连击（追打：应对状态）`],
+    };
+  },
+  // 炙热波动：应对状态：本次技能威力和赋予灼烧翻倍
+  skill_000380(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力翻倍（灼热波动：应对状态）`],
+    };
+  },
+  // 虫击：应对状态：本次技能威力变为2倍，无视敌方系别抵抗
+  skill_000588(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      // TODO:无视敌方系别抵抗
+      powerMult: 1,
+      notes: [`威力 ×2（虫击：应对状态）`],
+    };
+  },
+  // 突袭：应对状态：本次技能威力变为3倍
+  skill_000247(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 2,
+      notes: [`威力 ×3（突袭：应对状态）`],
+    };
+  },
+  // 暗突袭：应对状态：本次技能威力翻倍
+  skill_000697(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力翻倍（暗突袭：应对状态）`],
+    };
+  },
+  // 爆冲：应对状态：本次技能威力变为5倍
+  skill_000621(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 4,
+      notes: [`威力 ×5（爆冲：应对状态）`],
+    };
+  },
+  // 技巧打击：应对状态：本次技能威力变为10倍
+  skill_000612(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 9,
+      notes: [`威力 ×10（技巧打击：应对状态）`],
+    };
+  },
+  // 无影脚：应对状态：本次技能威力变为2倍
+  skill_000609(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力 ×2（无影脚：应对状态）`],
+    };
+  },
+  // 偷袭：应对状态：本次技能威力变为3倍
+  skill_000251(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 2,
+      notes: [`威力 ×3（偷袭：应对状态）`],
+    };
+  },
+  // 散手：应对状态：本技能改为6连击
+  skill_000608(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      comboAdd: 4,
+      notes: [`技能变为6连击（散手：应对状态）`],
+    };
+  },
+  // 连续爪击：应对状态：本次技能连击数翻倍
+  skill_000248(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      // TODO: 应该是翻倍而不是加2
+      comboAdd: 2,
+      notes: [`技能连击数翻倍（连续爪击：应对状态）`],
+    };
+  },
+  // 滚雪球：应对状态：额外获得2层，本次技能威力翻倍
+  skill_000505(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力翻倍（滚雪球：应对状态）`],
+    };
+  },
+  // 吹炎：应对状态：本次技能威力翻倍
+  skill_000521(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力翻倍（吹炎：应对状态）`],
+    };
+  },
+  // 地陷：应对状态：本次技能威力翻倍，且物防额外+70%
+  skill_000480(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 1,
+      notes: [`威力翻倍（地陷：应对状态）`],
+    };
+  },
+  // 闪燃：应对状态：本次技能威力变为4倍
+  skill_000361(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMult: 3,
+      notes: [`威力 ×4（闪燃：应对状态）`],
+    };
+  },
+  // 灾厄：对自己造成物伤，应对状态：改为对敌方造成物伤，且本次技能威力+120
+  skill_000699(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') {
+      return {
+        // 相当于不造成伤害
+        powerAdd: -60,
+        notes: [`威力 -60（灾厄：对自己造成物伤）`],
+      };
+    }
+    else {
+      return {
+        powerAdd: 120,
+        notes: [`威力 +120（灾厄：应对状态）`],
+      };
+    }
   },
   // Add more skills here as they're introduced.
 };
