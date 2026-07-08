@@ -3514,14 +3514,22 @@ const SKILL_MODS = {
       notes: [`威力 +${add}（星陨 ${ctx.starLayer} 层 ×20）`],
     };
   },
+  // 狂欢开始：本精灵受到的克制伤害+25%
+  skill_000200(_skill, ctx) {
+    if (effectiveness(ctx.activeSkill.element, ctx.defender.types) <= 1) return null;
+    return {
+      powerMult: 1.25,
+      notes: [`威力 ×${1.25.toFixed(2)}（克制伤害 +25%）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
 // Returns { powerMult, powerAdd, comboAdd, notes: [{source, text}, ...] }.
 // Iterates the attacker's skills (category === '特性') to collect
 // passive characteristics; no positional assumption is made.
-function computeSkillDynamicModifiers(attacker, activeSkill, starLayer) {
-  const ctx = { starLayer, activeSkill, attacker };
+function computeSkillDynamicModifiers(attacker, activeSkill, starLayer, defender) {
+  const ctx = { starLayer, activeSkill, attacker, defender };
   const result = { powerMult: 1, powerAdd: 0, comboAdd: 0, notes: [] };
 
   const apply = (skill) => {
@@ -3549,7 +3557,14 @@ function computeSkillDynamicModifiers(attacker, activeSkill, starLayer) {
     break;
   }
 
-  // 也还可以有防御者的特性和技能，暂时可能不需要
+  // (3) Defender's 特性 (characteristics).
+  for (const sid of (defender.skills || [])) {
+    const sk = SKILLS[sid];
+    if (!sk || sk.category !== '特性') continue;
+    apply(sk);
+    // 只存在一个特性
+    break;
+  }
 
   return result;
 }
@@ -3587,7 +3602,7 @@ function calculateDamage() {
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
 
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
-  const dyn = computeSkillDynamicModifiers(atk, skill, n);
+  const dyn = computeSkillDynamicModifiers(atk, skill, n, def);
   // 化劲/羽化 (attacker's pet-specific power boost) — flat addition to base power.
   const powerBoost = getPowerBoost();
   const powerBoostLabel = getPowerBoostConfig()?.label || null;
