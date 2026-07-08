@@ -3731,10 +3731,7 @@ function computeSkillDynamicModifiers(
     }
   };
 
-  // (1) Active skill self-modifier.
-  apply(attackSkill);
-
-  // (2) Attacker's 特性 (characteristics).
+  // (1) Attacker's 特性 (characteristics).
   for (const sid of (attacker.skills || [])) {
     const sk = SKILLS[sid];
     if (!sk || sk.category !== '特性') continue;
@@ -3743,7 +3740,7 @@ function computeSkillDynamicModifiers(
     break;
   }
 
-  // (3) Defender's 特性 (characteristics).
+  // (2) Defender's 特性 (characteristics).
   for (const sid of (defender.skills || [])) {
     const sk = SKILLS[sid];
     if (!sk || sk.category !== '特性') continue;
@@ -3751,6 +3748,9 @@ function computeSkillDynamicModifiers(
     // 只存在一个特性
     break;
   }
+
+  // (3) Attack skill self-modifier.
+  apply(attackSkill);
 
   return result;
 }
