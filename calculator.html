@@ -3586,8 +3586,14 @@ function selectDefenseSkill(idx) {
 
 // ============================================================
 // DYNAMIC SKILL MODIFIERS: skill-id-keyed function dictionary.
-// Each entry takes (skill, ctx) and returns either null or
-//   { comboAdd?: number, powerMult?: number, notes?: string[] }.
+// Each entry takes (ctx, fromAttacker) and returns either null or
+//   {
+//     comboAdd?: number, powerMult?: number, powerAdd?: number,
+//     ignoreResist?: boolean,
+//     notes?: string[],
+//   }.
+// ignoreResist: true ⇒ the defender's type resistance (effectiveness < 1)
+//   is neutralized to 1 (weak/super-effective multipliers are preserved).
 // The aggregator (computeSkillDynamicModifiers) merges them.
 //
 // The ctx object always carries:
@@ -3734,9 +3740,9 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      // TODO:无视敌方系别抵抗
       powerMult: 1,
-      notes: [`威力 ×2（虫击：应对状态）`],
+      ignoreResist: true,
+      notes: [`威力 ×2，无视敌方系别抵抗（虫击：应对状态）`],
     };
   },
   // 突袭：应对状态：本次技能威力变为3倍
@@ -3906,16 +3912,17 @@ function computeSkillDynamicModifiers(
     attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
   };
-  const result = { powerMult: 1, powerAdd: 0, comboAdd: 0, notes: [] };
+  const result = { powerMult: 1, powerAdd: 0, comboAdd: 0, ignoreResist: false, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     const fn = SKILL_MODS[skill?.id];
     if (!fn) return;
     const mod = fn(ctx, fromAttacker);
     if (!mod) return;
-    if (mod.comboAdd)  result.comboAdd  += mod.comboAdd;
-    if (mod.powerAdd)  result.powerAdd  += mod.powerAdd;
-    if (mod.powerMult) result.powerMult += mod.powerMult;
+    if (mod.comboAdd)     result.comboAdd     += mod.comboAdd;
+    if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
+    if (mod.powerMult)    result.powerMult    += mod.powerMult;
+    if (mod.ignoreResist) result.ignoreResist  = true;
     for (const text of (mod.notes || [])) {
       result.notes.push({ source: skill.name, text });
     }
@@ -3984,7 +3991,10 @@ function calculateDamage() {
   const powerBoostLabel = getPowerBoostConfig()?.label || null;
   // Skill damage (STAB applied BEFORE type effectiveness)
   const stab = getStabMultiplier(atk, skill);
-  const skillEff = effectiveness(skill.element, def.types);
+  const skillEffRaw = effectiveness(skill.element, def.types);
+  // ignoreResist（如 虫击：应对状态）：把敌方的系别抵抗（< 1）中和为 1，
+  // 但保留克制/双重克制等 > 1 的加成不变。
+  const skillEff = (dyn.ignoreResist && skillEffRaw < 1) ? 1 : skillEffRaw;
   const combo = (skill.combo ?? 1) + dyn.comboAdd;
   const power = ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult;
   const skillDmg = Math.floor(
@@ -4012,7 +4022,7 @@ function calculateDamage() {
 
   renderResult({
     finalDamage, skillDmg, starDmg, starPower,
-    skillEff, starEff, stab, combo,
+    skillEff, skillEffRaw, starEff, stab, combo,
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
@@ -4076,10 +4086,14 @@ function renderResult(data) {
     // has a fixed min-height so toggling the kill chip does not reflow
     // the damage ring above).
     let chipsHTML = '';
+    const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
     if (data.skillEff > 1) {
       chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
-    } else if (data.skillEff < 1) {
+    } else if (data.skillEff < 1 && !ignoredResist) {
       chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+    }
+    if (ignoredResist) {
+      chipsHTML += `<span class="result-chip not-effective" title="原抵抗 ×${data.skillEffRaw} 已被虫击·应对状态忽略">无视抵抗</span>`;
     }
     if (data.n > 0) {
       if (data.isSkillIllusion) {
@@ -4179,6 +4193,11 @@ function renderBreakdownList(breakdownList, data) {
   const buffLineHTML = buffBits.length
     ? `<div><span class="label">buff 调整:</span> <span class="multiplier">${buffBits.join(' · ')}</span></div>`
     : '';
+  const ignoredResist = (dynMods.ignoreResist || (data.dyn && data.dyn.ignoreResist))
+    && (data.skillEffRaw ?? 1) < 1;
+  const effExpr = ignoredResist
+    ? `${data.skillEff} <span class="label" style="font-size:0.7rem">(原 ×${data.skillEffRaw} 抵抗已无视)</span>`
+    : `${data.skillEff}`;
   breakdownList.innerHTML = `
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
     <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
@@ -4187,7 +4206,7 @@ function renderBreakdownList(breakdownList, data) {
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
     ${buffLineHTML}
     <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${data.skillEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo > 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo > 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
     ${dynNotesHTML}
     <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
