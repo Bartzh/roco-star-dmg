@@ -3602,6 +3602,20 @@ function selectDefenseSkill(idx) {
 //   attackerEffectiveSpeed, defenderEffectiveSpeed
 // (effective speed = finalSpeed(stat-block) + speedChip bonus)
 // ============================================================
+function isFirstStrike(ctx) {
+  const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+  const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
+  const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
+  const reacted = ctx.attackSkill.desc.includes('应对状态：') && ctx.defenseSkill.category === '状态';
+  if (ctx.defenseSkill.category === '防御' || lastStrike) return [false, ''];
+  if (!(firstStrike || faster || reacted)) return [false, ''];
+  const reason = firstStrike
+    ? `先手技能 ${ctx.attackSkill.name}`
+    : reacted
+    ? '应对必定先手'
+    : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+  return [true, reason];
+}
 const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
   skill_000727(ctx, fromAttacker) {
@@ -3656,13 +3670,8 @@ const SKILL_MODS = {
   // 有效速度 = 性格/个体修正后的最终速度 + 速度 chip 调整。
   skill_000049(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
-    const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
-    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (ctx.defenseSkill.category === '防御' || lastStrike || (!firstStrike && !faster)) return null;
-    const reason = firstStrike
-      ? `先手技能 ${ctx.attackSkill.name}`
-      : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    const [firstStrike, reason] = isFirstStrike(ctx);
+    if (!firstStrike) return null;
     return {
       powerMult: 0.5,
       notes: [`威力 ×1.50（顺风：先于敌方攻击 · ${reason}）`],
@@ -3671,13 +3680,8 @@ const SKILL_MODS = {
   // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
   skill_000230(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
-    const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
-    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (ctx.defenseSkill.category === '防御' || lastStrike || (!firstStrike && !faster)) return null;
-    const reason = firstStrike
-      ? `先手技能 ${ctx.attackSkill.name}`
-      : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    const [firstStrike, reason] = isFirstStrike(ctx);
+    if (!firstStrike) return null;
     return {
       powerMult: 0.75,
       notes: [`威力 ×1.75（破空：先于敌方攻击 · ${reason}）`],
@@ -3686,13 +3690,8 @@ const SKILL_MODS = {
   // 扇风：若先于敌方攻击，本次技能威力 +50%
   skill_000632(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
-    const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
-    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (ctx.defenseSkill.category === '防御' || lastStrike || (!firstStrike && !faster)) return null;
-    const reason = firstStrike
-      ? `先手技能 ${ctx.attackSkill.name}`
-      : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    const [firstStrike, reason] = isFirstStrike(ctx);
+    if (!firstStrike) return null;
     return {
       powerMult: 0.5,
       notes: [`威力 ×1.50（扇风：先于敌方攻击 · ${reason}）`],
@@ -3701,9 +3700,8 @@ const SKILL_MODS = {
   // 疾风刺：若先于敌方攻击，改为3连击
   skill_000634(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (ctx.defenseSkill.category === '防御' || !faster) return null;
-    const reason = `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    const [firstStrike, reason] = isFirstStrike(ctx);
+    if (!firstStrike) return null;
     return {
       comboAdd: 2,
       notes: [`变为3连击（疾风刺：先于敌方攻击 · ${reason}）`],
