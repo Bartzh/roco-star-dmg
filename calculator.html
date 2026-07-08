@@ -3629,19 +3629,19 @@ const SKILL_MODS = {
   skill_000031(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (stripXi(ctx.attackSkill.element) !== '地') return null;
-    const mult = 0.2 * ctx.starLayer;
+    const multAdd = 0.2 * ctx.starLayer;
     return {
-      powerMult: mult,
-      notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
+      powerMultAdd: multAdd,
+      notes: [`威力 +${Math.floor(multAdd*100)}%（星陨 ${ctx.starLayer} 层 ×20%）`],
     };
   },
   // 坠星：全技能威力每层星陨 +20%
   skill_000218(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    const mult = 0.2 * ctx.starLayer;
+    const multAdd = 0.2 * ctx.starLayer;
     return {
-      powerMult: mult,
-      notes: [`威力 ×${mult.toFixed(2)}（星陨 ${ctx.starLayer} 层 ×20%）`],
+      powerMultAdd: multAdd,
+      notes: [`威力 +${Math.floor(multAdd*100)}%（星陨 ${ctx.starLayer} 层 ×20%）`],
     };
   },
   // 天体吸积：每 1 层星陨印记，技能威力 +20
@@ -3658,8 +3658,8 @@ const SKILL_MODS = {
     if (fromAttacker) return null;
     if (effectiveness(ctx.attackSkill.element, ctx.defender.type) <= 1) return null;
     return {
-      powerMult: 0.25,
-      notes: [`威力 ×${1.25.toFixed(2)}（克制伤害 +25%）`],
+      powerMultAdd: 0.25,
+      notes: ['威力 +25%（额外克制伤害）'],
     };
   },
   // 顺风（岚鸟特性）：若先于敌方攻击，本次技能威力 +50%。
@@ -3673,8 +3673,8 @@ const SKILL_MODS = {
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
     return {
-      powerMult: 0.5,
-      notes: [`威力 ×1.50（顺风：先于敌方攻击 · ${reason}）`],
+      powerMultAdd: 0.5,
+      notes: [`威力 +50%（先于敌方攻击 · ${reason}）`],
     };
   },
   // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
@@ -3683,8 +3683,8 @@ const SKILL_MODS = {
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
     return {
-      powerMult: 0.75,
-      notes: [`威力 ×1.75（破空：先于敌方攻击 · ${reason}）`],
+      powerMultAdd: 0.75,
+      notes: [`威力 +75%（先于敌方攻击 · ${reason}）`],
     };
   },
   // 扇风：若先于敌方攻击，本次技能威力 +50%
@@ -3693,8 +3693,8 @@ const SKILL_MODS = {
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
     return {
-      powerMult: 0.5,
-      notes: [`威力 ×1.50（扇风：先于敌方攻击 · ${reason}）`],
+      powerMultAdd: 0.5,
+      notes: [`威力 +50%（先于敌方攻击 · ${reason}）`],
     };
   },
   // 疾风刺：若先于敌方攻击，改为3连击
@@ -3704,7 +3704,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       comboAdd: 2,
-      notes: [`变为3连击（疾风刺：先于敌方攻击 · ${reason}）`],
+      notes: [`变为3连击（先于敌方攻击 · ${reason}）`],
     };
   },
   // 铁蒺藜：应对状态：本次伤害翻倍
@@ -3712,8 +3712,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力翻倍（铁棘藜：应对状态）`],
+      powerMult: 2,
+      notes: [`威力翻倍（应对状态）`],
     };
   },
   // 龙卷风：应对状态：本次技能威力变为1.5倍
@@ -3721,8 +3721,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 0.5,
-      notes: [`威力 ×1.5（龙卷风：应对状态）`],
+      powerMult: 1.5,
+      notes: [`威力 ×1.5（应对状态）`],
     };
   },
   // 追打：应对状态：本技能变为3连击
@@ -3731,7 +3731,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboAdd: 2,
-      notes: [`技能变为3连击（追打：应对状态）`],
+      notes: [`技能变为3连击（应对状态）`],
     };
   },
   // 炙热波动：应对状态：本次技能威力和赋予灼烧翻倍
@@ -3739,8 +3739,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力翻倍（灼热波动：应对状态）`],
+      powerMult: 2,
+      notes: [`威力翻倍（应对状态）`],
     };
   },
   // 虫击：应对状态：本次技能威力变为2倍，无视敌方系别抵抗
@@ -3748,9 +3748,9 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
+      powerMult: 2,
       ignoreResist: true,
-      notes: [`威力 ×2，无视敌方系别抵抗（虫击：应对状态）`],
+      notes: [`威力 ×2，无视敌方系别抵抗（应对状态）`],
     };
   },
   // 突袭：应对状态：本次技能威力变为3倍
@@ -3758,8 +3758,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 2,
-      notes: [`威力 ×3（突袭：应对状态）`],
+      powerMult: 3,
+      notes: [`威力 ×3（应对状态）`],
     };
   },
   // 暗突袭：应对状态：本次技能威力翻倍
@@ -3767,8 +3767,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力翻倍（暗突袭：应对状态）`],
+      powerMult: 2,
+      notes: [`威力翻倍（应对状态）`],
     };
   },
   // 爆冲：应对状态：本次技能威力变为5倍
@@ -3776,8 +3776,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 4,
-      notes: [`威力 ×5（爆冲：应对状态）`],
+      powerMult: 5,
+      notes: [`威力 ×5（应对状态）`],
     };
   },
   // 技巧打击：应对状态：本次技能威力变为10倍
@@ -3785,8 +3785,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 9,
-      notes: [`威力 ×10（技巧打击：应对状态）`],
+      powerMult: 10,
+      notes: [`威力 ×10（应对状态）`],
     };
   },
   // 无影脚：应对状态：本次技能威力变为2倍
@@ -3794,8 +3794,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力 ×2（无影脚：应对状态）`],
+      powerMult: 2,
+      notes: [`威力 ×2（应对状态）`],
     };
   },
   // 偷袭：应对状态：本次技能威力变为3倍
@@ -3803,8 +3803,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 2,
-      notes: [`威力 ×3（偷袭：应对状态）`],
+      powerMult: 3,
+      notes: [`威力 ×3（应对状态）`],
     };
   },
   // 散手：应对状态：本技能改为6连击
@@ -3813,7 +3813,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboAdd: 4,
-      notes: [`技能变为6连击（散手：应对状态）`],
+      notes: [`变为6连击（应对状态）`],
     };
   },
   // 连续爪击：应对状态：本次技能连击数翻倍
@@ -3823,7 +3823,7 @@ const SKILL_MODS = {
     return {
       // TODO: 应该是翻倍而不是加2
       comboAdd: 2,
-      notes: [`技能连击数翻倍（连续爪击：应对状态）`],
+      notes: [`连击数翻倍（应对状态）`],
     };
   },
   // 滚雪球：应对状态：额外获得2层，本次技能威力翻倍
@@ -3831,8 +3831,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力翻倍（滚雪球：应对状态）`],
+      powerMult: 2,
+      notes: [`威力翻倍（应对状态）`],
     };
   },
   // 吹炎：应对状态：本次技能威力翻倍
@@ -3840,8 +3840,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力翻倍（吹炎：应对状态）`],
+      powerMult: 2,
+      notes: [`威力翻倍（应对状态）`],
     };
   },
   // 地陷：应对状态：本次技能威力翻倍，且物防额外+70%
@@ -3849,8 +3849,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 1,
-      notes: [`威力翻倍（地陷：应对状态）`],
+      powerMult: 2,
+      notes: [`威力翻倍（应对状态）`],
     };
   },
   // 闪燃：应对状态：本次技能威力变为4倍
@@ -3858,8 +3858,8 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMult: 3,
-      notes: [`威力 ×4（闪燃：应对状态）`],
+      powerMult: 4,
+      notes: [`威力 ×4（应对状态）`],
     };
   },
   // 灾厄：对自己造成物伤，应对状态：改为对敌方造成物伤，且本次技能威力+120
@@ -3869,16 +3869,17 @@ const SKILL_MODS = {
       return {
         // 相当于不造成伤害
         powerAdd: -60,
-        notes: [`威力 -60（灾厄：对自己造成物伤）`],
+        notes: [`威力 -60（对自己造成物伤）`],
       };
     }
     else {
       return {
         powerAdd: 120,
-        notes: [`威力 +120（灾厄：应对状态）`],
+        notes: [`威力 +120（应对状态）`],
       };
     }
   },
+  // TODO: 变形活画 skill_000161，敌方每有1层增益，本次技能威力+10%
   // Add more skills here as they're introduced.
 };
 
@@ -3920,7 +3921,7 @@ function computeSkillDynamicModifiers(
     attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
   };
-  const result = { powerMult: 1, powerAdd: 0, comboAdd: 0, ignoreResist: false, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, ignoreResist: false, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     const fn = SKILL_MODS[skill?.id];
@@ -3929,7 +3930,8 @@ function computeSkillDynamicModifiers(
     if (!mod) return;
     if (mod.comboAdd)     result.comboAdd     += mod.comboAdd;
     if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
-    if (mod.powerMult)    result.powerMult    += mod.powerMult;
+    if (mod.powerMultAdd) result.powerMultAdd += mod.powerMultAdd;
+    if (mod.powerMult)    result.powerMult    *= mod.powerMult;
     if (mod.ignoreResist) result.ignoreResist  = true;
     for (const text of (mod.notes || [])) {
       result.notes.push({ source: skill.name, text });
@@ -3957,6 +3959,9 @@ function computeSkillDynamicModifiers(
   // (3) Attack skill self-modifier.
   apply(attackSkill, true);
 
+  // (4) Power multiplier.
+  result.powerMult = result.powerMultAdd * result.powerMult;
+  delete result.powerMultAdd;
   return result;
 }
 
