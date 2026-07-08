@@ -3649,8 +3649,9 @@ const SKILL_MODS = {
   skill_000049(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+    const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
     const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (!ctx.defenseSkill._pseudo || (!firstStrike && !faster)) return null;
+    if (ctx.defenseSkill.category === '防御' || lastStrike || (!firstStrike && !faster)) return null;
     const reason = firstStrike
       ? `先手技能 ${ctx.attackSkill.name}`
       : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
@@ -3663,8 +3664,9 @@ const SKILL_MODS = {
   skill_000230(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+    const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
     const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (!ctx.defenseSkill._pseudo || (!firstStrike && !faster)) return null;
+    if (ctx.defenseSkill.category === '防御' || lastStrike || (!firstStrike && !faster)) return null;
     const reason = firstStrike
       ? `先手技能 ${ctx.attackSkill.name}`
       : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
@@ -3677,8 +3679,9 @@ const SKILL_MODS = {
   skill_000632(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+    const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
     const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
-    if (!ctx.defenseSkill._pseudo || (!firstStrike && !faster)) return null;
+    if (ctx.defenseSkill.category === '防御' || lastStrike || (!firstStrike && !faster)) return null;
     const reason = firstStrike
       ? `先手技能 ${ctx.attackSkill.name}`
       : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
@@ -3696,6 +3699,10 @@ const FIRST_STRIKE_SKILLS = {
   'skill_000654': true, // 俯冲
   'skill_000304': true, // 先发制人
   'skill_000305': true, // 天旋地转
+};
+// 后手技能：使用这些技能时无视双方速度差，必定后于敌方行动。
+const LAST_STRIKE_SKILLS = {
+  'skill_000309': true, // 后发制人
 };
 
 // Returns { powerMult, powerAdd, comboAdd, notes: [{source, text}, ...] }.
