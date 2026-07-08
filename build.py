@@ -77,6 +77,9 @@ def main():
         print(f'Copied favicon.ico to dist/')
     else:
         print(f'Warning: favicon.ico not found in root directory')
+    # 复制 images 目录到 dist 目录
+    shutil.copytree(os.path.join(ROOT, 'images'), os.path.join(ROOT, 'dist', 'images'), dirs_exist_ok=True)
+    print(f'Copied images/ to dist/')
 
     src_size = os.path.getsize(SRC)
     out_size = os.path.getsize(OUT)
