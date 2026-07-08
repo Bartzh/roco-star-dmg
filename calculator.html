@@ -3587,7 +3587,7 @@ function selectDefenseSkill(idx) {
 // DYNAMIC SKILL MODIFIERS: skill-id-keyed function dictionary.
 // Each entry takes (ctx, fromAttacker) and returns either null or
 //   {
-//     comboAdd?: number, powerMult?: number, powerAdd?: number,
+//     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
 //     ignoreResist?: boolean,
 //     notes?: string[],
 //   }.
@@ -3821,8 +3821,7 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      // TODO: 应该是翻倍而不是加2
-      comboAdd: 2,
+      comboMult: 2,
       notes: [`连击数翻倍（应对状态）`],
     };
   },
@@ -3895,7 +3894,7 @@ const LAST_STRIKE_SKILLS = {
   'skill_000309': true, // 后发制人
 };
 
-// Returns { powerMult, powerAdd, comboAdd, notes: [{source, text}, ...] }.
+// Returns { powerMult, powerAdd, comboAdd, comboMult, notes: [{source, text}, ...] }.
 // Iterates the attacker's skills (category === '特性') to collect
 // passive characteristics; no positional assumption is made.
 //
@@ -3921,7 +3920,7 @@ function computeSkillDynamicModifiers(
     attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
   };
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, ignoreResist: false, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     const fn = SKILL_MODS[skill?.id];
@@ -3932,6 +3931,7 @@ function computeSkillDynamicModifiers(
     if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
     if (mod.powerMultAdd) result.powerMultAdd += mod.powerMultAdd;
     if (mod.powerMult)    result.powerMult    *= mod.powerMult;
+    if (mod.comboMult)    result.comboMult    *= mod.comboMult;
     if (mod.ignoreResist) result.ignoreResist  = true;
     for (const text of (mod.notes || [])) {
       result.notes.push({ source: skill.name, text });
@@ -4008,7 +4008,7 @@ function calculateDamage() {
   // ignoreResist（如 虫击：应对状态）：把敌方的系别抵抗（< 1）中和为 1，
   // 但保留克制/双重克制等 > 1 的加成不变。
   const skillEff = (dyn.ignoreResist && skillEffRaw < 1) ? 1 : skillEffRaw;
-  const combo = (skill.combo ?? 1) + dyn.comboAdd;
+  const combo = ((skill.combo ?? 1) + dyn.comboAdd) * dyn.comboMult;
   const power = ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult;
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
@@ -4156,13 +4156,13 @@ function renderBreakdownList(breakdownList, data) {
     ? ' <span class="skill-badge stab">本系 ×1.25</span>'
     : '';
   const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
-  const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, notes: [] };
+  const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, notes: [] };
   const powerBoost = data.powerBoost || 0;
   const powerBoostLabel = data.powerBoostLabel || null;
   const basePower = data.skill.power ?? 0;
   const dynAdd = dynMods.powerAdd || 0;
   const basePowerWithBoost = basePower + powerBoost + dynAdd;
-  const effCombo  = (data.skill.combo ?? 1) + dynMods.comboAdd;
+  const effCombo  = ((data.skill.combo ?? 1) + dynMods.comboAdd) * dynMods.comboMult;
   const effPowerStr = (basePowerWithBoost * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
   // Compose the 威力 line so it reflects the flat power boost, the dynamic
   // additive bonus, and the dynamic multiplier, e.g.
