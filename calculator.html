@@ -3961,16 +3961,14 @@ function renderBreakdownList(breakdownList, data) {
   const addTerms = [];
   if (powerBoost > 0) addTerms.push(`${powerBoost}（${powerBoostLabel || '化劲/羽化'}）`);
   if (dynAdd > 0) {
-    const src = dynMods.notes.find(n => n.text.startsWith('威力 +'))?.source || '动态加成';
-    addTerms.push(`${dynAdd}（${src}）`);
+    addTerms.push(`${dynAdd}`);
   }
   const additiveExpr = addTerms.length
     ? `${basePower} + ${addTerms.join(' + ')} = ${basePowerWithBoost}`
     : null;
   let multExpr;
   if (dynMods.powerMult !== 1) {
-    const src = dynMods.notes.find(n => n.text.startsWith('威力 ×'))?.source || '动态加成';
-    multExpr = ` × ${dynMods.powerMult.toFixed(2)}（${src}） = ${effPowerStr}`;
+    multExpr = ` × ${dynMods.powerMult.toFixed(2)} = ${effPowerStr}`;
   }
   let powerText;
   if (additiveExpr && multExpr)      powerText = `${additiveExpr}${multExpr}`;
