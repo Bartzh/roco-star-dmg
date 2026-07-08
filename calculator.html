@@ -3666,6 +3666,19 @@ const SKILL_MODS = {
       notes: [`威力 ×1.75（破空：先于敌方攻击 · ${reason}）`],
     };
   },
+  // 扇风：若先于敌方攻击，本次技能威力 +50%
+  skill_000632(_skill, ctx) {
+    const firstStrike = !!FIRST_STRIKE_SKILLS[ctx.attackSkill.id];
+    const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
+    if (!ctx.defenseSkill._pseudo || (!firstStrike && !faster)) return null;
+    const reason = firstStrike
+      ? `先手技能 ${ctx.attackSkill.name}`
+      : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    return {
+      powerMult: 0.5,
+      notes: [`威力 ×1.50（扇风：先于敌方攻击 · ${reason}）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
