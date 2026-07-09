@@ -3964,7 +3964,6 @@ function calculateDamage() {
   const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
   // 威力 chip — flat addition to base power (always shown).
   const powerBoost = getPowerBoost();
-  const powerBoostLabel = POWER_LABEL;
   // 连击数 chip — flat addition to base combo count (always shown).
   const attackerCombo = getComboBoost();
   // Skill damage (STAB applied BEFORE type effectiveness)
@@ -3973,7 +3972,13 @@ function calculateDamage() {
   // ignoreResist（如 虫击：应对状态）：把敌方的系别抵抗（< 1）中和为 1，
   // 但保留克制/双重克制等 > 1 的加成不变。
   const skillEff = (dyn.ignoreResist && skillEffRaw < 1) ? 1 : skillEffRaw;
-  const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + getComboBoost()) * dyn.comboMult);
+  // 连击数 chip only takes effect for skills with a defined combo count
+  // (skill.combo != null). Single-hit skills (no combo) are unaffected
+  // by the chip; they still pick up dyn.comboAdd from skill modifiers
+  // (e.g. 多维击打's starLayer-based extra hits) but never the chip.
+  const hasCombo = skill.combo != null;
+  const chipCombo = hasCombo ? getComboBoost() : 0;
+  const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + chipCombo) * dyn.comboMult);
   const power = Math.max(0, ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
@@ -4006,7 +4011,7 @@ function calculateDamage() {
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic, dyn,
     atkBuffPct, defBuffPct,
-    powerBoost, powerBoostLabel, attackerCombo
+    powerBoost, attackerCombo, hasCombo
   });
   updateAtmosphere(hpPercent, isKill);
 }
@@ -4123,16 +4128,19 @@ function renderBreakdownList(breakdownList, data) {
   const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
   const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, notes: [] };
   const powerBoost = data.powerBoost || 0;
-  const powerBoostLabel = data.powerBoostLabel || null;
   const comboChip = data.attackerCombo || 0;
   const basePower = data.skill.power ?? 0;
   const dynAdd = dynMods.powerAdd || 0;
   const basePowerWithBoost = Math.max(0, basePower + powerBoost + dynAdd);
-  const baseCombo = data.skill.combo ?? 1;
+  const hasCombo = data.hasCombo !== false;   // default true for legacy callers
+  const baseCombo = hasCombo ? (data.skill.combo ?? 1) : 1;
   // The 连击数 chip is an additive term, so it lives inside the
-  // multiplication, alongside dynMods.comboAdd. The final combo
-  // (effCombo) is floored at 0 to match the damage formula.
-  const preMultCombo = Math.max(0, baseCombo + comboChip + dynMods.comboAdd);
+  // multiplication, alongside dynMods.comboAdd. The chip is gated on
+  // hasCombo — non-combo skills ignore it but still pick up
+  // dynMods.comboAdd from skill modifiers (e.g. 多维击打). The final
+  // combo (effCombo) is floored at 0 to match the damage formula.
+  const comboChipGated = hasCombo ? comboChip : 0;
+  const preMultCombo = Math.max(0, baseCombo + comboChipGated + dynMods.comboAdd);
   const effComboNoChip = preMultCombo * dynMods.comboMult;
   const effCombo  = Math.max(0, effComboNoChip);
   const effPowerStr = (basePowerWithBoost * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
@@ -4149,7 +4157,7 @@ function renderBreakdownList(breakdownList, data) {
   // Build the additive step "<base> + <term1> + <term2> = <sum>", or null
   // when there's no additive term (so we don't render a stray " + 0" line).
   const addTerms = [];
-  if (powerBoost !== 0) addTerms.push(`${powerBoost}（${powerBoostLabel || '威力'}）`);
+  if (powerBoost !== 0) addTerms.push(String(powerBoost));
   if (dynAdd !== 0) {
     addTerms.push(`${dynAdd > 0 ? '+' : ''}${dynAdd}`);
   }
@@ -4171,21 +4179,37 @@ function renderBreakdownList(breakdownList, data) {
   //   1 + 2（连击数） = 3                          (chip only)
   //   1 + 2（连击数） + 1（星陨） = 4              (chip + add)
   //   1 (×2 勇击) = 2                              (mult only)
-  //   1 + 1（连击数） - 3（连击数） = -1 (clamped to 0)
+  //   1 - 3（连击数） = -2 (clamped to 0)
+  //
+  // When the skill has no inherent combo (hasCombo === false), the
+  // 连击数 chip is ignored (per the damage formula) and we render
+  // "无连击" to make it explicit. dynMods.comboAdd from skill
+  // modifiers (e.g. 多维击打) still applies, since those are not the
+  // user's chip input.
+  // The chip's effective contribution, already gated on hasCombo above.
+  // Format an additive term: positive → "+N", negative → "-N", zero skipped.
+  const fmtTerm = (n) => {
+    if (n > 0) return `+ ${n}`;
+    if (n < 0) return `- ${Math.abs(n)}`;
+    return null;
+  };
   const comboAddTerms = [];
-  if (comboChip !== 0) comboAddTerms.push(`${comboChip}（${COMBO_LABEL}）`);
-  if (dynMods.comboAdd !== 0) {
-    comboAddTerms.push(`${dynMods.comboAdd > 0 ? '+' : ''}${dynMods.comboAdd}`);
-  }
+  const chipTerm = fmtTerm(comboChipGated);
+  if (chipTerm) comboAddTerms.push(chipTerm);
+  const dynAddTerm = fmtTerm(dynMods.comboAdd);
+  if (dynAddTerm) comboAddTerms.push(dynAddTerm);
   const comboAdditiveExpr = comboAddTerms.length
-    ? `${baseCombo} + ${comboAddTerms.join(' + ')} = ${preMultCombo}`
+    ? `${baseCombo} ${comboAddTerms.join(' ')} = ${preMultCombo}`
     : null;
   let comboMultExpr;
   if (dynMods.comboMult !== 1) {
     comboMultExpr = ` × ${dynMods.comboMult.toFixed(2)} = ${effComboNoChip}`;
   }
   let comboText;
-  if (comboAdditiveExpr && comboMultExpr) comboText = `${comboAdditiveExpr}${comboMultExpr}`;
+  if (!hasCombo) {
+    // No inherent combo: the chip is suppressed.
+    comboText = '无连击';
+  } else if (comboAdditiveExpr && comboMultExpr) comboText = `${comboAdditiveExpr}${comboMultExpr}`;
   else if (comboAdditiveExpr)            comboText = comboAdditiveExpr;
   else if (comboMultExpr)                comboText = `${baseCombo}${comboMultExpr}`;
   else                                  comboText = String(baseCombo);
