@@ -1559,7 +1559,7 @@ body {
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
-        <h3 class="section-title">攻击技能<span class="buff-chips" id="attacker-power-boost-chip" aria-label="化劲/羽化 调节"></span></h3>
+        <h3 class="section-title">攻击技能<span class="buff-chips" id="attacker-power-boost-chip" aria-label="威力 调节"></span></h3>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
     </section>
@@ -1800,13 +1800,13 @@ let state = {
   // Range [-990, +990], step 10; default 0 (no modification)
   attackerBuff: { atk: 0, matk: 0 },
   defenderBuff: { def: 0, mdef: 0 },
-  // Attacker's 化劲/羽化 bonus: flat addition to skill power. Range [0, 990].
-  // Step is per-pet (落陨星兔=40, 粉耳星兔=20). Only effective when the
-  // attacker is one of the pets listed in POWER_BOOST_PETS.
+  // Attacker's 威力 chip: flat addition to skill power (in absolute
+  // damage points, not %). Range [-990, +990], step 10; default 0.
+  // Always shown in the attacker panel regardless of pet selection.
   attackerPowerBoost: 0,
-  // Per-side 速度 (speed) bonus: flat addition to the pet's speed stat.
-  // Range [-990, +990], step 10; default 0. Only shown when the attacker
-  // is one of the pets listed in SPEED_BOOST_PETS (e.g. 岚鸟).
+  // Per-side 速度 (speed) chip: flat addition to the pet's speed stat.
+  // Range [-990, +990], step 10; default 0. Always shown on BOTH
+  // attacker and defender panels.
   attackerSpeed: 0,
   defenderSpeed: 0
 };
@@ -2948,17 +2948,16 @@ function selectSpirit(side, id) {
     state.attackerIVs    = DEFAULT_IVS.attacker.slice();
     // Reset attacker buffs on spirit change
     state.attackerBuff   = { atk: 0, matk: 0 };
-    // Reset 化劲/羽化 (may not even be applicable to the new attacker)
+    // Reset 威力 chip value
     state.attackerPowerBoost = 0;
-    // Reset 速度 (may not even be applicable to the new attacker);
-    // also reset the defender side since the speed chip's visibility
-    // on the defender panel is gated by the attacker's identity.
+    // Reset 速度 chip values on both sides
     state.attackerSpeed = 0;
     state.defenderSpeed = 0;
     state.spiritPicking.attacker = false;
     renderSpiritArea('attacker');
-    // Speed chip visibility on the defender side depends on the
-    // attacker's identity, so re-render the defender's chips too.
+    // 速度 chip is always shown on both sides, so re-render the
+    // defender's chips too (the displayed value is unchanged, but
+    // the click handlers were rebuilt when the chip was cleared).
     renderBuffChips('defender');
   } else if (side === 'defender') {
     state.defender = spirit;
@@ -2970,8 +2969,7 @@ function selectSpirit(side, id) {
     state.defenderIVs    = DEFAULT_IVS.defender.slice();
     // Reset defender buffs on spirit change
     state.defenderBuff   = { def: 0, mdef: 0 };
-    // Reset defender 速度 (visibility is unchanged since it depends on
-    // the attacker, but the value should not carry over to a new pet).
+    // Reset defender 速度 chip value (should not carry over to a new pet).
     state.defenderSpeed = 0;
     state.spiritPicking.defender = false;
     renderSpiritArea('defender');
@@ -3191,50 +3189,44 @@ function renderBuffChips(side) {
   const container = document.getElementById(`${side}-buff-chips`);
   if (!container) return;
   const configs = BUFF_STAT_CONFIGS[side] || [];
-  const speedActive = isSpeedBoostActive();
 
   // Speed chip comes FIRST so it visually appears on the left of the
-  // atk/matk (or def/mdef) chips. Only present when the attacker is
-  // one of the SPEED_BOOST_PETS (e.g. 岚鸟).
-  const speedHTML = speedActive ? (() => {
-    const val = getSpeed(side);
-    const cls = _buffChipClass(val);
-    return `<div class="buff-chip ${cls}"
-                 aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，拖动 / 滚轮 / 双击重置）"
-                 data-side="${side}" data-stat="speed"
-                 title="拖动 · 滚轮 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
-  })() : '';
+  // atk/matk (or def/mdef) chips. Always present on both sides.
+  const val = getSpeed(side);
+  const cls = _buffChipClass(val);
+  const speedHTML = `<div class="buff-chip ${cls}"
+                          aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，拖动 / 滚轮 / 双击重置）"
+                          data-side="${side}" data-stat="speed"
+                          title="拖动 · 滚轮 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
 
   const buffsHTML = configs.map(c => {
-    const val = getBuff(side, c.key);
-    const cls = _buffChipClass(val);
-    return `<div class="buff-chip ${cls}"
-                 aria-label="${c.label} 调整（当前 ${formatBuff(val)}，拖动 / 滚轮 / 双击重置）"
+    const bv = getBuff(side, c.key);
+    const bcls = _buffChipClass(bv);
+    return `<div class="buff-chip ${bcls}"
+                 aria-label="${c.label} 调整（当前 ${formatBuff(bv)}，拖动 / 滚轮 / 双击重置）"
                  data-side="${side}" data-stat="${c.key}"
-                 title="拖动 · 滚轮 · 双击重置">${c.label} <span class="buff-val">${formatBuff(val)}</span></div>`;
+                 title="拖动 · 滚轮 · 双击重置">${c.label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
   }).join('');
 
   container.innerHTML = speedHTML + buffsHTML;
 
-  if (speedActive) {
-    const speedChip = container.querySelector(`.buff-chip[data-stat="speed"]`);
-    if (speedChip) {
-      attachChipDrag(speedChip, {
-        shiftMultiplier: 5,
-        getVal: () => getSpeed(side),
-        setVal: (v) => setSpeed(side, v),
-        formatVal: formatSpeed,
-        dragValue: (dx, startVal) => {
-          const delta = Math.round(dx / SPEED_DRAG_PX_PER_STEP) * SPEED_STEP;
-          return Math.max(SPEED_MIN, Math.min(SPEED_MAX, startVal + delta));
-        },
-        wheelValue: (cur, dirMult) => {
-          return Math.max(SPEED_MIN, Math.min(SPEED_MAX, cur + dirMult * SPEED_STEP));
-        },
-        reset: () => { setSpeed(side, 0); renderBuffChips(side); },
-        onChange: calculateDamage,
-      });
-    }
+  const speedChip = container.querySelector(`.buff-chip[data-stat="speed"]`);
+  if (speedChip) {
+    attachChipDrag(speedChip, {
+      shiftMultiplier: 5,
+      getVal: () => getSpeed(side),
+      setVal: (v) => setSpeed(side, v),
+      formatVal: formatSpeed,
+      dragValue: (dx, startVal) => {
+        const delta = Math.round(dx / SPEED_DRAG_PX_PER_STEP) * SPEED_STEP;
+        return Math.max(SPEED_MIN, Math.min(SPEED_MAX, startVal + delta));
+      },
+      wheelValue: (cur, dirMult) => {
+        return Math.max(SPEED_MIN, Math.min(SPEED_MAX, cur + dirMult * SPEED_STEP));
+      },
+      reset: () => { setSpeed(side, 0); renderBuffChips(side); },
+      onChange: calculateDamage,
+    });
   }
 
   for (const c of configs) {
@@ -3259,96 +3251,42 @@ function renderBuffChips(side) {
 }
 
 // ============================================================
-// POWER-BOOST CHIP: 化劲/羽化 — flat addition to skill power.
-// Activated by attacker being one of the pets in POWER_BOOST_PETS.
-// Reuses the .buff-chip visual style; behaviour mirrors the buff
-// chips (press-and-drag horizontal, wheel, dblclick to reset) but
-// with pet-specific step value and a [0, POWER_BOOST_MAX] range.
-//
-// Discrete-level model:
-//   The cap (POWER_BOOST_MAX = 990) is NOT a multiple of the pet's
-//   step (40 for 化劲, 20 for 羽化), so reaching the cap produces a
-//   "virtual" final level separate from the natural step sequence.
-//   To avoid off-step values like 950/910/970 (which would otherwise
-//   appear when decrementing from the cap), we operate on integer
-//   LEVEL INDICES and map back to values:
-//
-//     化劲 (step 40):  26 levels  → values 0, 40, …, 960, 990
-//     羽化 (step 20):  51 levels  → values 0, 20, …, 980, 990
-//
-//   Going up:   0 → 1 → … → k → (k+1)   (k+1 is the cap level)
-//   Going back from cap jumps to k   (not k·step − step).
+// 威力 CHIP: 威力 — flat addition to the attack skill's base
+// power. Replaces the old 化劲/羽化 chips (which had per-pet step
+// values of 40 and 20 respectively and a [0, 990] range). Now a
+// single always-visible chip with a uniform step of 10 and a
+// symmetric [-990, +990] range, so the user can subtract as well
+// as add. Reuses the .buff-chip visual style; behaviour mirrors
+// the buff chips (press-and-drag horizontal, wheel, dblclick to
+// reset).
 // ============================================================
-const POWER_BOOST_PETS = {
-  'pet_000413': { label: '化劲', step: 40 },   // 落陨星兔
-  'pet_000287': { label: '羽化', step: 20 }    // 粉耳星兔
-};
-const POWER_BOOST_MAX = 990;
-const POWER_BOOST_DRAG_PX_PER_STEP = 8;
-
-// Largest level index. With step=40 and cap=990: k=24 (val 960), maxLevel=25.
-// With step=20 and cap=990: k=49 (val 980), maxLevel=50.
-function getMaxPowerBoostLevel(step) {
-  return Math.floor((POWER_BOOST_MAX - 1) / step) + 1;
-}
-// Map a level index to its displayed value.
-function getValueAtPowerBoostLevel(level, step) {
-  const maxLevel = getMaxPowerBoostLevel(step);
-  if (level <= 0) return 0;
-  if (level >= maxLevel) return POWER_BOOST_MAX;
-  return level * step;
-}
-// Map a value to the nearest level index (used when starting a drag or
-// when setPowerBoost is called with an off-step value).
-function getPowerBoostLevel(val, step) {
-  if (val <= 0) return 0;
-  if (val >= POWER_BOOST_MAX) return getMaxPowerBoostLevel(step);
-  const maxLevel = getMaxPowerBoostLevel(step);
-  const k = maxLevel - 1;          // index of the largest natural level
-  const kVal = k * step;           // value of the largest natural level
-  if (val < kVal) return Math.round(val / step);
-  // val ∈ [kVal, POWER_BOOST_MAX). Snap to kVal or the cap, whichever
-  // is closer (ties go to the cap for consistency with the going-up path).
-  return (val - kVal <= POWER_BOOST_MAX - val) ? k : maxLevel;
-}
+const POWER_LABEL = '威力';
+const POWER_MIN = -990;
+const POWER_MAX = 990;
+const POWER_STEP = 10;
+const POWER_DRAG_PX_PER_STEP = 8;
 
 function getPowerBoost() { return state.attackerPowerBoost; }
 function setPowerBoost(val) {
-  // Clamp to [0, POWER_BOOST_MAX] and snap to a valid level so the
-  // stored value is always one of the natural step values or the cap.
-  const config = getPowerBoostConfig();
-  if (!config) { state.attackerPowerBoost = 0; return; }
-  const clamped = Math.max(0, Math.min(POWER_BOOST_MAX, val));
-  const level = getPowerBoostLevel(clamped, config.step);
-  state.attackerPowerBoost = getValueAtPowerBoostLevel(level, config.step);
-}
-function getPowerBoostConfig() {
-  if (!state.attacker) return null;
-  return POWER_BOOST_PETS[state.attacker.id] || null;
+  const clamped = Math.max(POWER_MIN, Math.min(POWER_MAX, Math.round(val / POWER_STEP) * POWER_STEP));
+  state.attackerPowerBoost = clamped;
 }
 function formatPowerBoost(val) {
-  // Always non-negative; always shown with a leading '+'.
-  return '+' + val;
+  if (val > 0) return '+' + val;
+  if (val < 0) return String(val);   // already has minus sign
+  return '+0';
 }
 
 function renderPowerBoostChip() {
   const container = document.getElementById('attacker-power-boost-chip');
   if (!container) return;
-  const config = getPowerBoostConfig();
-  if (!config) {
-    // No special attacker → hide the chip entirely.
-    container.innerHTML = '';
-    return;
-  }
-  // Defensive: if a stale off-step value (e.g. 1000 from the old
-  // rounding bug) is in state, snap it down to a valid level before
-  // displaying.
+  // Defensive: clamp a stale out-of-range value before displaying.
   setPowerBoost(getPowerBoost());
   const val = getPowerBoost();
-  const cls = val > 0 ? 'positive' : 'neutral';
+  const cls = _buffChipClass(val);
   container.innerHTML = `<div class="buff-chip ${cls}"
-                              aria-label="${config.label} 调整（当前 ${formatPowerBoost(val)}，拖动 / 滚轮 / 双击重置）"
-                              title="拖动 · 滚轮 · 双击重置">${config.label} <span class="buff-val">${formatPowerBoost(val)}</span></div>`;
+                              aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(val)}，拖动 / 滚轮 / 双击重置）"
+                              title="拖动 · 滚轮 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(val)}</span></div>`;
   const chip = container.querySelector('.buff-chip');
   if (!chip) return;
   attachChipDrag(chip, {
@@ -3356,29 +3294,12 @@ function renderPowerBoostChip() {
     getVal: getPowerBoost,
     setVal: (v) => { state.attackerPowerBoost = v; },
     formatVal: formatPowerBoost,
-    // Remember the start LEVEL (not the start value) so the drag moves
-    // through the discrete level sequence rather than continuous values.
-    prepareDrag: () => {
-      const cfg = getPowerBoostConfig();
-      if (!cfg) return false;   // no longer eligible (race) → abort
-      return { step: cfg.step, maxLevel: getMaxPowerBoostLevel(cfg.step) };
+    dragValue: (dx, startVal) => {
+      const delta = Math.round(dx / POWER_DRAG_PX_PER_STEP) * POWER_STEP;
+      return Math.max(POWER_MIN, Math.min(POWER_MAX, startVal + delta));
     },
-    dragValue: (dx, startVal, startExtra) => {
-      const levelDelta = Math.round(dx / POWER_BOOST_DRAG_PX_PER_STEP);
-      const startLevel = getPowerBoostLevel(startVal, startExtra.step);
-      const newLevel = Math.max(0, Math.min(startExtra.maxLevel, startLevel + levelDelta));
-      return getValueAtPowerBoostLevel(newLevel, startExtra.step);
-    },
-    // dirMult is in "levels" (1 = 1 level, 5 = 5 levels via shift). We
-    // map back to a value so the stored value is always on a valid
-    // level (e.g. 化劲: 960 → 990 going up, 990 → 960 going back).
     wheelValue: (cur, dirMult) => {
-      const cfg = getPowerBoostConfig();
-      if (!cfg) return null;
-      const curLevel = getPowerBoostLevel(cur, cfg.step);
-      const maxLevel = getMaxPowerBoostLevel(cfg.step);
-      const newLevel = Math.max(0, Math.min(maxLevel, curLevel + dirMult));
-      return getValueAtPowerBoostLevel(newLevel, cfg.step);
+      return Math.max(POWER_MIN, Math.min(POWER_MAX, cur + dirMult * POWER_STEP));
     },
     reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
     onChange: calculateDamage,
@@ -3387,42 +3308,20 @@ function renderPowerBoostChip() {
 
 // ============================================================
 // SPEED CHIP: 速度 — flat addition to the pet's speed stat.
-// Activated by attacker being one of the pets in SPEED_BOOST_PETS
-// (e.g. 岚鸟). Shown on BOTH attacker and defender sides (each
-// side stores its own value). Reuses the .buff-chip visual style;
+// Always shown on BOTH attacker and defender sides (each side
+// stores its own value). Reuses the .buff-chip visual style;
 // behaviour mirrors the buff chips (press-and-drag horizontal,
 // wheel, dblclick to reset). Range [-990, +990], step 10.
 //
 // The speed value is currently NOT used in damage calculation; it
 // is stored so that future features can read it.
 // ============================================================
-const SPEED_BOOST_PETS = {
-  'pet_000028': true,   // 冬羽雀（本来的样子）
-  'pet_000254': true,   // 冬羽雀（春天的样子）
-  'pet_000255': true,   // 冬羽雀（夏天的样子）
-  'pet_000256': true,   // 冬羽雀（秋天的样子）
-  'pet_000455': true,   // 雪绒鸟（本来的样子）
-  'pet_000251': true,   // 雪绒鸟（春天的样子）
-  'pet_000252': true,   // 雪绒鸟（夏天的样子）
-  'pet_000253': true,   // 雪绒鸟（秋天的样子）
-  'pet_000037': true,   // 岚鸟（本来的样子）
-  'pet_000257': true,   // 岚鸟（春天的样子）
-  'pet_000258': true,   // 岚鸟（夏天的样子）
-  'pet_000259': true,   // 岚鸟（秋天的样子）
-  'pet_000634': true,   // 霜翼领主（本来的样子）
-  'pet_000650': true,   // 霜翼领主（春天的样子）
-  'pet_000651': true,   // 霜翼领主（夏天的样子）
-  'pet_000652': true,   // 霜翼领主（秋天的样子）
-};
 const SPEED_LABEL = '速度';
 const SPEED_MIN = -990;
 const SPEED_MAX = 990;
 const SPEED_STEP = 10;
 const SPEED_DRAG_PX_PER_STEP = 8;
 
-function isSpeedBoostActive() {
-  return !!(state.attacker && SPEED_BOOST_PETS[state.attacker.id]);
-}
 function getSpeed(side) {
   return side === 'attacker' ? state.attackerSpeed : state.defenderSpeed;
 }
@@ -3999,9 +3898,9 @@ function calculateDamage() {
 
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
   const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
-  // 化劲/羽化 (attacker's pet-specific power boost) — flat addition to base power.
+  // 威力 chip — flat addition to base power (always shown).
   const powerBoost = getPowerBoost();
-  const powerBoostLabel = getPowerBoostConfig()?.label || null;
+  const powerBoostLabel = POWER_LABEL;
   // Skill damage (STAB applied BEFORE type effectiveness)
   const stab = getStabMultiplier(atk, skill);
   const skillEffRaw = effectiveness(skill.element, def.types);
@@ -4168,17 +4067,18 @@ function renderBreakdownList(breakdownList, data) {
   // additive bonus, and the dynamic multiplier, e.g.
   //   100                                          (no boost, no add, no mult)
   //   100 × 1.20 = 120                             (mult only)
-  //   100 + 40（化劲） = 140                       (boost only)
-  //   100 + 40（化劲） + 60（天体吸积） = 200      (boost + add)
-  //   100 + 40（化劲） = 140 × 1.20 = 168          (boost + mult)
-  //   100 + 40（化劲） + 60（天体吸积） = 200 × 1.20 = 240 (all three)
+  //   100 + 40（威力） = 140                       (boost only)
+  //   100 + 40（威力） + 60（天体吸积） = 200      (boost + add)
+  //   100 + 40（威力） = 140 × 1.20 = 168          (boost + mult)
+  //   100 + 40（威力） + 60（天体吸积） = 200 × 1.20 = 240 (all three)
   //   100 + 60（天体吸积） = 160                    (add only — no powerBoost)
+  //   100 - 30（威力） = 70                        (negative 威力)
   // Build the additive step "<base> + <term1> + <term2> = <sum>", or null
   // when there's no additive term (so we don't render a stray " + 0" line).
   const addTerms = [];
-  if (powerBoost > 0) addTerms.push(`${powerBoost}（${powerBoostLabel || '化劲/羽化'}）`);
-  if (dynAdd > 0) {
-    addTerms.push(`${dynAdd}`);
+  if (powerBoost !== 0) addTerms.push(`${powerBoost}（${powerBoostLabel || '威力'}）`);
+  if (dynAdd !== 0) {
+    addTerms.push(`${dynAdd > 0 ? '+' : ''}${dynAdd}`);
   }
   const additiveExpr = addTerms.length
     ? `${basePower} + ${addTerms.join(' + ')} = ${basePowerWithBoost}`
@@ -4347,7 +4247,7 @@ function init() {
   // 初始即渲染两侧的内嵌选择器（未选精灵时直接显示）
   renderSpiritArea('attacker');
   renderSpiritArea('defender');
-  // 化劲/羽化 chip 占位（未选攻击方时为空）
+  // 威力 chip 占位（未选攻击方时也常驻显示）
   renderPowerBoostChip();
   renderWaiting();
 }
