@@ -3908,7 +3908,7 @@ function calculateDamage() {
   // 但保留克制/双重克制等 > 1 的加成不变。
   const skillEff = (dyn.ignoreResist && skillEffRaw < 1) ? 1 : skillEffRaw;
   const combo = ((skill.combo ?? 1) + dyn.comboAdd) * dyn.comboMult;
-  const power = ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult;
+  const power = Math.max(0, ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
   );
@@ -4060,7 +4060,7 @@ function renderBreakdownList(breakdownList, data) {
   const powerBoostLabel = data.powerBoostLabel || null;
   const basePower = data.skill.power ?? 0;
   const dynAdd = dynMods.powerAdd || 0;
-  const basePowerWithBoost = basePower + powerBoost + dynAdd;
+  const basePowerWithBoost = Math.max(0, basePower + powerBoost + dynAdd);
   const effCombo  = ((data.skill.combo ?? 1) + dynMods.comboAdd) * dynMods.comboMult;
   const effPowerStr = (basePowerWithBoost * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
   // Compose the 威力 line so it reflects the flat power boost, the dynamic
