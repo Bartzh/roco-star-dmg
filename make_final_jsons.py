@@ -183,7 +183,7 @@ sprites['pet_789987'] = {
     'def': 183,
     'mdef': 183,
     'spd': 145,
-    'skills': ['skill_000633', 'skill_000304', 'skill_000727', 'skill_000742', 'skill_000725'],
+    'skills': ['skill_000633', 'skill_000635', 'skill_000304', 'skill_000727', 'skill_000742', 'skill_000725'],
     'pinyin': 'pintu',
     'pinyin_initials': 'pt',
     'hbid': 789987,
