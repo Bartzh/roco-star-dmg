@@ -3527,7 +3527,7 @@ function renderSkills(side) {
       return `
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 onclick="selectAttackSkill(${idx})">
-          <div class="skill-icon">${renderSkillIconHTML(sk, el)}</div>
+          <div class="skill-icon" title="${sk.desc}">${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
             <span class="skill-name">${sk.name}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk, powerClass)}</div>
