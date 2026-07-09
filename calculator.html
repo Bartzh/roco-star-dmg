@@ -665,6 +665,7 @@ body {
 }
 .skill-badge.atk     { color: #ff8c00; }
 .skill-badge.matk    { color: #aa66ff; }
+.skill-badge.auto    { color: #ffd700; }   /* 愿力冲击：自适应 */
 .skill-badge.power   { color: var(--accent-cyan); }
 .skill-badge.power.super-effective {
   color: var(--accent-green);
@@ -1840,6 +1841,24 @@ function formatBuff(val) {
   return '+0%';
 }
 
+// ============================================================
+// 固定攻击技能：愿力冲击（每个系别一种，共18种）
+// 类似防御方的"无"和"聚能"，始终附加在攻击技能列表末尾。
+// 特殊机制：伤害类型由精灵当前最终物攻/魔攻（含 buff）中
+// 较高者决定（物攻 ≥ 魔攻 → 物攻；否则魔攻）。在 SKILL_MODS
+// 中以 modKey='__yuanli__' 注册共用效果：应对状态 +150% 威力。
+// ============================================================
+const YUANLI_SKILLS = Object.keys(ELEMENTS).map(el => ({
+  id: '__yuanli_' + el + '__',
+  name: '愿力冲击',
+  category: '攻击',
+  element: el + '系',
+  damage_class: '自适应',
+  power: 80,
+  modKey: '__yuanli__',
+  desc: '应对状态：技能威力+150%。伤害类型由精灵当前最终物攻/魔攻中的较高者决定。',
+}));
+
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
   const opts = [
@@ -1854,12 +1873,14 @@ function getDefenseSkillOptions(defender) {
   return opts;
 }
 function getAttackSkillOptions(attacker) {
-  if (!attacker) return [];
+  if (!attacker) return YUANLI_SKILLS.slice();
   const out = [];
   for (const sid of (attacker.skills || [])) {
     const s = SKILLS[sid];
     if (s && s.category === '攻击') out.push(s);
   }
+  // Append fixed 愿力冲击 skills (one per element) at the end.
+  out.push(...YUANLI_SKILLS);
   return out;
 }
 
@@ -3462,6 +3483,9 @@ function renderInlineBadge(sk, powerClass = '') {
     badges.push(`<span class="skill-badge atk">物攻</span>`);
   } else if (sk.damage_class === '魔攻') {
     badges.push(`<span class="skill-badge matk">魔攻</span>`);
+  } else if (sk.damage_class === '自适应') {
+    // 愿力冲击：伤害类型由精灵当前最终物攻/魔攻中较高者决定
+    badges.push(`<span class="skill-badge auto">自适应</span>`);
   }
   if (sk.damage_class) {
     // attack skill: show power
@@ -3917,6 +3941,17 @@ const SKILL_MODS = {
       notes: [`威力 +${powerAdd}（物防差 ${defGap}）`],
     };
   },
+  // 愿力冲击：应对状态：技能威力 +150%。伤害类型由精灵当前最终
+  // 物攻/魔攻中的较高者决定（在 calculateDamage 中通过 modKey 命中）。
+  // modKey 共享 __yuanli__，apply() 会按 modKey 回退查找。
+  __yuanli__(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.defenseSkill.category !== '状态') return null;
+    return {
+      powerMultAdd: 1.5,
+      notes: [`威力 +150%（应对状态）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
@@ -3961,7 +3996,9 @@ function computeSkillDynamicModifiers(
   const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, notes: [] };
 
   const apply = (skill, fromAttacker) => {
-    const fn = SKILL_MODS[skill?.id];
+    // 优先用 modKey（用于把多个"同族"技能共享到同一条 SKILL_MODS），
+    // 找不到时回退到 skill.id。
+    const fn = SKILL_MODS[skill?.modKey] || SKILL_MODS[skill?.id];
     if (!fn) return;
     const mod = fn(ctx, fromAttacker);
     if (!mod) return;
@@ -4019,19 +4056,32 @@ function calculateDamage() {
   const layer = state.starLayer;
   const n = layer;
 
-  const isMagic = skill.damage_class === '魔攻';
-  // Use final stats (base + IVs + nature) for both attacker and defender
+  // 伤害类型决定：
+  //   - damage_class === '自适应'（愿力冲击）：按精灵当前最终物攻/魔攻
+  //     （含 buff）中较高者决定，物攻 ≥ 魔攻 → 物攻，否则魔攻。
+  //   - 其他：保持原行为（'魔攻' → 魔攻，其余 → 物攻）。
   const atkNature = getNature('attacker');
   const defNature = getNature('defender');
   const atkIVs    = getIVs('attacker');
   const defIVs    = getIVs('defender');
+  const atkBaseNoBuff  = getFinalStat(atk, 'atk',  atkNature, atkIVs);
+  const matkBaseNoBuff = getFinalStat(atk, 'matk', atkNature, atkIVs);
+  let isMagic;
+  if (skill.damage_class === '自适应') {
+    const atkFull  = atkBaseNoBuff  * (1 + getBuff('attacker', 'atk')  / 100);
+    const matkFull = matkBaseNoBuff * (1 + getBuff('attacker', 'matk') / 100);
+    // 物攻 ≥ 魔攻 → 物攻；只有魔攻严格更高时才用魔攻。
+    isMagic = matkFull > atkFull;
+  } else {
+    isMagic = skill.damage_class === '魔攻';
+  }
   const atkStatKey = isMagic ? 'matk' : 'atk';
   const defStatKey = isMagic ? 'mdef' : 'def';
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
   // nonsensical negative stats from extreme debuffs.
   const atkBuffPct = getBuff('attacker', atkStatKey);
   const defBuffPct = getBuff('defender', defStatKey);
-  const atkStat = Math.max(0, Math.round(getFinalStat(atk, atkStatKey, atkNature, atkIVs) * (1 + atkBuffPct / 100)));
+  const atkStat = Math.max(0, Math.round((isMagic ? matkBaseNoBuff : atkBaseNoBuff) * (1 + atkBuffPct / 100)));
   const defStat = Math.max(0, Math.round(getFinalStat(def, defStatKey, defNature, defIVs) * (1 + defBuffPct / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
