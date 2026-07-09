@@ -3190,6 +3190,7 @@ const BUFF_STAT_CONFIGS = {
 const BUFF_DRAG_PX_PER_STEP = 8;   // 8px → 10% step
 const BUFF_STEP_PCT = 10;
 const BUFF_MAX_PCT = 990;
+const BUFF_MIN_PCT = -100;
 
 function _buffChipClass(val) {
   return val > 0 ? 'positive' : val < 0 ? 'negative' : 'neutral';
@@ -3249,10 +3250,10 @@ function renderBuffChips(side) {
       formatVal: formatBuff,
       dragValue: (dx, startVal) => {
         const delta = Math.round(dx / BUFF_DRAG_PX_PER_STEP) * BUFF_STEP_PCT;
-        return Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT, startVal + delta));
+        return Math.max(BUFF_MIN_PCT, Math.min(BUFF_MAX_PCT, startVal + delta));
       },
       wheelValue: (cur, dirMult) => {
-        return Math.max(-BUFF_MAX_PCT, Math.min(BUFF_MAX_PCT, cur + dirMult * BUFF_STEP_PCT));
+        return Math.max(BUFF_MIN_PCT, Math.min(BUFF_MAX_PCT, cur + dirMult * BUFF_STEP_PCT));
       },
       reset: () => { setBuff(side, c.key, 0); renderBuffChips(side); },
       onChange: calculateDamage,
