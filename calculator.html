@@ -1559,7 +1559,7 @@ body {
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
-        <h3 class="section-title">攻击技能<span class="buff-chips" id="attacker-power-boost-chip" aria-label="威力 调节"></span></h3>
+        <h3 class="section-title">攻击技能<span class="buff-chips" id="attacker-power-boost-chip" aria-label="连击数 / 威力 调节"></span></h3>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
     </section>
@@ -1804,6 +1804,10 @@ let state = {
   // damage points, not %). Range [-990, +990], step 10; default 0.
   // Always shown in the attacker panel regardless of pet selection.
   attackerPowerBoost: 0,
+  // Attacker's 连击数 chip: flat addition to skill combo count.
+  // Range [-99, +99], step 1; default 0. Always shown in the
+  // attacker panel regardless of pet selection.
+  attackerCombo: 0,
   // Per-side 速度 (speed) chip: flat addition to the pet's speed stat.
   // Range [-990, +990], step 10; default 0. Always shown on BOTH
   // attacker and defender panels.
@@ -2950,6 +2954,8 @@ function selectSpirit(side, id) {
     state.attackerBuff   = { atk: 0, matk: 0 };
     // Reset 威力 chip value
     state.attackerPowerBoost = 0;
+    // Reset 连击数 chip value
+    state.attackerCombo = 0;
     // Reset 速度 chip values on both sides
     state.attackerSpeed = 0;
     state.defenderSpeed = 0;
@@ -3251,20 +3257,32 @@ function renderBuffChips(side) {
 }
 
 // ============================================================
-// 威力 CHIP: 威力 — flat addition to the attack skill's base
-// power. Replaces the old 化劲/羽化 chips (which had per-pet step
-// values of 40 and 20 respectively and a [0, 990] range). Now a
-// single always-visible chip with a uniform step of 10 and a
-// symmetric [-990, +990] range, so the user can subtract as well
-// as add. Reuses the .buff-chip visual style; behaviour mirrors
-// the buff chips (press-and-drag horizontal, wheel, dblclick to
+// 威力 / 连击数 CHIPS
+// Both chips live in the attacker's skill header (the same DOM
+// container). 连击数 sits to the LEFT of 威力. They are always
+// visible, share the .buff-chip visual style, and behave like the
+// stat-buff chips (press-and-drag horizontal, wheel, dblclick to
 // reset).
+//
+//   威力:    flat addition to skill base power.  Range [-990, +990], step 10.
+//   连击数:  flat addition to skill combo count. Range [-99,  +99], step  1.
+//
+//   Replaces the old 化劲/羽化 chips (which had per-pet step
+//   values of 40 and 20 respectively and a [0, 990] range) with a
+//   single always-visible 威力 chip, and adds a symmetric
+//   连击数 chip for adjusting the hit count.
 // ============================================================
 const POWER_LABEL = '威力';
 const POWER_MIN = -990;
 const POWER_MAX = 990;
 const POWER_STEP = 10;
 const POWER_DRAG_PX_PER_STEP = 8;
+
+const COMBO_LABEL = '连击';
+const COMBO_MIN = -99;
+const COMBO_MAX = 99;
+const COMBO_STEP = 1;
+const COMBO_DRAG_PX_PER_STEP = 8;
 
 function getPowerBoost() { return state.attackerPowerBoost; }
 function setPowerBoost(val) {
@@ -3277,33 +3295,79 @@ function formatPowerBoost(val) {
   return '+0';
 }
 
+function getComboBoost() { return state.attackerCombo; }
+function setComboBoost(val) {
+  const clamped = Math.max(COMBO_MIN, Math.min(COMBO_MAX, Math.round(val / COMBO_STEP) * COMBO_STEP));
+  state.attackerCombo = clamped;
+}
+function formatComboBoost(val) {
+  if (val > 0) return '+' + val;
+  if (val < 0) return String(val);   // already has minus sign
+  return '+0';
+}
+
 function renderPowerBoostChip() {
   const container = document.getElementById('attacker-power-boost-chip');
   if (!container) return;
-  // Defensive: clamp a stale out-of-range value before displaying.
+  // Defensive: clamp stale out-of-range values before displaying.
   setPowerBoost(getPowerBoost());
-  const val = getPowerBoost();
-  const cls = _buffChipClass(val);
-  container.innerHTML = `<div class="buff-chip ${cls}"
-                              aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(val)}，拖动 / 滚轮 / 双击重置）"
-                              title="拖动 · 滚轮 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(val)}</span></div>`;
-  const chip = container.querySelector('.buff-chip');
-  if (!chip) return;
-  attachChipDrag(chip, {
-    shiftMultiplier: 5,
-    getVal: getPowerBoost,
-    setVal: (v) => { state.attackerPowerBoost = v; },
-    formatVal: formatPowerBoost,
-    dragValue: (dx, startVal) => {
-      const delta = Math.round(dx / POWER_DRAG_PX_PER_STEP) * POWER_STEP;
-      return Math.max(POWER_MIN, Math.min(POWER_MAX, startVal + delta));
-    },
-    wheelValue: (cur, dirMult) => {
-      return Math.max(POWER_MIN, Math.min(POWER_MAX, cur + dirMult * POWER_STEP));
-    },
-    reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
-    onChange: calculateDamage,
-  });
+  setComboBoost(getComboBoost());
+
+  // 连击数 chip — rendered first so it sits to the LEFT of 威力.
+  const comboVal = getComboBoost();
+  const comboCls = _buffChipClass(comboVal);
+  const comboHTML = `<div class="buff-chip ${comboCls}"
+                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，拖动 / 滚轮 / 双击重置）"
+                            data-stat="combo"
+                            title="拖动 · 滚轮 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
+
+  // 威力 chip.
+  const powerVal = getPowerBoost();
+  const powerCls = _buffChipClass(powerVal);
+  const powerHTML = `<div class="buff-chip ${powerCls}"
+                            aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(powerVal)}，拖动 / 滚轮 / 双击重置）"
+                            data-stat="power"
+                            title="拖动 · 滚轮 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
+
+  container.innerHTML = comboHTML + powerHTML;
+
+  const comboChip = container.querySelector('.buff-chip[data-stat="combo"]');
+  if (comboChip) {
+    attachChipDrag(comboChip, {
+      shiftMultiplier: 5,
+      getVal: getComboBoost,
+      setVal: (v) => { state.attackerCombo = v; },
+      formatVal: formatComboBoost,
+      dragValue: (dx, startVal) => {
+        const delta = Math.round(dx / COMBO_DRAG_PX_PER_STEP) * COMBO_STEP;
+        return Math.max(COMBO_MIN, Math.min(COMBO_MAX, startVal + delta));
+      },
+      wheelValue: (cur, dirMult) => {
+        return Math.max(COMBO_MIN, Math.min(COMBO_MAX, cur + dirMult * COMBO_STEP));
+      },
+      reset: () => { state.attackerCombo = 0; renderPowerBoostChip(); },
+      onChange: calculateDamage,
+    });
+  }
+
+  const powerChip = container.querySelector('.buff-chip[data-stat="power"]');
+  if (powerChip) {
+    attachChipDrag(powerChip, {
+      shiftMultiplier: 5,
+      getVal: getPowerBoost,
+      setVal: (v) => { state.attackerPowerBoost = v; },
+      formatVal: formatPowerBoost,
+      dragValue: (dx, startVal) => {
+        const delta = Math.round(dx / POWER_DRAG_PX_PER_STEP) * POWER_STEP;
+        return Math.max(POWER_MIN, Math.min(POWER_MAX, startVal + delta));
+      },
+      wheelValue: (cur, dirMult) => {
+        return Math.max(POWER_MIN, Math.min(POWER_MAX, cur + dirMult * POWER_STEP));
+      },
+      reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
+      onChange: calculateDamage,
+    });
+  }
 }
 
 // ============================================================
@@ -3901,13 +3965,15 @@ function calculateDamage() {
   // 威力 chip — flat addition to base power (always shown).
   const powerBoost = getPowerBoost();
   const powerBoostLabel = POWER_LABEL;
+  // 连击数 chip — flat addition to base combo count (always shown).
+  const attackerCombo = getComboBoost();
   // Skill damage (STAB applied BEFORE type effectiveness)
   const stab = getStabMultiplier(atk, skill);
   const skillEffRaw = effectiveness(skill.element, def.types);
   // ignoreResist（如 虫击：应对状态）：把敌方的系别抵抗（< 1）中和为 1，
   // 但保留克制/双重克制等 > 1 的加成不变。
   const skillEff = (dyn.ignoreResist && skillEffRaw < 1) ? 1 : skillEffRaw;
-  const combo = ((skill.combo ?? 1) + dyn.comboAdd) * dyn.comboMult;
+  const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + getComboBoost()) * dyn.comboMult);
   const power = Math.max(0, ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
@@ -3940,7 +4006,7 @@ function calculateDamage() {
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic, dyn,
     atkBuffPct, defBuffPct,
-    powerBoost, powerBoostLabel
+    powerBoost, powerBoostLabel, attackerCombo
   });
   updateAtmosphere(hpPercent, isKill);
 }
@@ -4058,10 +4124,17 @@ function renderBreakdownList(breakdownList, data) {
   const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, notes: [] };
   const powerBoost = data.powerBoost || 0;
   const powerBoostLabel = data.powerBoostLabel || null;
+  const comboChip = data.attackerCombo || 0;
   const basePower = data.skill.power ?? 0;
   const dynAdd = dynMods.powerAdd || 0;
   const basePowerWithBoost = Math.max(0, basePower + powerBoost + dynAdd);
-  const effCombo  = ((data.skill.combo ?? 1) + dynMods.comboAdd) * dynMods.comboMult;
+  const baseCombo = data.skill.combo ?? 1;
+  // The 连击数 chip is an additive term, so it lives inside the
+  // multiplication, alongside dynMods.comboAdd. The final combo
+  // (effCombo) is floored at 0 to match the damage formula.
+  const preMultCombo = Math.max(0, baseCombo + comboChip + dynMods.comboAdd);
+  const effComboNoChip = preMultCombo * dynMods.comboMult;
+  const effCombo  = Math.max(0, effComboNoChip);
   const effPowerStr = (basePowerWithBoost * dynMods.powerMult).toFixed(2).replace(/\.00$/, '');
   // Compose the 威力 line so it reflects the flat power boost, the dynamic
   // additive bonus, and the dynamic multiplier, e.g.
@@ -4092,6 +4165,30 @@ function renderBreakdownList(breakdownList, data) {
   else if (additiveExpr)             powerText = additiveExpr;
   else if (multExpr)                 powerText = `${basePower}${multExpr}`;
   else                               powerText = String(basePower);
+
+  // Compose the 连击 line — same additive-then-multiplier style as 威力.
+  //   1                                            (no chip, no add, no mult)
+  //   1 + 2（连击数） = 3                          (chip only)
+  //   1 + 2（连击数） + 1（星陨） = 4              (chip + add)
+  //   1 (×2 勇击) = 2                              (mult only)
+  //   1 + 1（连击数） - 3（连击数） = -1 (clamped to 0)
+  const comboAddTerms = [];
+  if (comboChip !== 0) comboAddTerms.push(`${comboChip}（${COMBO_LABEL}）`);
+  if (dynMods.comboAdd !== 0) {
+    comboAddTerms.push(`${dynMods.comboAdd > 0 ? '+' : ''}${dynMods.comboAdd}`);
+  }
+  const comboAdditiveExpr = comboAddTerms.length
+    ? `${baseCombo} + ${comboAddTerms.join(' + ')} = ${preMultCombo}`
+    : null;
+  let comboMultExpr;
+  if (dynMods.comboMult !== 1) {
+    comboMultExpr = ` × ${dynMods.comboMult.toFixed(2)} = ${effComboNoChip}`;
+  }
+  let comboText;
+  if (comboAdditiveExpr && comboMultExpr) comboText = `${comboAdditiveExpr}${comboMultExpr}`;
+  else if (comboAdditiveExpr)            comboText = comboAdditiveExpr;
+  else if (comboMultExpr)                comboText = `${baseCombo}${comboMultExpr}`;
+  else                                  comboText = String(baseCombo);
   const dynNotesHTML = dynMods.notes.length
     ? `<div><span class="label">动态修正:</span></div>` +
       dynMods.notes.map(n =>
@@ -4119,7 +4216,8 @@ function renderBreakdownList(breakdownList, data) {
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
     ${buffLineHTML}
     <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo > 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
+    <div><span class="label">连击:</span> <span class="value">${comboText}</span></div>
+    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
     ${dynNotesHTML}
     <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
