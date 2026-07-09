@@ -3867,7 +3867,19 @@ const SKILL_MODS = {
       };
     }
   },
-  // TODO: 变形活画 skill_000161，敌方每有1层增益，本次技能威力+10%
+  // 变形活画：敌方每有1层增益，本次技能威力+10%
+  skill_000161(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    const speedLayers = Math.max(0, Math.floor(ctx.defenderSpeedBonus / 10));
+    const defLayers   = Math.max(0, Math.floor(getBuff('defender', 'def')  / 10));
+    const mdefLayers  = Math.max(0, Math.floor(getBuff('defender', 'mdef') / 10));
+    const layers = speedLayers + defLayers + mdefLayers;
+    if (layers === 0) return null;
+    return {
+      powerMultAdd: layers * 0.1,
+      notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
