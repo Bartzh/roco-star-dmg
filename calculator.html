@@ -1903,10 +1903,14 @@ function getFinalStat(spirit, statKey, nature, ivs) {
 // STAB (Same-Type Attack Bonus): ×1.25 if the skill's element
 // matches any of the attacker's types. Applied BEFORE type
 // effectiveness. Star damage does NOT receive STAB.
+// `elementOverride` (optional) replaces skill.element — used by
+// dynamic modifiers (e.g. 展翅) to change the effective element
+// without mutating the underlying skill data.
 // ============================================================
-function getStabMultiplier(attacker, skill) {
-  if (!attacker || !skill || !skill.element) return 1;
-  const skillEl = stripXi(skill.element);
+function getStabMultiplier(attacker, skill, elementOverride) {
+  const element = elementOverride || (skill && skill.element);
+  if (!attacker || !element) return 1;
+  const skillEl = stripXi(element);
   if (!skillEl || !ELEMENTS[skillEl]) return 1;
   const attackerTypes = (attacker.types || []).map(t => stripXi(t));
   if (attackerTypes.includes(skillEl)) return 1.25;
@@ -3551,11 +3555,14 @@ function selectDefenseSkill(idx) {
 // Each entry takes (ctx, fromAttacker) and returns either null or
 //   {
 //     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
-//     ignoreResist?: boolean,
+//     ignoreResist?: boolean, elementOverride?: string,
 //     notes?: string[],
 //   }.
 // ignoreResist: true ⇒ the defender's type resistance (effectiveness < 1)
 //   is neutralized to 1 (weak/super-effective multipliers are preserved).
+// elementOverride: if set, replaces skill.element for STAB / effectiveness /
+//   幻-element checks during damage calculation (e.g. 展翅 changes
+//   普通系 → 翼系). The original skill.element is preserved.
 // The aggregator (computeSkillDynamicModifiers) merges them.
 //
 // The ctx object always carries:
@@ -3669,6 +3676,25 @@ const SKILL_MODS = {
       comboAdd: 2,
       notes: [`变为3连击（先于敌方攻击 · ${reason}）`],
     };
+  },
+  // 展翅：自己携带的普通系技能变为翼系技能，若后于对手行动，自己受到的伤害+25%
+  skill_000052(ctx, fromAttacker) {
+    if (fromAttacker) {
+      // 通过 elementOverride 在伤害计算时把 effective element 替换为翼系，
+      if (stripXi(ctx.attackSkill.element) !== '普通') return null;
+      return {
+        elementOverride: '翼系',
+        notes: ['普通系技能变为翼系'],
+      };
+    }
+    else {
+      const [firstStrike, reason] = isFirstStrike(ctx);
+      if (!firstStrike) return null;
+      return {
+        powerMultAdd: 0.25,
+        notes: [`威力 +25%（后于对手行动 · ${reason}）`],
+      };
+    }
   },
   // 铁蒺藜：应对状态：本次伤害翻倍
   skill_000453(ctx, fromAttacker) {
@@ -3883,7 +3909,7 @@ function computeSkillDynamicModifiers(
     attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
   };
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     const fn = SKILL_MODS[skill?.id];
@@ -3896,6 +3922,7 @@ function computeSkillDynamicModifiers(
     if (mod.powerMult)    result.powerMult    *= mod.powerMult;
     if (mod.comboMult)    result.comboMult    *= mod.comboMult;
     if (mod.ignoreResist) result.ignoreResist  = true;
+    if (mod.elementOverride != null) result.elementOverride = mod.elementOverride;
     for (const text of (mod.notes || [])) {
       result.notes.push({ source: skill.name, text });
     }
@@ -3966,9 +3993,13 @@ function calculateDamage() {
   const powerBoost = getPowerBoost();
   // 连击数 chip — flat addition to base combo count (always shown).
   const attackerCombo = getComboBoost();
+  // Effective element for STAB / effectiveness / 幻 checks. Dynamic modifiers
+  // (e.g. 展翅) can override the skill's original element (普通 → 翼) without
+  // mutating the skill data.
+  const effectiveElement = dyn.elementOverride || skill.element;
   // Skill damage (STAB applied BEFORE type effectiveness)
-  const stab = getStabMultiplier(atk, skill);
-  const skillEffRaw = effectiveness(skill.element, def.types);
+  const stab = getStabMultiplier(atk, skill, dyn.elementOverride);
+  const skillEffRaw = effectiveness(effectiveElement, def.types);
   // ignoreResist（如 虫击：应对状态）：把敌方的系别抵抗（< 1）中和为 1，
   // 但保留克制/双重克制等 > 1 的加成不变。
   const skillEff = (dyn.ignoreResist && skillEffRaw < 1) ? 1 : skillEffRaw;
@@ -3986,7 +4017,7 @@ function calculateDamage() {
 
   // Starfall damage (幻 element)
   const starPower = n * n + 24 * n - 24;
-  const isSkillIllusion = stripXi(skill.element) === '幻';
+  const isSkillIllusion = stripXi(effectiveElement) === '幻';
   const starTriggered = n > 0 && !isSkillIllusion;
   const starEff = effectiveness('幻系', def.types);
   let starDmg = 0;
@@ -4121,7 +4152,9 @@ function renderResult(data) {
 }
 
 function renderBreakdownList(breakdownList, data) {
-  const skillNameEl = data.skill.element ? elOf(data.skill.element).name : '无';
+  // Use the overridden element (e.g. 展翅: 普通 → 翼) for the displayed name.
+  const skillElementRaw = (data.dyn && data.dyn.elementOverride) || data.skill.element;
+  const skillNameEl = skillElementRaw ? elOf(skillElementRaw).name : '无';
   const stabBadge = data.stab > 1
     ? ' <span class="skill-badge stab">本系 ×1.25</span>'
     : '';
