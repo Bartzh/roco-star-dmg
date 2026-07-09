@@ -4157,12 +4157,12 @@ function renderBreakdownList(breakdownList, data) {
   // Build the additive step "<base> + <term1> + <term2> = <sum>", or null
   // when there's no additive term (so we don't render a stray " + 0" line).
   const addTerms = [];
-  if (powerBoost !== 0) addTerms.push(String(powerBoost));
-  if (dynAdd !== 0) {
-    addTerms.push(`${dynAdd > 0 ? '+' : ''}${dynAdd}`);
-  }
+  if (powerBoost > 0) addTerms.push(`+ ${powerBoost}`);
+  else if (powerBoost < 0) addTerms.push(`- ${Math.abs(powerBoost)}`);
+  if (dynAdd > 0) addTerms.push(`+ ${dynAdd}`);
+  else if (dynAdd < 0) addTerms.push(`- ${Math.abs(dynAdd)}`);
   const additiveExpr = addTerms.length
-    ? `${basePower} + ${addTerms.join(' + ')} = ${basePowerWithBoost}`
+    ? `${basePower} ${addTerms.join(' ')} = ${basePowerWithBoost}`
     : null;
   let multExpr;
   if (dynMods.powerMult !== 1) {
