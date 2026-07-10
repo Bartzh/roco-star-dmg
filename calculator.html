@@ -1856,7 +1856,7 @@ const YUANLI_SKILLS = Object.keys(ELEMENTS).map(el => ({
   damage_class: '自适应',
   power: 80,
   modKey: '__yuanli__',
-  desc: '应对状态：技能威力+150%。伤害类型由精灵当前最终物攻/魔攻中的较高者决定。',
+  desc: '造成伤害，伤害类型取决于精灵双攻更高的一项，应对状态：本次威力+150%。',
   icon_url: `./images/愿力冲击_${el}.webp`
 }));
 
@@ -3949,8 +3949,9 @@ const SKILL_MODS = {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
-      powerMultAdd: 1.5,
-      notes: [`威力 +150%（应对状态）`],
+      // 愿力是乘算
+      powerMult: 2.5,
+      notes: [`威力 ×2.5（应对状态）`],
     };
   },
   // Add more skills here as they're introduced.
