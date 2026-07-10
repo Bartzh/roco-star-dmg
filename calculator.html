@@ -1864,7 +1864,7 @@ const YUANLI_SKILLS = Object.keys(ELEMENTS).map(el => ({
 function getDefenseSkillOptions(defender) {
   const opts = [
     { id: '__none__', name: '无', reduction: 1, _pseudo: true },
-    { id: '__state__', name: '聚能', category: '状态', icon_url: './images/聚能.webp' }
+    { id: '__state__', name: '聚能', category: '状态', desc: '用于使攻击方能够应对状态。', icon_url: './images/聚能.webp' }
   ];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
@@ -3528,7 +3528,7 @@ function renderSkills(side) {
       return `
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 onclick="selectAttackSkill(${idx})">
-          <div class="skill-icon" title="${sk.desc}">${renderSkillIconHTML(sk, el)}</div>
+          <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
             <span class="skill-name">${sk.name}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk, powerClass)}</div>
@@ -3548,7 +3548,7 @@ function renderSkills(side) {
       return `
         <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${isNone ? 'none-skill' : ''}"
                 onclick="selectDefenseSkill(${idx})">
-          <div class="skill-icon">${iconHTML}</div>
+          <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${iconHTML}</div>
           <div class="skill-content">
             <span class="skill-name">${isNone ? '无' : sk.name}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
