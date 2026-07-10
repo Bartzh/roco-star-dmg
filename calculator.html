@@ -3652,7 +3652,7 @@ const SKILL_MODS = {
   // 狂欢开始：本精灵受到的克制伤害+25%
   skill_000200(ctx, fromAttacker) {
     if (fromAttacker) return null;
-    if (effectiveness(ctx.attackSkill.element, ctx.defender.type) <= 1) return null;
+    if (effectiveness(ctx.attackSkill.element, ctx.defender.types) <= 1) return null;
     return {
       powerMult: 1.25,
       notes: ['威力 ×1.25（额外克制伤害）'],
