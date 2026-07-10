@@ -1857,13 +1857,14 @@ const YUANLI_SKILLS = Object.keys(ELEMENTS).map(el => ({
   power: 80,
   modKey: '__yuanli__',
   desc: '应对状态：技能威力+150%。伤害类型由精灵当前最终物攻/魔攻中的较高者决定。',
+  icon_url: `./images/愿力冲击_${el}.webp`
 }));
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
   const opts = [
     { id: '__none__', name: '无', reduction: 1, _pseudo: true },
-    { id: '__state__', name: '聚能', category: '状态', icon_url: './images/聚能.png' }
+    { id: '__state__', name: '聚能', category: '状态', icon_url: './images/聚能.webp' }
   ];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
