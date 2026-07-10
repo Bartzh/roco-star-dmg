@@ -531,13 +531,15 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  min-height: 145px;
-  max-height: 145px;
+  min-height: 140px;
+  max-height: 140px;
   overflow-y: auto;
   padding-right: 2px;
   align-content: start;
   /* 避免动画遮挡边框 */
   padding-top: 1px;
+  /* 纵向强制吸附（暂时不考虑启用） */
+  /* scroll-snap-type: y mandatory; */
 }
 
 /* Skill card: 48px icon (fills card height) + right-side content (name + badges row) */
@@ -557,6 +559,8 @@ body {
   text-align: left;
   position: relative;
   font-size: 0.85rem;
+  /* 吸附到容器顶部（暂时不考虑启用） */
+  /* scroll-snap-align: start; */
 }
 .skill-btn:hover {
   background: rgba(255,255,255,0.08);
