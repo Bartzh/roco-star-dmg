@@ -3654,8 +3654,8 @@ const SKILL_MODS = {
     if (fromAttacker) return null;
     if (effectiveness(ctx.attackSkill.element, ctx.defender.type) <= 1) return null;
     return {
-      powerMultAdd: 0.25,
-      notes: ['威力 +25%（额外克制伤害）'],
+      powerMult: 1.25,
+      notes: ['威力 ×1.25（额外克制伤害）'],
     };
   },
   // 顺风（岚鸟特性）：若先于敌方攻击，本次技能威力 +50%。
@@ -3717,8 +3717,8 @@ const SKILL_MODS = {
       const [firstStrike, reason] = isFirstStrike(ctx);
       if (!firstStrike) return null;
       return {
-        powerMultAdd: 0.25,
-        notes: [`威力 +25%（后于对手行动 · ${reason}）`],
+        powerMult: 1.25,
+        notes: [`威力 ×1.25（后于对手行动 · ${reason}）`],
       };
     }
   },
