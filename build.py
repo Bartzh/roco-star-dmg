@@ -18,7 +18,6 @@ SRC = os.path.join(ROOT, 'calculator.html')
 OUT = os.path.join(ROOT, 'calculator.built.html')
 if not os.path.exists(os.path.join(ROOT, 'dist')):
     os.makedirs(os.path.join(ROOT, 'dist'))
-DIST = os.path.join(ROOT, 'dist', 'index.html')
 
 DATA_FILES = [
     ('sprites-data',      'sprites.json'),
@@ -67,16 +66,18 @@ def main():
 
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write(out_html)
-    with open(DIST, 'w', encoding='utf-8') as f:
-        f.write(out_html)
-    # 复制 favicon.ico 到 dist 目录
-    favicon_src = os.path.join(ROOT, 'favicon.ico')
-    favicon_dst = os.path.join(ROOT, 'dist', 'favicon.ico')
-    if os.path.exists(favicon_src):
-        shutil.copy2(favicon_src, favicon_dst)
-        print(f'Copied favicon.ico to dist/')
-    else:
-        print(f'Warning: favicon.ico not found in root directory')
+
+    # 复制到 dist 目录（GitHub Pages 镜像部署）
+    for seo_file in ('calculator.html', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'styles.css', 'calculator.js'):
+        src = os.path.join(ROOT, seo_file)
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(ROOT, 'dist', 'index.html' if seo_file == 'calculator.html' else seo_file))
+            print(f'Copied {seo_file} to dist/')
+        else:
+            print(f'Warning: {seo_file} not found in root directory')
+    # 复制 datas/final 目录到 dist 目录
+    shutil.copytree(os.path.join(ROOT, 'datas', 'final'), os.path.join(ROOT, 'dist', 'datas', 'final'), dirs_exist_ok=True)
+    print(f'Copied datas/final/ to dist/datas/final/')
     # 复制 images 目录到 dist 目录
     shutil.copytree(os.path.join(ROOT, 'images'), os.path.join(ROOT, 'dist', 'images'), dirs_exist_ok=True)
     print(f'Copied images/ to dist/')

@@ -1,6 +1,6 @@
 # 洛克王国星陨伤害计算器 (roco-star-dmg)
 
-一个专为星陨设计的《洛克王国：世界》精灵对战伤害计算器。基于 BWiki 的精灵 / 技能 / 属性数据，配合一条 Python 数据流水线，最终产物是一个**单文件 HTML**。
+一个专为星陨设计的《洛克王国：世界》精灵对战伤害计算器。基于 BWiki 的精灵 / 技能 / 属性数据，配合一条 Python 数据流水线，最终产出一个网页。
 
 [国内网站](https://stardmg.top/) / [GitHub Pages](https://bartzh.github.io/roco-star-dmg/) / 自行构建：见下方 [构建与运行](#构建与运行)。
 
@@ -145,6 +145,14 @@ uv run build.py
 - 改完 `datas/src/*.lua` → 重跑 `lua2json.py` → `make_final_jsons.py` → `build.py`
 - 改完 `calculator.html` → 直接重跑 `build.py` 即可
 - 想要新增/调整「常用精灵」预设 → 编辑 `make_final_jsons.py` 顶部的 `COMMON_ATTACKERS` / `COMMON_DEFENDERS`
+
+---
+
+## TODO
+
+- 过山车/奇异
+- 测验游戏
+- 更新公告/说明
 
 ---
 

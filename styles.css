@@ -1,0 +1,1526 @@
+/* ============ CSS Variables ============ */
+:root {
+  --bg-primary: #000000;
+  --bg-secondary: #1b1b1b;
+  --glass-bg: rgba(255,255,255,0.05);
+  --glass-border: rgba(255,255,255,0.1);
+  --glass-blur: 16px;
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888aa;
+  --accent-cyan: #00e5ff;
+  --accent-gold: #ffd700;
+  --accent-red: #ff3b3b;
+  --accent-orange: #ff8c00;
+  --accent-green: #00e676;
+  --seal-glow-color: rgba(100,140,255,0.3);
+  --seal-glow-size: 10px;
+  --seal-pulse-speed: 3s;
+  --atmosphere-color: transparent;
+  --atmosphere-intensity: 0;
+  --hp-bar-color: var(--accent-green);
+  --danger-level: 0;
+}
+
+/* ============ Reset & Base ============ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* 始终预留垂直滚动条 gutter，避免页面过长时滚动条出现/消失造成
+   横向布局位移（视觉上的整体左/右抖动）。 */
+html { overflow-y: scroll; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ============ Star Background ============ */
+#star-canvas {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ============ Atmosphere Overlay ============ */
+#atmosphere-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--atmosphere-color);
+  opacity: var(--atmosphere-intensity);
+  transition: all 0.8s ease;
+}
+
+/* ============ Main Container ============ */
+.container {
+  position: relative;
+  z-index: 2;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 30px 12px 60px;
+}
+
+/* ============ Header ============ */
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.header h1 {
+  font-size: 1.8rem;
+  font-weight: 300;
+  letter-spacing: 4px;
+  color: var(--text-primary);
+  text-shadow: 0 0 24px rgba(0,229,255,0.18);
+}
+.header .subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  letter-spacing: 1px;
+}
+.header .subtitle a {
+  color: #7be0ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(123,224,255,0.4);
+  padding-bottom: 1px;
+  transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
+}
+.header .subtitle a:hover {
+  color: #b8f0ff;
+  border-bottom-color: #b8f0ff;
+  text-shadow: 0 0 8px rgba(123,224,255,0.6);
+}
+
+/* ============ Battle Area ============ */
+.battle-area {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+/* ============ Glass Panel ============ */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 18px;
+  transition: all 0.3s ease;
+}
+.glass-panel:hover {
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.07);
+}
+
+/* ============ Spirit Panel ============ */
+.spirit-panel { min-height: 698px; min-width: 0; }
+.spirit-panel .panel-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.spirit-panel .panel-label .icon { font-size: 1rem; }
+
+/* Spirit Card (selected) */
+.spirit-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 20px 0px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.spirit-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
+.spirit-card .emoji { font-size: 3rem; margin-bottom: 8px; display: block; }
+.spirit-card .name { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+.spirit-card .element-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  margin-bottom: 12px;
+}
+.spirit-card .stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+.spirit-card .stat { text-align: center; }
+.spirit-card .stat-label { color: var(--text-secondary); font-size: 0.7rem; }
+.spirit-card .stat-value { font-weight: 600; font-size: 0.95rem; }
+.spirit-card .change-hint {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 6px;
+  background: rgba(0,229,255,0.1);
+  font-size: 0.7rem;
+  color: var(--accent-cyan);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.spirit-card:hover .change-hint { opacity: 1; }
+
+/* ============ Inline Spirit Picker ============ */
+/* 精灵选择直接渲染在精灵面板中（替代原来的模态弹窗） */
+.spirit-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.spirit-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.spirit-picker-header .picker-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+}
+.spirit-picker-header .picker-btn {
+  padding: 4px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+/* 取消按钮无意义时（未选精灵）占位但不显示，避免排版跳动 */
+.spirit-picker-header .picker-btn.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+.spirit-picker-header .picker-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.22);
+}
+.spirit-picker-grid {
+  display: grid;
+  /* minmax(0, 1fr) 显式将列最小宽度设为 0，
+     避免 `1fr` 默认的 `minmax(auto, 1fr)` 在子项内容坍缩时被 auto 拉成 0，
+     进而让整列塌陷、卡片叠成一团。 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 450px;
+  overflow-y: auto;
+  /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
+  scrollbar-gutter: stable;
+  /* 避免动画遮挡边框 */
+  padding-top: 3px;
+  /* 防止遮挡下边框 */
+  padding-bottom: 1px;
+  /* 右侧留 1px，让滚动条不压住最右一列卡片的右边框 */
+  padding-right: 1px;
+  /* 行内卡片高度不一致时，让每张卡片都从顶部对齐，而不是被拉伸到同行最高那张。
+     同时减少 Safari 在重排时的不必要高度计算，提升移动端滚动流畅度。 */
+  align-items: start;
+  /* 让 grid 内部布局不影响外部，减少含 backdrop-filter 父级重排的范围。 */
+  contain: layout;
+}
+.spirit-picker-option {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  text-align: center;
+  position: relative;
+  min-width: 0;       /* allow grid track to shrink below content's min-size */
+  /* 最小高度：图片 + 名称 + 类型 + 内边距的合理下限。
+     防止图片资源加载失败/极慢时整张卡片被压扁到只剩上边框。 */
+  min-height: 120px;
+  overflow: hidden;
+}
+.spirit-picker-option:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+.spirit-picker-option.current {
+  border-color: var(--accent-cyan);
+  background: rgba(0,229,255,0.1);
+  box-shadow: 0 0 0 1px var(--accent-cyan);
+}
+.spirit-picker-option.current::after {
+  content: '✓';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  color: var(--accent-cyan);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.spirit-picker-option .picker-image {
+  width: 100%;
+  /* 用 padding-top: 100% 实现 1:1 比例，兼容所有浏览器（包括 iOS Safari < 15）。
+     `aspect-ratio` 在旧版 Safari 上会失效导致图片高度坍缩为 0，引发整张卡片
+     退化为只剩上边框，几十张卡片堆叠后触发 Safari 重排崩溃。 */
+  padding-top: 100%;
+  height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  position: relative;
+}
+.spirit-picker-option .picker-image img {
+  /* 绝对定位以贴合 .picker-image 通过 padding-top: 100% 撑起的高度 */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* 攻击方立绘水平翻转：默认朝左 → 朝右（仅作用于攻击方选择区） */
+#attacker-select-area .picker-image img {
+  transform: scaleX(-1);
+}
+.spirit-picker-option .picker-image .placeholder {
+  /* 同上，绝对定位以贴合容器尺寸 */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  color: rgba(255,255,255,0.95);
+}
+.spirit-picker-option .picker-name {
+  font-weight: 600;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+.spirit-picker-option .picker-types {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.spirit-picker-option .picker-types .type-tag {
+  font-size: 0.6rem;
+  padding: 1px 5px;
+}
+.spirit-picker-option .picker-types .type-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* 卡片 ↔ 选择器 切换时的过渡动画 */
+@keyframes spiritAreaIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.spirit-picker, .spirit-card {
+  animation: spiritAreaIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .spirit-picker, .spirit-card { animation: none; }
+}
+
+/* ============ Spirit Picker Toolbar (search + filter chips) ============
+   整块 toolbar 是一个 CSS Grid；列数 N 由 JS 根据容器宽度动态算出
+   （见 fitPickerToolbar），写进 --cols / --search-span。
+   网格列等宽 (`repeat(N, 1fr)`) → 容器宽度总能被 N 个 cell + (N-1) 个 gap 整除，
+   不会在右边缘留白；每个 chip 用 aspect-ratio: 1 强制正方形，
+   所有 chip 边长相等；搜索行 grid-column: span 跨 N-1 列。
+   18 个系别 chip 直接作为 toolbar 的 grid 子项，不再包一层 flex。 */
+.spirit-picker-toolbar {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 9), 1fr);
+  grid-auto-rows: 1fr;
+  gap: var(--chip-gap, 6px);
+  padding: 8px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+}
+
+/* 搜索行：横跨 (N-1) 列，剩下 1 列给 "常" chip。高度由 grid-auto-rows: 1fr 决定。 */
+.spirit-picker-search {
+  grid-column: span var(--search-span, 8);
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+.spirit-picker-search input {
+  flex: 1;
+  min-width: 0;
+  /* 左侧 28px 让出 🔍；高与 cell 高度一致由 grid 决定 */
+  height: 100%;
+  padding: 0 10px 0 28px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.spirit-picker-search input::placeholder { color: var(--text-secondary); }
+.spirit-picker-search input:hover {
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08);
+}
+.spirit-picker-search input:focus {
+  border-color: var(--accent-cyan);
+  background: rgba(0,229,255,0.06);
+}
+.spirit-picker-search .search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  display: block;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* chip 默认是 grid 里的一个 cell：正方形、填满格子。圆角 50% 让其表现为圆形。
+   大小完全由 grid 决定（width/height = 100% cell），不再用 padding 凑。 */
+.spirit-picker-chip {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1;
+}
+.spirit-picker-chip:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.22);
+}
+.spirit-picker-chip.active {
+  background: rgba(0,229,255,0.18);
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.25);
+}
+/* chip 内的图标按格子尺寸的 56% 缩放，保持视觉一致 */
+.spirit-picker-chip .chip-icon {
+  width: 56%;
+  height: 56%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 1px rgba(0,0,0,0.4));
+}
+.spirit-picker-chip .chip-emoji {
+  width: 56%;
+  height: 56%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.spirit-picker-empty {
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  grid-column: 1 / -1;
+}
+.spirit-picker-empty button {
+  display: block;
+  margin: 8px auto 0;
+  background: none;
+  border: 1px solid var(--glass-border);
+  color: var(--accent-cyan);
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px 12px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+.spirit-picker-empty button:hover {
+  background: rgba(0,229,255,0.1);
+  border-color: var(--accent-cyan);
+}
+
+/* Element colors */
+.el-fire { --el-color: #ff4444; --el-bg: rgba(255,68,68,0.15); }
+.el-water { --el-color: #4488ff; --el-bg: rgba(68,136,255,0.15); }
+.el-grass { --el-color: #44cc44; --el-bg: rgba(68,204,68,0.15); }
+.el-electric { --el-color: #ffcc00; --el-bg: rgba(255,204,0,0.15); }
+.el-dark { --el-color: #aa66ff; --el-bg: rgba(170,102,255,0.15); }
+.el-light { --el-color: #ffeedd; --el-bg: rgba(255,238,221,0.15); }
+
+.element-tag {
+  background: var(--el-bg);
+  color: var(--el-color);
+  border: 1px solid var(--el-color);
+}
+.spirit-card { border-top: 3px solid var(--el-color, var(--glass-border)); }
+
+/* ============ Skill Selection ============ */
+.skills-section {
+  margin-top: 20px;
+}
+.skills-section .section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.skills-section .section-title .icon { font-size: 1rem; }
+/* Scrollable + 2-column grid; fixed height to align both panels */
+.skill-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  min-height: 140px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 2px;
+  align-content: start;
+  /* 避免动画遮挡边框 */
+  padding-top: 1px;
+  /* 纵向强制吸附（暂时不考虑启用） */
+  /* scroll-snap-type: y mandatory; */
+}
+
+/* Skill card: 48px icon (fills card height) + right-side content (name + badges row) */
+.skill-btn {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  min-height: 58px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: left;
+  position: relative;
+  font-size: 0.85rem;
+  /* 吸附到容器顶部（暂时不考虑启用） */
+  /* scroll-snap-align: start; */
+}
+.skill-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+.skill-btn.active {
+  background: rgba(0,229,255,0.1);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0,229,255,0.15), inset 3px 0 0 var(--accent-cyan);
+}
+.skill-btn.none-skill {
+  border-style: dashed;
+  opacity: 0.85;
+}
+.skill-btn.none-skill.active {
+  border-style: solid;
+  opacity: 1;
+}
+
+/* Skill icon (48px square, fills card height) */
+.skill-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  position: relative;
+  background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+.skill-icon > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px;
+}
+.skill-icon .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  border-radius: 8px;
+}
+
+/* Element icon overlay at top-left corner of skill icon (slightly inside) */
+.skill-icon .el-overlay {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 22px;
+  height: 22px;
+  z-index: 2;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
+  border-radius: 4px;
+  pointer-events: none;
+}
+.skill-icon .el-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Right side: name (top, right-aligned) + badges row (bottom) */
+.skill-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+.skill-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  max-width: 100%;
+  letter-spacing: 0.3px;
+}
+.skill-badges-row {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: center;
+}
+.skill-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+.skill-badge.atk     { color: #ff8c00; }
+.skill-badge.matk    { color: #aa66ff; }
+.skill-badge.auto    { color: #ffd700; }   /* 愿力冲击：自适应 */
+.skill-badge.power   { color: var(--accent-cyan); }
+.skill-badge.power.super-effective {
+  color: var(--accent-green);
+}
+.skill-badge.power.super-effective.double {
+  color: #00ff66;
+  text-shadow: 0 0 10px rgba(0, 255, 102, 0.55)
+}
+.skill-badge.power.not-effective {
+  color: var(--accent-red);
+}
+.skill-badge.power.not-effective.double {
+  color: #ff2525;
+  text-shadow: 0 0 10px rgba(255, 37, 37, 0.55);
+}
+.skill-badge.reduction { color: #00e676; }
+
+/* ============ Star Seal (Center) ============ */
+.seal-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 220px;
+  gap: 0;
+}
+.seal-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.seal-top {
+  flex: 1 1 0;
+  min-height: 220px;
+  padding: 8px 0 4px;
+}
+.seal-middle {
+  flex: 0 0 auto;
+  padding: 6px 0 8px;
+}
+.result-bottom {
+  flex: 1 1 0;
+  min-height: 240px;
+  padding: 4px 0 8px;
+}
+.seal-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 30px;
+}
+.seal-wrapper {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 50%;
+}
+.seal-wrapper canvas {
+  position: absolute;
+  top: -40px; left: -40px;
+  width: 280px; height: 280px;
+  pointer-events: none;
+}
+
+/* The seal itself */
+.seal {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.5s ease;
+  box-shadow:
+    0 0 var(--seal-glow-size) var(--seal-glow-color),
+    0 0 calc(var(--seal-glow-size) * 2) var(--seal-glow-color),
+    0 0 calc(var(--seal-glow-size) * 4) var(--seal-glow-color);
+  animation: seal-pulse var(--seal-pulse-speed) ease-in-out infinite;
+}
+
+.seal svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+}
+
+.seal-number {
+  position: relative;
+  z-index: 2;
+  font-size: 2.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  text-shadow: 0 0 20px var(--seal-glow-color);
+  transition: all 0.3s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.seal-hint {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* Slider below seal */
+.seal-slider-container {
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.seal-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.1);
+  outline: none;
+  transition: all 0.3s;
+}
+.seal-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,229,255,0.5);
+  transition: all 0.2s;
+}
+.seal-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 16px rgba(0,229,255,0.8);
+}
+.seal-slider::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%; border: none;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,229,255,0.5);
+}
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+/* Bonus display */
+.seal-bonus {
+  font-size: 0.85rem;
+  color: var(--accent-gold);
+  font-weight: 500;
+  text-align: center;
+  padding: 6px 16px;
+  background: rgba(255,215,0,0.08);
+  border: 1px solid rgba(255,215,0,0.2);
+  border-radius: 20px;
+  transition: all 0.3s;
+}
+
+/* ============ Result Ring (lower half, mirrors the seal ring) ============ */
+.result-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.result-ring-wrap {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+.result-ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.result-ring-track {
+  fill: none;
+  stroke: rgba(255,255,255,0.06);
+  stroke-width: 8;
+}
+.result-ring-fill {
+  fill: none;
+  stroke: var(--hp-bar-color, var(--accent-green));
+  stroke-width: 8;
+  stroke-linecap: round;
+  /* 2 * pi * 80 = 502.65 — set in HTML, transitions in JS */
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              stroke 0.5s ease;
+  filter: drop-shadow(0 0 8px var(--hp-bar-color, var(--accent-green)));
+}
+.result-ring-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  width: 75%;
+}
+.result-pct {
+  font-size: 1.9rem;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text-primary);
+  text-shadow: 0 0 18px var(--hp-bar-color, var(--accent-green));
+  transition: text-shadow 0.5s ease;
+}
+.result-dmg {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+}
+
+/* Result info (below the ring) */
+.result-info {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  max-width: 220px;
+  /* Reserved height so the waiting state (one short line) and the
+     calculation state (chips row + damage line) occupy the same
+     vertical space — prevents the damage ring from shifting up/down
+     when toggling between "等待选择" and "已计算" messages. */
+  min-height: 50px;
+}
+.result-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  /* Fixed row height so the kill chip appearing/disappearing does not
+     shift the damage ring above. */
+  min-height: 24px;
+  width: 100%;
+}
+.result-chip {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.result-chip.super-effective {
+  background: rgba(0,230,118,0.12);
+  border-color: rgba(0,230,118,0.4);
+  color: #00e676;
+}
+.result-chip.not-effective {
+  background: rgba(255,140,0,0.1);
+  border-color: rgba(255,140,0,0.3);
+  color: #ff8c00;
+}
+.result-chip.overflow {
+  background: rgba(255,59,59,0.15);
+  border-color: rgba(255,59,59,0.4);
+  color: var(--accent-red);
+}
+.result-dmg-line {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.result-dmg-line strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.result-dmg-line .star-val {
+  color: var(--accent-gold);
+}
+.result-waiting-mini {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  text-align: center;
+  padding: 4px 8px;
+  letter-spacing: 1px;
+  /* Keep the waiting message on a single line so all waiting
+     states occupy the same vertical space. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Kill confirmation (compact) */
+.kill-banner {
+  display: none;
+  margin-top: 4px;
+  padding: 5px 14px;
+  background: rgba(255,59,59,0.15);
+  border: 1px solid rgba(255,59,59,0.4);
+  border-radius: 12px;
+  color: var(--accent-red);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  animation: kill-flash 0.5s ease-out;
+}
+.kill-banner.show { display: block; }
+.kill-banner .overflow-damage {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  letter-spacing: normal;
+}
+
+/* ============ Breakdown Section (below battle area) ============ */
+.breakdown-section {
+  margin: 24px auto 0;
+  max-width: 720px;
+  padding: 8px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.breakdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 0.3s;
+  width: 100%;
+  font-family: inherit;
+  letter-spacing: 1px;
+  position: relative;
+}
+.breakdown-toggle:hover { color: var(--text-primary); }
+.breakdown-toggle .arrow {
+  transition: transform 0.3s;
+  font-size: 0.7rem;
+}
+.breakdown-toggle.open .arrow { transform: rotate(180deg); }
+
+.breakdown-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+  position: relative;
+}
+.breakdown-content.open { max-height: 700px; overflow: visible; }
+.breakdown-list {
+  padding: 16px 24px;
+  text-align: left;
+  font-size: 0.82rem;
+  line-height: 2;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+/* (Old result-area / hp-bar / breakdown styles removed; replaced by Result Ring
+   and Breakdown Section above.) */
+
+/* Breakdown list children (kept — used by dynamic content) */
+.breakdown-list .label { color: var(--text-secondary); }
+.breakdown-list .value { color: var(--text-primary); font-weight: 600; }
+.breakdown-list .multiplier { color: var(--accent-gold); }
+.breakdown-list .divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin: 6px 0;
+}
+.breakdown-list .final-line .value {
+  color: var(--accent-cyan);
+}
+
+/* ============ Element Effectiveness Badge ============ */
+.effectiveness-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.effectiveness-badge.super-effective {
+  background: rgba(255,59,59,0.15);
+  color: var(--accent-red);
+  border: 1px solid rgba(255,59,59,0.3);
+}
+.effectiveness-badge.not-effective {
+  background: rgba(100,100,200,0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(100,100,200,0.2);
+}
+.effectiveness-badge.neutral {
+  display: none;
+}
+
+/* ============ Animations ============ */
+@keyframes seal-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.92; }
+}
+
+@keyframes kill-flash {
+  0% { background: rgba(255,59,59,0.5); transform: scale(1.05); }
+  100% { background: rgba(255,59,59,0.15); transform: scale(1); }
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-4px, -2px); }
+  20% { transform: translate(4px, 2px); }
+  30% { transform: translate(-3px, 3px); }
+  40% { transform: translate(3px, -3px); }
+  50% { transform: translate(-2px, 2px); }
+  60% { transform: translate(2px, -1px); }
+  70% { transform: translate(-1px, 1px); }
+  80% { transform: translate(1px, -1px); }
+  90% { transform: translate(-1px, 0px); }
+}
+
+.shake { animation: screen-shake 0.5s ease-out; }
+
+@keyframes number-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.number-pop { animation: number-pop 0.3s ease-out; }
+
+@keyframes flash-red {
+  0% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+#flash-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, rgba(255,50,50,0.4), transparent 70%);
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+}
+#flash-overlay.flash {
+  animation: flash-red 0.6s ease-out;
+}
+
+@keyframes float-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 768px) {
+  .battle-area {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .seal-container {
+    /* On mobile, drop the strict top/result flex split — content height */
+    height: auto;
+    min-width: 0;
+  }
+  .seal-top, .result-bottom {
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 4px 0;
+  }
+  .seal-middle { padding: 4px 0; }
+  .spirit-panel { min-height: auto; }
+  .result-ring-wrap { width: 160px; height: 160px; }
+  .result-pct { font-size: 1.5rem; }
+  .result-dmg { font-size: 0.7rem; }
+  .seal-wrapper { width: 160px; height: 160px; }
+  .seal { width: 160px; height: 160px; }
+  .seal-number { font-size: 2.2rem; }
+  .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
+  .container { padding: 20px 16px 40px; }
+  .breakdown-section { margin: 16px 0 0; }
+  /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills */
+  .skill-list {
+    grid-template-columns: repeat(2, 1fr);
+    min-height: 125px;
+    max-height: 125px;
+  }
+  .skill-btn {
+    min-height: 54px;
+    padding: 0 8px;
+    gap: 10px;
+  }
+  .skill-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .skill-icon .el-overlay {
+    width: 20px;
+    height: 20px;
+  }
+  /* Buff chips: keep them on a single horizontal line on mobile too
+     (no vertical stacking). Use flex-wrap + justify-content:flex-end so
+     that if two chips ever exceed the panel width they wrap neatly to
+     the right instead of falling under the section title. */
+  .stats-section .buff-chips,
+  .skills-section .buff-chips {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 2px;
+  }
+  .stat-cell {
+    padding: 6px 4px;
+    gap: 4px;
+  }
+  .iv-slot { min-width: 38px; font-size: 0.6rem; }
+  /* Spirit picker: 3 columns on mobile, taller scroll area.
+     同样用 minmax(0, 1fr) 防止列塌陷；并把 max-height 调高一点，
+     让 3 列布局下能完整显示 2 行卡片（图片+名称+类型），避免视觉上"挤成一团"。 */
+  .spirit-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 404px;
+  }
+  .spirit-picker-option { min-height: 110px; padding: 6px; }
+  .spirit-picker-option .picker-name { font-size: 0.72rem; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+
+/* Spirit card image */
+.spirit-image {
+  width: 160px;
+  /* 显式 height 替代 aspect-ratio: 1，避免 iOS Safari < 15 上高度坍缩为 0 */
+  height: 160px;
+  border-radius: 10px;
+  margin: 0 auto 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.spirit-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* 攻击方立绘水平翻转：默认朝左 → 朝右 */
+#attacker-select-area .spirit-image img {
+  transform: scaleX(-1);
+}
+.spirit-image .placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Type tags wrapper */
+.type-tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 10px; }
+.type-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid var(--tag-color, #888);
+  background: var(--tag-bg, rgba(255,255,255,0.05));
+  color: var(--tag-color, #888);
+}
+.type-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
+.spirit-card .type-tag { font-size: 0.72rem; padding: 2px 10px; }
+.spirit-card .type-icon { width: 20px; height: 20px; }
+
+/* Stats: 5-column grid */
+.spirit-card .stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  font-size: 0.7rem;
+}
+.spirit-card .stat-label { font-size: 0.6rem; }
+.spirit-card .stat-value { font-size: 0.78rem; }
+
+/* ============ Stats Config Section ============ */
+.stats-section {
+  margin-top: 20px;
+}
+.stats-section .section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stats-section .section-title .icon { font-size: 1rem; }
+/* Buff chips (replaces old stat-counters: shows adjustable atk/matk | def/mdef %) */
+.stats-section .buff-chips,
+.skills-section .buff-chips {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  text-transform: none;
+}
+.buff-chip {
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  touch-action: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.buff-chip:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.22);
+}
+.buff-chip.positive {
+  background: rgba(0,230,118,0.15);
+  border-color: rgba(0,230,118,0.45);
+  color: #00e676;
+}
+.buff-chip.negative {
+  background: rgba(255,59,59,0.15);
+  border-color: rgba(255,59,59,0.45);
+  color: #ff5e5e;
+}
+.buff-chip.dragging {
+  /* Keep the underlying state color (.positive / .negative / .neutral).
+     Active feedback is a bright white ring + cyan glow that sits on top. */
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
+}
+.buff-chip .buff-val {
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  margin-left: 1px;
+}
+
+/* 3x2 grid for 6 stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.stat-cell {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+.stat-cell:hover { background: rgba(255,255,255,0.06); }
+
+/* Nature slot (left): 18px column */
+.nature-slot {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.12);
+  color: transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.nature-slot:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.25);
+}
+.nature-slot.up {
+  background: rgba(0,230,118,0.18);
+  border: 1px solid rgba(0,230,118,0.5);
+  color: #00e676;
+  text-shadow: 0 0 6px rgba(0,230,118,0.6);
+}
+.nature-slot.down {
+  background: rgba(255,59,59,0.18);
+  border: 1px solid rgba(255,59,59,0.5);
+  color: #ff5e5e;
+  text-shadow: 0 0 6px rgba(255,59,59,0.6);
+}
+.nature-slot.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Stat center column: label on top, value below */
+.stat-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  gap: 1px;
+}
+.stat-center .stat-label {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+.stat-center .stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* IV slot (right) */
+.iv-slot {
+  min-width: 38px;
+  height: 18px;
+  padding: 0px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.12);
+  color: transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+.iv-slot:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.25);
+}
+.iv-slot.active {
+  background: rgba(255,215,0,0.18);
+  border: 1px solid rgba(255,215,0,0.5);
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255,215,0,0.5);
+}
+.iv-slot.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Skill badges (damage class + power / reduction) — shown in a row below the skill name */
+
+
+/* ============ Accessibility: focus rings ============ */
+:focus:not(:focus-visible) { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.skill-btn:focus-visible,
+.spirit-picker-option:focus-visible,
+.spirit-card:focus-visible,
+.buff-chip:focus-visible,
+.nature-slot:focus-visible,
+.iv-slot:focus-visible,
+.breakdown-toggle:focus-visible,
+.picker-btn:focus-visible {
+  box-shadow: 0 0 0 4px rgba(0,229,255,0.15);
+}
+.buff-chip:focus-visible { outline-offset: 3px; }
+
+/* ============ Accessibility: reduced motion ============ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .seal { animation: none; }
+  .star-canvas, #particle-canvas { display: none; }
+  .shake, .number-pop, .kill-banner.show { animation: none; }
+}
+
+/* ============ Accessibility: skip-link target ============ */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
