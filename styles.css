@@ -19,6 +19,7 @@
   --atmosphere-intensity: 0;
   --hp-bar-color: var(--accent-green);
   --danger-level: 0;
+  --font-mono: 'Courier New', monospace;
 }
 
 /* ============ Reset & Base ============ */
@@ -765,7 +766,7 @@ body {
   color: var(--text-primary);
   text-shadow: 0 0 20px var(--seal-glow-color);
   transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 .seal-hint {
@@ -882,7 +883,7 @@ body {
 .result-pct {
   font-size: 1.9rem;
   font-weight: 800;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--text-primary);
@@ -893,7 +894,7 @@ body {
   font-size: 0.78rem;
   color: var(--text-secondary);
   margin-top: 6px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
 }
 
@@ -953,7 +954,7 @@ body {
 .result-dmg-line {
   font-size: 0.72rem;
   color: var(--text-secondary);
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   white-space: nowrap;
   letter-spacing: 0.3px;
 }
@@ -1047,7 +1048,7 @@ body {
   font-size: 0.82rem;
   line-height: 2;
   color: var(--text-secondary);
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
 }
 
 /* (Old result-area / hp-bar / breakdown styles removed; replaced by Result Ring
@@ -1356,7 +1357,7 @@ body {
 }
 .buff-chip .buff-val {
   font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   margin-left: 1px;
 }
 
@@ -1438,7 +1439,7 @@ body {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-primary);
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1460,7 +1461,7 @@ body {
   color: transparent;
   transition: all 0.2s ease;
   user-select: none;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   white-space: nowrap;
 }
 .iv-slot:hover {
