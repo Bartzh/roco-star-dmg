@@ -32,7 +32,7 @@
 ├── calculator.js             # 源码 JS（含 <!-- INJECT_DATA_HERE --> 标记）
 ├── styles.css                # 源码 CSS
 ├── favicon.ico               # 网页图标，用于浏览器标签页
-├── robot.txt                 # 搜索引擎爬虫规则
+├── robots.txt                # 搜索引擎爬虫规则
 ├── sitemap.xml               # 搜索引擎索引文件
 ├── build.py                  # 把 datas/final/*.json 注入到 calculator.html
 ├── lua2json.py               # 把 datas/src/*.lua 转为 datas/intermediate/*.json
