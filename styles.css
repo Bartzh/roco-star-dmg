@@ -1535,7 +1535,10 @@ body {
   border: none;
   border-bottom: 1px solid rgba(123,224,255,0.4);
   padding-bottom: 1px;
+  letter-spacing: inherit;
   cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
   transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
 .header .subtitle .nav-link:hover {
@@ -1608,6 +1611,7 @@ body {
   letter-spacing: 1px;
 }
 .modal-close {
+  font-family: inherit;
   width: 30px; height: 30px;
   display: flex; align-items: center; justify-content: center;
   background: none;
