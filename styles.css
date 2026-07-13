@@ -1544,26 +1544,34 @@ body {
   text-shadow: 0 0 8px rgba(123,224,255,0.6);
 }
 
-/* ============ Info Modal (公告 / 使用说明) ============ */
+/* ============ Info Modal (公告 / 使用说明) ============
+   双向淡入淡出：默认 opacity:0 + visibility:hidden + pointer-events:none，
+   .is-open 时三者切到可见状态。visibility 用 0s linear 配合不同延迟，
+   实现"打开时立即可见、关闭时等淡出完成后再隐藏"（这样淡出动画能正常播放，
+   关闭后元素也会彻底脱离无障碍树与命中区）。卡片同步缩放淡入淡出。 */
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.7);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
-  display: none;          /* 默认隐藏，避免页面打开时弹窗占满屏幕 */
+  display: flex;          /* 始终 flex：visibility/opacity 控显隐，便于双向过渡 */
   align-items: center;
   justify-content: center;
   z-index: 9999;
   padding: 20px;
-  /* open 时由 .is-open 切到 flex，并触发 fade-in 动画 */
+  /* 默认隐藏态 */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* 关闭时：opacity 先过渡，0.18s 后再切 visibility（用 0s 延迟 0.18s 实现） */
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s;
 }
 .modal-overlay.is-open {
-  display: flex;
-  animation: modal-fade-in 0.18s ease both;
-}
-@keyframes modal-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  /* 打开时：visibility 立即切换，opacity 同步过渡 */
+  transition: opacity 0.18s ease, visibility 0s linear 0s;
 }
 .modal-card {
   width: min(720px, 100%);
@@ -1575,14 +1583,14 @@ body {
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.55);
   overflow: hidden;
-  /* 默认无 transform；open 时缩放入场 */
+  /* 默认缩小 + 透明：关闭时与遮罩同步反向过渡回此状态 */
+  transform: scale(0.95);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1.2);
 }
 .modal-overlay.is-open .modal-card {
-  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.7, 0.3, 1.2) both;
-}
-@keyframes modal-pop-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
+  transform: scale(1);
+  opacity: 1;
 }
 .modal-header {
   display: flex;
