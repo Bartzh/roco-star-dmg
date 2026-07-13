@@ -1616,13 +1616,26 @@ body {
   display: flex; align-items: center; justify-content: center;
   background: none;
   border: none;
-  color: var(--text-secondary);
-  font-size: 1.5rem;
+  position: relative;
+  color: var(--text-primary);
+  font-size: 0;
   line-height: 1;
   cursor: pointer;
   border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease;
 }
+.modal-close::before,
+.modal-close::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 16px; height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transform-origin: center;
+}
+.modal-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.modal-close::after  { transform: translate(-50%, -50%) rotate(-45deg); }
 .modal-close:hover {
   color: var(--text-primary);
   background: rgba(255,255,255,0.08);
