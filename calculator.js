@@ -2855,7 +2855,7 @@ function toggleBreakdown() {
 // 修改后无需改 HTML：所有渲染都由 initInfoModal() 注入。
 const MODAL_CONTENT = {
   announcement: {
-    title: '📢 更新公告',
+    title: '更新公告',
     html: `
       <h3>v1.3.0 <span class="modal-date">· 2026-07-13</span></h3>
       <ul>
@@ -2872,7 +2872,7 @@ const MODAL_CONTENT = {
     `
   },
   guide: {
-    title: '📖 使用说明',
+    title: '使用说明',
     html: `
       <h3>基本流程</h3>
       <ol>

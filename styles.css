@@ -1578,7 +1578,7 @@ body {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(16, 16, 16, 0.65);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.55);
@@ -1661,8 +1661,13 @@ body {
   color: #7be0ff;
   text-decoration: none;
   border-bottom: 1px solid rgba(123,224,255,0.4);
+  transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
-.modal-body a:hover { color: #b8f0ff; border-bottom-color: #b8f0ff; }
+.modal-body a:hover {
+  color: #b8f0ff;
+  border-bottom-color: #b8f0ff;
+  text-shadow: 0 0 8px rgba(123,224,255,0.6);
+}
 .modal-body hr {
   border: none;
   border-top: 1px solid rgba(255,255,255,0.08);
