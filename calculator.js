@@ -2864,11 +2864,11 @@ const MODAL_CONTENT = {
       <hr>
       <h3>「应对状态」与部分特性适配 <span class="modal-date">· 2026-07-08 ~ 07-12</span></h3>
       <ul>
-        <li><strong>「应对状态」机制上线</strong>（本轮最大改动）：防御方新增「聚能」选项；激活后，<strong>所有应对状态技能</strong>会按各自规则改变威力或连击数，覆盖铁蒺藜、龙卷风、追打、炙热波动、虫击、突袭、暗突袭、爆冲、技巧打击、无影脚、偷袭、散手、连续爪击、滚雪球、吹炎、地陷、闪燃、灾厄等。</li>
+        <li><strong>「应对状态」机制上线</strong>（本轮最大改动）：防御方新增「聚能」选项；激活后，<strong>所有应对状态技能</strong>会按各自规则改变威力或连击数，覆盖铁蒺藜、龙卷风、追打、炙热波动、虫击、突袭、暗突袭、爆冲、技巧打击、无影脚、偷袭、散手、连续爪击、滚雪球、吹炎、地陷、闪燃、灾厄。</li>
         <li>适配 18 系「愿力冲击」：伤害类型自适应（自动取精灵物攻/魔攻较高者），应对状态时威力 +150%。</li>
         <li>「威力」调节器改为常驻显示：之前只有部分精灵会显示，现在所有精灵都能直接调节。</li>
         <li>新增「连击」调节器，可实时调整连击数；伤害明细中同步新增独立的连击计算行。</li>
-        <li>新增「速度」调节器，可实时调整速度，用于影响「顺风 / 破风」「扇风」「疾风刺」「闪击」等特性或技能计算。</li>
+        <li>新增「速度」调节器，可实时调整速度，用于影响「顺风 / 破空」「扇风」「疾风刺」「闪击」等特性或技能计算。</li>
         <li>适配「扇风」技能：先手时威力 +50%。</li>
         <li>适配「闪击」「鸣沙陷阱」技能，分别按速度差、物防差加成威力。</li>
         <li>适配「疾风刺」技能：先手时变为 3 连击。</li>
@@ -2899,19 +2899,21 @@ const MODAL_CONTENT = {
         <li>调整种族值、性格、努力值（IV）、双攻 / 双防 buff。</li>
         <li>选择攻击技能（必选）与防御技能（可选）。</li>
         <li>拖动中央<strong>星陨层数</strong>滑块（0~99），实时查看伤害与剩余血量。</li>
+        <li>点击「伤害计算明细」可展开完整公式逐项乘数。</li>
       </ol>
 
-      <h3>关键操作</h3>
+      <h3>特别适配</h3>
       <ul>
-        <li>星陨层数：可拖拽印记、滚轮、或用下方滑块调节。</li>
-        <li>连击数 / 减伤百分比：自动从技能描述中识别并显示。</li>
-        <li>点击「伤害计算明细」可展开完整公式逐项乘数。</li>
+        <li>精灵特性，包括：仪式巨像家族，岚鸟家族，凡鹰家族，机幕方舟家族，画间沉铁兽。</li>
+        <li>与星陨层数联动的技能，包括：多维击打、天体吸积。</li>
+        <li>可以通过防御方的「聚能」来触发特殊的「应对状态」效果的攻击技能，包括：铁蒺藜、龙卷风、追打、炙热波动、虫击、突袭、暗突袭、爆冲、技巧打击、无影脚、偷袭、散手、连续爪击、滚雪球、吹炎、地陷、闪燃、灾厄，以及十八系愿力冲击。</li>
+        <li>此外还有扇风、疾风刺、闪击、鸣沙陷阱。</li>
       </ul>
 
       <h3>数据来源</h3>
       <ul>
-        <li>种族、属性、克制关系与技能数据参考 <a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
-        <li>伤害公示公式见 BWiki 洛克王国：世界专区。</li>
+        <li>精灵与技能数据来自 <a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
+        <li>数据更新于 2026-06-29。</li>
       </ul>
 
       <h3>关于</h3>
@@ -2919,7 +2921,8 @@ const MODAL_CONTENT = {
         <li>国内主站：<a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
         <li>备用镜像：<a href="https://bartzh.github.io/roco-star-dmg/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></li>
         <li>开源仓库：<a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">Bartzh/roco-star-dmg</a></li>
-        <li>所有数据开源免费，欢迎贡献与反馈。</li>
+        <li>作者B站主页：<a href="https://space.bilibili.com/235905700" target="_blank" rel="noopener noreferrer">Bilibili Space</a></li>
+        <li>所有代码以WTFPL协议（你他妈爱干嘛干嘛许可证）开源，欢迎贡献与反馈。</li>
       </ul>
     `
   }
