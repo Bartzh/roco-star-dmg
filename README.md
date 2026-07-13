@@ -27,8 +27,13 @@
 
 ```
 .
-├── calculator.html           # 源码 HTML（含 <!-- INJECT_DATA_HERE --> 标记）
+├── calculator.html           # 源码 HTML
 ├── calculator.built.html     # build.py 产物，内联 JSON，可直接打开（gitignore）
+├── calculator.js             # 源码 JS（含 <!-- INJECT_DATA_HERE --> 标记）
+├── styles.css                # 源码 CSS
+├── favicon.ico               # 网页图标，用于浏览器标签页
+├── robot.txt                 # 搜索引擎爬虫规则
+├── sitemap.xml               # 搜索引擎索引文件
 ├── build.py                  # 把 datas/final/*.json 注入到 calculator.html
 ├── lua2json.py               # 把 datas/src/*.lua 转为 datas/intermediate/*.json
 ├── crawling_image_urls.py    # 通过 BWiki 的 MediaWiki API 抓取精灵/技能/属性图标 URL
@@ -36,11 +41,12 @@
 ├── helper.lua                # lua2json.py 用到的 Lua 帮助函数（is_lua_array）
 ├── pyproject.toml            # Python 依赖：lupa / pypinyin / requests
 ├── uv.lock                   # uv 锁定的依赖版本
-└── datas/
+├── datas/
     ├── src/                  # 原始 Lua 源数据（来自BWiki）
     ├── intermediate/         # lua2json + image crawl 的中间产物
     ├── final/                # 给 calculator.html 用的最终 JSON
     └── README.md             # ⚠️ 提示 AI 不要轻易完整读 datas/ 下的文件
+└── images/                   # 聚能和十八系愿力冲击图标
 ```
 
 ---
