@@ -78,7 +78,12 @@
 <div class="container" id="main-container">
   <header class="header">
     <h1>星陨伤害计算器</h1>
-    <p class="subtitle">开源仓库<a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">GitHub</a> | 数据与图源来自<a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a></p>
+    <p class="subtitle">
+      <button type="button" class="nav-link" data-modal="guide">使用说明</button> |
+      <button type="button" class="nav-link" data-modal="announcement">更新公告</button> |
+      开源仓库<a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">GitHub</a> |
+      数据与图源来自<a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>
+    </p>
   </header>
 
   <section class="battle-area" aria-label="对战配置区">
@@ -175,6 +180,20 @@
       <div class="breakdown-list" id="breakdown-list"></div>
     </div>
   </section>
+</div>
+
+<!-- 信息弹窗：公告 / 使用说明（默认隐藏，由 calculator.js 控制显示） -->
+<div class="modal-overlay" id="info-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header class="modal-header">
+      <h2 class="modal-title" id="modal-title">📢 更新公告</h2>
+      <button type="button" class="modal-close" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body" id="modal-body"></div>
+    <footer class="modal-footer">
+      <button type="button" class="modal-confirm">我知道了</button>
+    </footer>
+  </div>
 </div>
 
 <script src="./calculator.js" defer></script>

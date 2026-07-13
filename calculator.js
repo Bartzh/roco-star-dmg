@@ -2848,12 +2848,126 @@ function toggleBreakdown() {
   }
 }
 
+// ============================================================
+// INFO MODAL: 公告 / 使用说明
+// ============================================================
+// 维护指南：在数组开头追加新版本，html 字段支持 h3 / ul / li / code / a / hr 等行内结构。
+// 修改后无需改 HTML：所有渲染都由 initInfoModal() 注入。
+const MODAL_CONTENT = {
+  announcement: {
+    title: '📢 更新公告',
+    html: `
+      <h3>v1.3.0 <span class="modal-date">· 2026-07-13</span></h3>
+      <ul>
+        <li>新增「更新公告」与「使用说明」信息弹窗。</li>
+        <li>优化界面与说明文档结构。</li>
+      </ul>
+      <hr>
+      <h3>v1.2.x</h3>
+      <ul>
+        <li>完整伤害公式、18 系属性相克、连击数 / 减伤自动识别。</li>
+        <li>星陨层数 0~99，可视化脉动动画与滑块拖拽。</li>
+      </ul>
+      <p style="color:var(--text-secondary);margin-top:14px">完整历史与源码请见 <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>。</p>
+    `
+  },
+  guide: {
+    title: '📖 使用说明',
+    html: `
+      <h3>基本流程</h3>
+      <ol>
+        <li>选择<strong>攻击方</strong>与<strong>防御方</strong>精灵（可搜索 / 筛选系别）。</li>
+        <li>调整种族值、性格、努力值（IV）、双攻 / 双防 buff。</li>
+        <li>选择攻击技能（必选）与防御技能（可选）。</li>
+        <li>拖动中央<strong>星陨层数</strong>滑块（0~99），实时查看伤害与剩余血量。</li>
+      </ol>
+
+      <h3>关键操作</h3>
+      <ul>
+        <li>星陨层数：可拖拽印记、滚轮、或用下方滑块调节。</li>
+        <li>连击数 / 减伤百分比：自动从技能描述中识别并显示。</li>
+        <li>点击「伤害计算明细」可展开完整公式逐项乘数。</li>
+      </ul>
+
+      <h3>数据来源</h3>
+      <ul>
+        <li>种族、属性、克制关系与技能数据参考 <a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
+        <li>伤害公示公式见 BWiki 洛克王国：世界专区。</li>
+      </ul>
+
+      <h3>关于</h3>
+      <ul>
+        <li>国内主站：<a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
+        <li>备用镜像：<a href="https://bartzh.github.io/roco-star-dmg/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></li>
+        <li>开源仓库：<a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">Bartzh/roco-star-dmg</a></li>
+        <li>所有数据开源免费，欢迎贡献与反馈。</li>
+      </ul>
+    `
+  }
+};
+
+// 初始化弹窗：触发按钮、ESC、点击遮罩、底部确认按钮均可关闭。
+// 打开时锁定 body 滚动，关闭后恢复焦点到触发按钮。
+function initInfoModal() {
+  const overlay = document.getElementById('info-modal');
+  if (!overlay) return;
+  const titleEl    = document.getElementById('modal-title');
+  const bodyEl     = document.getElementById('modal-body');
+  const closeBtn   = overlay.querySelector('.modal-close');
+  const confirmBtn = overlay.querySelector('.modal-confirm');
+  const triggers   = document.querySelectorAll('.nav-link[data-modal]');
+  if (!titleEl || !bodyEl || !closeBtn || !confirmBtn || triggers.length === 0) return;
+
+  let lastFocus = null;
+
+  const open = (type) => {
+    const data = MODAL_CONTENT[type];
+    if (!data) return;
+    titleEl.textContent = data.title;
+    bodyEl.innerHTML    = data.html;
+    lastFocus = document.activeElement;
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    // 锁定背景滚动，避免长公告内容滚动时背景跟着动
+    document.body.style.overflow = 'hidden';
+    // 焦点移入弹窗，方便键盘 / 屏幕阅读器用户操作
+    setTimeout(() => closeBtn.focus(), 0);
+  };
+  const close = () => {
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (lastFocus && typeof lastFocus.focus === 'function') {
+      lastFocus.focus();
+    }
+  };
+
+  triggers.forEach(btn => {
+    btn.addEventListener('click', () => open(btn.dataset.modal));
+  });
+  closeBtn.addEventListener('click', close);
+  confirmBtn.addEventListener('click', close);
+  // 点击遮罩（卡片外）关闭
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  // ESC 关闭
+  document.addEventListener('keydown', (e) => {
+    if (overlay.classList.contains('is-open') && e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  });
+}
+
 function init() {
   initStarCanvas();
   generateSealSVG();
   initParticles();
   initSealInteraction();
   updateSealGlow();
+  // 信息弹窗：公告 / 使用说明
+  initInfoModal();
   // 初始即渲染两侧的内嵌选择器（未选精灵时直接显示）
   renderSpiritArea('attacker');
   renderSpiritArea('defender');

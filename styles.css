@@ -1525,3 +1525,167 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* ============ Header Nav (info modal triggers, styled as links) ============
+   使用说明 / 更新公告 以 <button> 形式写在副标题里，外观与 GitHub / BWIKI
+   链接完全一致（仅在行为上是按钮：不会跳转、不会改 URL）。 */
+.header .subtitle .nav-link {
+  color: #7be0ff;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(123,224,255,0.4);
+  padding-bottom: 1px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
+}
+.header .subtitle .nav-link:hover {
+  color: #b8f0ff;
+  border-bottom-color: #b8f0ff;
+  text-shadow: 0 0 8px rgba(123,224,255,0.6);
+}
+
+/* ============ Info Modal (公告 / 使用说明) ============ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  display: none;          /* 默认隐藏，避免页面打开时弹窗占满屏幕 */
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  /* open 时由 .is-open 切到 flex，并触发 fade-in 动画 */
+}
+.modal-overlay.is-open {
+  display: flex;
+  animation: modal-fade-in 0.18s ease both;
+}
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.modal-card {
+  width: min(720px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+  overflow: hidden;
+  /* 默认无 transform；open 时缩放入场 */
+}
+.modal-overlay.is-open .modal-card {
+  animation: modal-pop-in 0.22s cubic-bezier(0.2, 0.7, 0.3, 1.2) both;
+}
+@keyframes modal-pop-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 1px;
+}
+.modal-close {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.modal-close:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+}
+.modal-body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.88);
+  font-size: 0.85rem;
+  flex: 1 1 auto;
+}
+.modal-body h3 {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+.modal-body h3:first-child { margin-top: 0; }
+.modal-body .modal-date {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 0.78rem;
+  margin-left: 4px;
+}
+.modal-body ul, .modal-body ol {
+  padding-left: 1.4em;
+  margin: 0 0 10px;
+}
+.modal-body li { margin: 4px 0; }
+.modal-body code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: var(--font-mono);
+}
+.modal-body a {
+  color: #7be0ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(123,224,255,0.4);
+}
+.modal-body a:hover { color: #b8f0ff; border-bottom-color: #b8f0ff; }
+.modal-body hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin: 14px 0;
+}
+.modal-footer {
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.modal-confirm {
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 7px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.modal-confirm:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.25);
+}
+
+/* 移动端：弹窗占满宽度的安全边距更小 */
+@media (max-width: 480px) {
+  .modal-overlay { padding: 12px; }
+  .modal-header, .modal-footer { padding: 12px 14px; }
+  .modal-body { padding: 14px 16px; }
+}
