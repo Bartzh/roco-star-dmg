@@ -1341,32 +1341,24 @@ body.challenge-mode .seal-container {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   /* 复用 drag chip 的过渡曲线，确保视觉一致；额外加 transform 用于按压 */
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
-              box-shadow 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
   white-space: nowrap;
   line-height: 1.4;
 }
 .label-chip:hover {
-  color: var(--text-primary);
   background: rgba(255,255,255,0.1);
   border-color: rgba(255,255,255,0.22);
 }
-/* drag chip 的按压特效（pointerdown 期间 JS 加 .pressing 类） */
-.label-chip.pressing {
-  transform: scale(0.96);
-  background: rgba(255,255,255,0.13);
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
-}
-/* 选中态：与 .spirit-picker-chip.active 视觉一致（1px 蓝环 + 蓝色背景 + 蓝色 glow），
-   不要 skill-btn 那种 inset 左侧条——label-chip 是 drag chip 风格，不是卡片风格。 */
+/* 选中态：与 .buff-chip.active 视觉一致（1px 蓝环 + 蓝色背景 + 蓝色 glow） */
 .label-chip.active {
-  color: var(--text-primary);
-  background: rgba(0,229,255,0.1);
-  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0,229,255,0.15);
+  border-color: rgba(0,229,255,0.45);
   box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.2);
 }
-.label-chip.active:hover {
-  background: rgba(0,229,255,0.16);
+/* drag chip 的按压特效（pointerdown 期间 JS 加 .pressing 类） */
+.label-chip.pressing {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
 }
 
 /* label-chip-group：在 panel-label / section-title 内是 inline-flex 容器 */
