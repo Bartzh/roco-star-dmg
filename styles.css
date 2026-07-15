@@ -1564,6 +1564,13 @@ body.challenge-mode .seal-container {
   gap: 6px;
 }
 .stats-section .section-title .icon { font-size: 1rem; }
+/* 没有 .buff-chips 占位的 section-title（目前只有防御技能），
+   进入挑战模式时 chip 比 label 高会撑高整个 title 进而顶动下面的
+   skill-list。这里用 :has() 反选给它们预留 chip 高度空间。
+   有 buff-chips 的 section-title 由 buff-chip 天然占位，无需此处理。 */
+.section-title:not(:has(.buff-chips)) {
+  min-height: 22px;
+}
 /* Buff chips (replaces old stat-counters: shows adjustable atk/matk | def/mdef %) */
 .stats-section .buff-chips,
 .skills-section .buff-chips {

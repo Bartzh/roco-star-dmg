@@ -3123,10 +3123,16 @@ function _collectLabelSwapPairs() {
 
 // 进入挑战模式：把 chip 组淡入到 label 位置；显示 .challenge-setup；
 // 隐藏星陨/伤害结果。按钮文案切换为"退出挑战"。
+//
+// 关键时序（必须与侧栏 label 切换 440ms 对齐）：
+//   t=0    开始：星陨/伤害结果淡出 (220ms) + 侧栏 label-text 淡出 (220ms) [并行]
+//   t=220  完成：星陨/伤害结果 → body.challenge-mode (display:none) + 挑战设置淡入 (220ms) + 侧栏 chip 淡入 (220ms) [并行]
+//   t=440  全部完成
+//   旧实现：body.challenge-mode 立即加上 → 星陨/伤害结果瞬间消失 → 挑战设置 220ms 淡入。
+//   这导致中心比两侧 chip 早 220ms 完成（侧栏是 text 淡出 220 + chip 淡入 220 = 440ms）。
 function enterChallengeMode() {
   if (state.challenge.active) return;
   state.challenge.active = true;
-  document.body.classList.add('challenge-mode');
 
   // 切换按钮文案 + 视觉
   const btn = document.getElementById('challenge-toggle-btn');
@@ -3139,27 +3145,46 @@ function enterChallengeMode() {
   if (text) text.textContent = '退出挑战';
   if (icon) icon.textContent = '✕';
 
-  // 显示挑战设置区。**必须先取消 setup 上残留的 Web Animations**——上次 exit
-  // 的 Animation 留在 getAnimations() 里、其 fill:'forwards' 会把 setup 钉在
-  // opacity:0；不取消的话，setup.hidden = false 后会被 fill 拉回 0（出现一下就消失）。
-  // 入场动画用 JS 显式播放，不依赖 CSS animation（避免与 fill 残留互相覆盖），
-  // 时长与 label 切换保持一致（CHALLENGE_LABEL_TRANSITION_MS）。
-  const setup = document.getElementById('challenge-setup');
-  if (setup) {
-    _cancelAnimations(setup);
-    setup.style.opacity = '';
-    setup.style.transform = '';
-    setup.hidden = false;
-    setup.animate(
+  // 1) 星陨/伤害结果淡出 → 2) body.challenge-mode + challenge-setup 淡入
+  // 与退出对称：先让旧内容淡出，再让新内容淡入，使总时长对齐 chip 的 440ms。
+  const sections = document.querySelectorAll('.seal-top, .seal-middle, .result-bottom');
+  const sectionAnims = Array.from(sections).map(s =>
+    s.animate(
       [
-        { opacity: 0, transform: 'translateY(6px)' },
         { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-4px)' },
       ],
-      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
-    );
-  }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+    )
+  );
+  Promise.all(sectionAnims.map(a => a.finished)).then(() => {
+    sections.forEach(s => {
+      s.style.opacity = '';
+      s.style.transform = '';
+    });
+    // 此时才让 body.challenge-mode 生效（星陨/伤害结果回归 display:none）。
+    document.body.classList.add('challenge-mode');
 
-  // 逐对 label 做淡出 → 淡入 chip 组的过渡
+    // 显示挑战设置区。**必须先取消 setup 上残留的 Web Animations**——上次 exit
+    // 的 Animation 留在 getAnimations() 里、其 fill:'forwards' 会把 setup 钉在
+    // opacity:0；不取消的话，setup.hidden = false 后会被 fill 拉回 0（出现一下就消失）。
+    const setup = document.getElementById('challenge-setup');
+    if (setup) {
+      _cancelAnimations(setup);
+      setup.style.opacity = '';
+      setup.style.transform = '';
+      setup.hidden = false;
+      setup.animate(
+        [
+          { opacity: 0, transform: 'translateY(6px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      );
+    }
+  });
+
+  // 逐对 label 做淡出 → 淡入 chip 组的过渡（与星陨/伤害结果淡出并行开始；总 440ms）
   for (const pair of _collectLabelSwapPairs()) {
     _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: true });
   }
