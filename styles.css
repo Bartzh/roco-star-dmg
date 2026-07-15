@@ -61,7 +61,7 @@ body {
 .container {
   position: relative;
   z-index: 2;
-  max-width: 1100px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 30px 12px 60px;
 }
@@ -241,8 +241,8 @@ body {
      进而让整列塌陷、卡片叠成一团。 */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  min-height: 458px;
-  max-height: 458px;
+  min-height: 447px;
+  max-height: 447px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
@@ -705,9 +705,8 @@ body {
   flex-direction: column;
   align-items: center;
   height: 100%;
-  /* 固定 280px 宽度，避免进入/退出挑战模式时 .battle-area 横向抖动 */
-  width: 280px;
-  min-width: 280px;
+  width: 240px;
+  min-width: 240px;
   gap: 0;
   transition: width 0.3s ease, min-width 0.3s ease;
 }
@@ -1398,9 +1397,7 @@ body.challenge-mode .seal-container {
   .seal-container {
     /* On mobile, drop the strict top/result flex split — content height */
     height: auto;
-    /* 仍保持 280px 固定宽度，避免进入/退出挑战模式时与 1fr 列产生跳动 */
-    width: 280px;
-    min-width: 280px;
+    min-width: 0;
   }
   .seal-top, .result-bottom {
     flex: 0 0 auto;
