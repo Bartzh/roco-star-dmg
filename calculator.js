@@ -167,7 +167,23 @@ let state = {
   // Range [-990, +990], step 10; default 0. Always shown on BOTH
   // attacker and defender panels.
   attackerSpeed: 0,
-  defenderSpeed: 0
+  defenderSpeed: 0,
+  // 挑战模式状态（UI 控件 + 用户偏好）
+  //   active    : 是否处于挑战模式（进入设置阶段时为 true，退出为 false）
+  //   preset    : 预设难度：'easy' | 'standard' | 'hard'
+  //   count     : 题目数：3 | 5 | 10 | 20
+  //   pool      : 每侧精灵池单选：'all' | 'common' | 'custom'，不能空选
+  //   randomStats: 每侧是否启用「属性随机」（开关）
+  //   randomSkill: 每侧是否启用「技能随机」（开关）
+  // 本次只承载控件状态；rollScenario / 评分 / 题号推进等业务逻辑后续 PR。
+  challenge: {
+    active: false,
+    preset: 'standard',
+    count: 10,
+    pool: { attacker: 'common', defender: 'common' },
+    randomStats: { attacker: false, defender: false },
+    randomSkill: { attacker: false, defender: false },
+  },
 };
 
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
@@ -2982,6 +2998,357 @@ function initInfoModal() {
   });
 }
 
+// ============================================================
+// CHALLENGE MODE (UI 控件层)
+// ------------------------------------------------------------
+// 本文件此次只承载"控件 + 过渡"：进入/退出挑战模式、预设/题目数 chip、
+// 侧栏 label ↔ chip 切换动画。业务逻辑（出题、提交、评分）后续 PR。
+//
+// 关键不变量：
+//   1. 精灵池（攻击方/防御方）是**单选** chip 组：3 个 chip（全部/常见/自选）
+//      同时只有一个 .active，**不能空选**。点击当前选中项保持选中不变。
+//   2. 「随机」chip 是**开关**：在 .active 和无 .active 之间切换。
+//   3. 所有 chip 都复用 .buff-chip 的视觉（.label-chip），并带按压特效
+//      （pointerdown 期间加 .pressing 类）。
+//   4. 进入挑战模式：body 加 .challenge-mode；隐藏星陨/伤害结果，
+//      显示 .challenge-setup；侧栏 label-text 淡出，label-chip-group 淡入。
+//   5. 退出：反向。display 切换串在 Web Animations API 动画的 onfinish 时机。
+//   6. seal-container 宽度固定 280px，避免进入/退出时 .battle-area 横向抖动。
+// ============================================================
+
+const CHALLENGE_LABEL_TRANSITION_MS = 220;   // label ↔ chip 淡入淡出时长
+
+// 工具：用 Web Animations API 播放「淡出 → 隐藏 → 淡出对方/淡入自己」序列。
+//   fadeOut: true 时把元素淡出后 display:none；fadeIn: true 时把元素从 display:none
+//   切到 inline-flex 后淡入。两个参数可同时为 false（仅同步样式）。
+function _swapLabelVisibility(textEl, chipEl, opts) {
+  const { showChip } = opts;
+
+  // 进入或退出前，**先取消**这两个元素上残留的 Web Animations（避免旧的
+  // fill:'forwards' 在新动画结束后"复活"，把元素重新拉到 opacity:0）。
+  // 这是双向切换必须的清理，否则第二次进入/退出后 chip 或文本会"卡死"。
+  _cancelAnimations(textEl);
+  _cancelAnimations(chipEl);
+
+  if (showChip) {
+    // 文本淡出 → 隐藏 → chip 取消 hidden 并淡入
+    if (textEl && textEl.style.display !== 'none') {
+      const a = textEl.animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-4px)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      );
+      a.onfinish = () => {
+        textEl.style.display = 'none';
+        if (chipEl) {
+          chipEl.hidden = false;
+          chipEl.animate(
+            [
+              { opacity: 0, transform: 'translateY(4px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+          );
+        }
+      };
+    } else if (chipEl) {
+      // 文本已经隐藏（再次进入时），直接让 chip 淡入
+      chipEl.hidden = false;
+      chipEl.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      );
+    }
+  } else {
+    // chip 淡出 → 隐藏 → 文本取消 hidden 并淡入
+    if (chipEl && !chipEl.hidden) {
+      const a = chipEl.animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-4px)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      );
+      a.onfinish = () => {
+        chipEl.hidden = true;
+        if (textEl) {
+          textEl.style.display = '';
+          textEl.animate(
+            [
+              { opacity: 0, transform: 'translateY(4px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+          );
+        }
+      };
+    } else if (textEl) {
+      // chip 已经隐藏，文本直接淡入
+      textEl.style.display = '';
+      textEl.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      );
+    }
+  }
+}
+
+// 取消元素上所有 Web Animations（包括 fill:'forwards' 残留的"最终态"）。
+// 双向切换前调用，避免旧动画在"后"相位把元素拉回 opacity:0 的"卡死"态。
+function _cancelAnimations(el) {
+  if (!el || typeof el.getAnimations !== 'function') return;
+  for (const a of el.getAnimations()) {
+    try { a.cancel(); } catch (_) {}
+  }
+}
+
+// 收集挑战模式下需要切换的 (text, chip) 对：
+//   - 攻击方 / 防御方 的 panel-label
+//   - 属性配置 / 攻击技能 / 防御技能 的 section-title
+function _collectLabelSwapPairs() {
+  const groups = document.querySelectorAll('.label-chip-group');
+  return Array.from(groups).map(g => ({
+    textEl: g.parentElement.querySelector('.label-text'),
+    chipEl: g,
+  })).filter(p => p.textEl && p.chipEl);
+}
+
+// 进入挑战模式：把 chip 组淡入到 label 位置；显示 .challenge-setup；
+// 隐藏星陨/伤害结果。按钮文案切换为"退出挑战"。
+function enterChallengeMode() {
+  if (state.challenge.active) return;
+  state.challenge.active = true;
+  document.body.classList.add('challenge-mode');
+
+  // 切换按钮文案 + 视觉
+  const btn = document.getElementById('challenge-toggle-btn');
+  const text = btn && btn.querySelector('.challenge-toggle-text');
+  const icon = btn && btn.querySelector('.challenge-toggle-icon');
+  if (btn) {
+    btn.classList.add('is-active');
+    btn.setAttribute('aria-pressed', 'true');
+  }
+  if (text) text.textContent = '退出挑战';
+  if (icon) icon.textContent = '✕';
+
+  // 显示挑战设置区。**必须先取消 setup 上残留的 Web Animations**——上次 exit
+  // 的 Animation 留在 getAnimations() 里、其 fill:'forwards' 会把 setup 钉在
+  // opacity:0；不取消的话，setup.hidden = false 后会被 fill 拉回 0（出现一下就消失）。
+  // 入场动画用 JS 显式播放，不依赖 CSS animation（避免与 fill 残留互相覆盖）。
+  const setup = document.getElementById('challenge-setup');
+  if (setup) {
+    _cancelAnimations(setup);
+    setup.style.opacity = '';
+    setup.style.transform = '';
+    setup.hidden = false;
+    setup.animate(
+      [
+        { opacity: 0, transform: 'translateY(6px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+    );
+  }
+
+  // 逐对 label 做淡出 → 淡入 chip 组的过渡
+  for (const pair of _collectLabelSwapPairs()) {
+    _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: true });
+  }
+}
+
+// 退出挑战模式：反向过渡；隐藏 .challenge-setup；按钮恢复"挑战模式"。
+// 关键顺序：1) setup 淡出 → 2) hidden → 3) body.challenge-mode 移除（星陨/伤害结果
+// 重新出现）→ 4) 星陨/伤害结果淡入。**不能**先移除 body.challenge-mode 再淡出 setup，
+// 否则两者会同时存在导致布局挤兑（星陨/伤害结果被 setup 顶到下面挤在一起）。
+function exitChallengeMode() {
+  if (!state.challenge.active) return;
+  state.challenge.active = false;
+
+  const btn = document.getElementById('challenge-toggle-btn');
+  const text = btn && btn.querySelector('.challenge-toggle-text');
+  const icon = btn && btn.querySelector('.challenge-toggle-icon');
+  if (btn) {
+    btn.classList.remove('is-active');
+    btn.setAttribute('aria-pressed', 'false');
+  }
+  if (text) text.textContent = '挑战模式';
+  if (icon) icon.textContent = '⚔';
+
+  // 逐对 label 做反向过渡（与 setup 淡出并行）
+  for (const pair of _collectLabelSwapPairs()) {
+    _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: false });
+  }
+
+  // 挑战设置淡出 → 隐藏 → 移除 body.challenge-mode → 星陨/伤害结果淡入
+  const setup = document.getElementById('challenge-setup');
+  if (setup) {
+    _cancelAnimations(setup);
+    const a = setup.animate(
+      [
+        { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-6px)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+    );
+    a.onfinish = () => {
+      setup.hidden = true;
+      setup.style.opacity = '';
+      setup.style.transform = '';
+      a.cancel();  // 主动取消，避免 fill 残留到下次 enter
+      // 此时才让 body.challenge-mode 移除（星陨/伤害结果回归），并用淡入过渡消解"突然出现"。
+      document.body.classList.remove('challenge-mode');
+      const sections = document.querySelectorAll('.seal-top, .seal-middle, .result-bottom');
+      sections.forEach(s => {
+        const anim = s.animate(
+          [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+        );
+        anim.onfinish = () => {
+          s.style.opacity = '';
+          s.style.transform = '';
+        };
+      });
+    };
+  }
+}
+
+// 给 .label-chip 挂按压特效（pointerdown/pointerup/cancel）。
+// 用 capturing=false 即可，chip 内部不再消费 pointerdown。
+function _attachLabelChipPressEffect(chip) {
+  if (chip.__pressBound) return;
+  chip.__pressBound = true;
+  const onDown = () => chip.classList.add('pressing');
+  const release = () => chip.classList.remove('pressing');
+  chip.addEventListener('pointerdown', onDown);
+  chip.addEventListener('pointerup', release);
+  chip.addEventListener('pointercancel', release);
+  chip.addEventListener('pointerleave', release);
+  // 键盘 Enter/Space 也复用该特效（按下时短暂加类）
+  chip.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') onDown();
+  });
+  chip.addEventListener('keyup', release);
+  chip.addEventListener('blur', release);
+}
+
+// 单选 chip 组：点击触发时把同组内 .active 切到目标 chip；点击当前 active
+// 不做任何事（不能空选）。返回值表示是否真的切换了。
+function _setSingleChoice(group, value) {
+  const chips = group.querySelectorAll('.label-chip');
+  let changed = false;
+  chips.forEach(c => {
+    const isTarget = c.dataset.value === value || c.dataset.pool === value;
+    if (isTarget && !c.classList.contains('active')) {
+      c.classList.add('active');
+      c.setAttribute('aria-pressed', 'true');
+      changed = true;
+    } else if (isTarget) {
+      // 已经是 active，也保持并同步 aria
+      c.setAttribute('aria-pressed', 'true');
+    } else if (c.classList.contains('active')) {
+      c.classList.remove('active');
+      c.setAttribute('aria-pressed', 'false');
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+// 开关 chip：toggle .active。返回新状态（true=激活）。
+function _toggleChip(chip) {
+  const newActive = !chip.classList.contains('active');
+  chip.classList.toggle('active', newActive);
+  chip.setAttribute('aria-pressed', newActive ? 'true' : 'false');
+  return newActive;
+}
+
+// 初始化挑战模式：挂事件 + 让初始 chip 状态与 state.challenge 同步。
+function initChallengeMode() {
+  const btn = document.getElementById('challenge-toggle-btn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (state.challenge.active) exitChallengeMode();
+      else enterChallengeMode();
+    });
+  }
+
+  // 侧栏 pool chip（精灵池单选）
+  document.querySelectorAll('.label-chip-group[data-kind="pool"]').forEach(group => {
+    const side = group.dataset.side;        // 'attacker' | 'defender'
+    const chips = group.querySelectorAll('.label-chip');
+    chips.forEach(chip => _attachLabelChipPressEffect(chip));
+
+    // 初始同步：state.challenge.pool[side] 与 chip.active 对齐
+    const current = state.challenge.pool[side];
+    _setSingleChoice(group, current);
+
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.label-chip');
+      if (!chip || !group.contains(chip)) return;
+      const val = chip.dataset.pool;
+      if (!val) return;
+      // 单选：点已选中的保持选中；不能空选
+      const changed = _setSingleChoice(group, val);
+      if (changed) {
+        state.challenge.pool[side] = val;
+      }
+    });
+  });
+
+  // 侧栏 random-stats / random-skill chip（开关）
+  document.querySelectorAll('.label-chip-group[data-kind="random-stats"], .label-chip-group[data-kind="random-skill"]').forEach(group => {
+    const side = group.dataset.side;        // 'attacker' | 'defender'
+    const kind = group.dataset.kind;        // 'random-stats' | 'random-skill'
+    const chip = group.querySelector('.label-chip');
+    if (!chip) return;
+    _attachLabelChipPressEffect(chip);
+
+    // 初始同步
+    const key = kind === 'random-stats' ? 'randomStats' : 'randomSkill';
+    chip.classList.toggle('active', state.challenge[key][side]);
+    chip.setAttribute('aria-pressed', state.challenge[key][side] ? 'true' : 'false');
+
+    chip.addEventListener('click', () => {
+      const newActive = _toggleChip(chip);
+      state.challenge[key][side] = newActive;
+    });
+  });
+
+  // 挑战设置区 chip（预设 / 题目数，都是单选）
+  document.querySelectorAll('.challenge-setup-chips').forEach(group => {
+    const groupName = group.dataset.group;  // 'preset' | 'count'
+    const chips = group.querySelectorAll('.label-chip');
+    chips.forEach(c => _attachLabelChipPressEffect(c));
+
+    // 初始同步
+    const initial = groupName === 'preset' ? state.challenge.preset : String(state.challenge.count);
+    _setSingleChoice(group, initial);
+
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.label-chip');
+      if (!chip || !group.contains(chip)) return;
+      const val = chip.dataset.value;
+      if (val == null) return;
+      const changed = _setSingleChoice(group, val);
+      if (!changed) return;
+      if (groupName === 'preset') {
+        state.challenge.preset = val;
+      } else if (groupName === 'count') {
+        const n = parseInt(val, 10);
+        if (Number.isFinite(n) && n > 0) state.challenge.count = n;
+      }
+    });
+  });
+}
+
 function init() {
   initStarCanvas();
   generateSealSVG();
@@ -2996,6 +3363,8 @@ function init() {
   // 威力 chip 占位（未选攻击方时也常驻显示）
   renderPowerBoostChip();
   renderWaiting();
+  // 挑战模式：仅挂事件、初始化 chip 状态，不主动进入
+  initChallengeMode();
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
