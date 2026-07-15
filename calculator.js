@@ -3142,7 +3142,8 @@ function enterChallengeMode() {
   // 显示挑战设置区。**必须先取消 setup 上残留的 Web Animations**——上次 exit
   // 的 Animation 留在 getAnimations() 里、其 fill:'forwards' 会把 setup 钉在
   // opacity:0；不取消的话，setup.hidden = false 后会被 fill 拉回 0（出现一下就消失）。
-  // 入场动画用 JS 显式播放，不依赖 CSS animation（避免与 fill 残留互相覆盖）。
+  // 入场动画用 JS 显式播放，不依赖 CSS animation（避免与 fill 残留互相覆盖），
+  // 时长与 label 切换保持一致（CHALLENGE_LABEL_TRANSITION_MS）。
   const setup = document.getElementById('challenge-setup');
   if (setup) {
     _cancelAnimations(setup);
@@ -3154,7 +3155,7 @@ function enterChallengeMode() {
         { opacity: 0, transform: 'translateY(6px)' },
         { opacity: 1, transform: 'translateY(0)' },
       ],
-      { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
     );
   }
 

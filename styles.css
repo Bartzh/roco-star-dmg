@@ -132,8 +132,24 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 始终预留 chip 高度空间，避免进入挑战模式时"攻击方/防御方"label 切换成
+     chip-group 后整个面板向下抖动。chip 高度 ≈ 2*padding(4) + font(0.65rem)*1.4
+     + 2*border(2) ≈ 20.56px，向上取整到 22px。section-title 因为本身有
+     buff-chips 占位，天然稳定，无需此处理。 */
+  min-height: 22px;
 }
 .spirit-panel .panel-label .icon { font-size: 1rem; }
+
+/* label-text 内的小字（如"（可选）"）：与 label-text 一起淡出，
+   避免进入挑战模式后留下孤儿小字。 */
+.label-optional {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  margin-left: 4px;
+}
 
 /* Spirit Card (selected) */
 .spirit-card {
@@ -1297,6 +1313,10 @@ body.challenge-mode .seal-top,
 body.challenge-mode .seal-middle,
 body.challenge-mode .result-bottom {
   display: none;
+}
+/* 挑战模式下，seal-container 内只剩挑战设置，让其垂直居中显示（相对于精灵面板高度） */
+body.challenge-mode .seal-container {
+  justify-content: center;
 }
 
 /* label-chip：与 .buff-chip 视觉一致的 chip（替换侧栏 label） */
