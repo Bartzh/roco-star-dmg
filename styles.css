@@ -122,7 +122,7 @@ body {
 }
 
 /* ============ Spirit Panel ============ */
-.spirit-panel { min-height: 698px; min-width: 0; }
+.spirit-panel { min-height: 697px; min-width: 0; }
 .spirit-panel .panel-label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -136,7 +136,7 @@ body {
      chip-group 后整个面板向下抖动。chip 高度 ≈ 2*padding(4) + font(0.65rem)*1.4
      + 2*border(2) ≈ 20.56px，向上取整到 22px。section-title 因为本身有
      buff-chips 占位，天然稳定，无需此处理。 */
-  min-height: 22px;
+  min-height: 21px;
 }
 .spirit-panel .panel-label .icon { font-size: 1rem; }
 
@@ -241,7 +241,8 @@ body {
      进而让整列塌陷、卡片叠成一团。 */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  max-height: 450px;
+  min-height: 458px;
+  max-height: 458px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
@@ -533,6 +534,8 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 防止切换挑战模式时布局抖动 */
+  min-height: 21px;
 }
 .skills-section .section-title .icon { font-size: 1rem; }
 /* Scrollable + 2-column grid; fixed height to align both panels */
@@ -540,8 +543,8 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  min-height: 140px;
-  max-height: 140px;
+  min-height: 141px;
+  max-height: 141px;
   overflow-y: auto;
   padding-right: 2px;
   align-content: start;
@@ -1564,13 +1567,6 @@ body.challenge-mode .seal-container {
   gap: 6px;
 }
 .stats-section .section-title .icon { font-size: 1rem; }
-/* 没有 .buff-chips 占位的 section-title（目前只有防御技能），
-   进入挑战模式时 chip 比 label 高会撑高整个 title 进而顶动下面的
-   skill-list。这里用 :has() 反选给它们预留 chip 高度空间。
-   有 buff-chips 的 section-title 由 buff-chip 天然占位，无需此处理。 */
-.section-title:not(:has(.buff-chips)) {
-  min-height: 22px;
-}
 /* Buff chips (replaces old stat-counters: shows adjustable atk/matk | def/mdef %) */
 .stats-section .buff-chips,
 .skills-section .buff-chips {
