@@ -178,8 +178,8 @@ let state = {
   // 本次只承载控件状态；rollScenario / 评分 / 题号推进等业务逻辑后续 PR。
   challenge: {
     active: false,
-    preset: 'standard',
-    count: 10,
+    preset: 'easy',
+    count: 5,
     pool: { attacker: 'common', defender: 'common' },
     randomStats: { attacker: false, defender: false },
     randomSkill: { attacker: false, defender: false },
