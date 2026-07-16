@@ -24,47 +24,50 @@ with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f
 # sprite; duplicates are harmless (the Set check is per-id).
 # ============================================================
 COMMON_ATTACKERS: list[str] = [
-    'pet_000175', # 龙息帕尔
-    'pet_000317', # 暮星辰
-    'pet_000629', # 祭礼巨像
-    'pet_000338', # 圣羽翼王
-    'pet_000413', # 落陨星兔
-    'pet_000287', # 粉耳星兔
-    'pet_000224', # 怖哭菇
-    'pet_000372', # 噼啪鸟
-    'pet_000068', # 锤头鹳
-    'pet_000203', # 翼龙
-    'pet_000332', # 龙鱼
-    'pet_000348', # 权杖-V
-    'pet_000070', # 音速犬
-    'pet_000385', # 月牙雪熊
+    '龙息帕尔',
+    '暮星辰',
+    '祭礼巨像',
+    '离心舞者',
+    '圣羽翼王',
+    '落陨星兔',
+    '粉耳星兔',
+    '怖哭菇',
+    '噼啪鸟',
+    '锤头鹳',
+    '翼龙',
+    '龙鱼',
+    '权杖-V',
+    '音速犬',
+    '月牙雪熊',
 ]
 COMMON_DEFENDERS: list[str] = [
-    'pet_000198', # 贝古斯
-    'pet_000076', # 尖嘴狐仙
-    'pet_000468', # 帕帕斯卡
-    'pet_000070', # 音速犬
-    'pet_000084', # 火焰猿
-    'pet_000520', # 食尘短绒
-    'pet_000329', # 利灯鱼
-    'pet_000365', # 燃薪虫
-    'pet_000190', # 荆棘电环
-    'pet_000530', # 窃光蚊
-    'pet_000318', # 春花兔
-    'pet_000494', # 爆焰喷喷
-    'pet_000372', # 噼啪鸟
-    'pet_000317', # 暮星辰
-    'pet_000419', # 泥吼牙
-    'pet_000635', # 女王蜂
-    'pet_000575', # 机幕方舟
-    'pet_000570', # 音碟吼
-    'pet_000237', # 冰钻布鲁斯
-    'pet_000314', # 嘟嘟锅
-    'pet_000636', # 恶魔狼王
-    'pet_000553', # 巨鼓象
-    'pet_000534', # 迷迷箱怪
-    'pet_000549', # 绒光优优
-    'pet_000420', # 兽花蕾
+    '贝古斯',
+    '尖嘴狐仙',
+    '帕帕斯卡',
+    '音速犬',
+    '火焰猿',
+    '食尘短绒',
+    '利灯鱼',
+    '燃薪虫',
+    '荆棘电环',
+    '窃光蚊',
+    '春花兔',
+    '爆焰喷喷',
+    '噼啪鸟',
+    '暮星辰',
+    '泥吼牙',
+    '飞飞钥',
+    '女王蜂',
+    '机幕方舟',
+    '音碟吼',
+    '冰钻布鲁斯',
+    '嘟嘟锅',
+    '恶魔狼王',
+    '巨鼓象',
+    '迷迷箱怪',
+    '绒光优优',
+    '兽花蕾',
+    '离心舞者',
 ]
 
 
@@ -110,15 +113,15 @@ for pet_id, pet_info in core.items():
     skills = []
     learnset = learnset_catalog[learnsets[pet_id]]
     if fs := learnset.get('fs'):
-        skills.append(fs)
+        skills.append(f'sk_{skill_catalog[fs]['id']}')
     if ns := learnset.get('ns'):
-        skills.extend(s['sk'] for s in ns)
+        skills.extend(f'sk_{skill_catalog[s['sk']]['id']}' for s in ns)
     if lg := learnset.get('lg'):
-        skills.append(lg['sk'])
+        skills.append(f'sk_{skill_catalog[lg['sk']]['id']}')
     if ss := learnset.get('ss'):
-        skills.extend(ss)
+        skills.extend(f'sk_{skill_catalog[s]['id']}' for s in ss)
     if bs := learnset.get('bs'):
-        skills.extend(s['sk'] for s in bs)
+        skills.extend(f'sk_{skill_catalog[s['sk']]['id']}' for s in bs)
     if not skills:
         no_skills.append(pet_id)
         continue
@@ -129,7 +132,7 @@ for pet_id, pet_info in core.items():
     elif name == '落陨星兔':
         print(f'出现"落陨星兔"，可能不再需要重命名代码')
     pinyin_full, pinyin_initials = make_search_keys(name)
-    sprites[pet_id] = {
+    sprites[name] = {
         # 用于排序，随后删除
         'hb': pet_info['hb'],
 
@@ -152,15 +155,11 @@ for pet_id, pet_info in core.items():
         'hbid': int(pet_info['hb']['i'][9:]),
     }
     if il_url := pet_illustration_urls.get(pet_id):
-        sprites[pet_id]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
+        sprites[name]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
 # 排除剩下的一些精灵
-del sprites['pet_000617'] # 幽影树（突变的样子）
-del sprites["pet_000645"] # 圣光迪莫（第1阶段）
-del sprites["pet_000646"] # 圣草迪莫（第1阶段）
-del sprites["pet_000647"] # 圣火迪莫（第1阶段）
-del sprites["pet_000648"] # 圣水迪莫（第1阶段）
+del sprites['幽影树（突变的样子）']
 # 按图鉴id排序
 def hb_id(item: tuple[str, dict]) -> int:
     sprite = item[1]
@@ -173,7 +172,7 @@ sprites = dict(sorted(sprites.items(), key=hb_id))
 # 删除hb
 for s in sprites:
     del sprites[s]['hb']
-sprites['pet_789987'] = {
+sprites['拼图'] = {
     'id': 'pet_789987',
     'name': '拼图',
     'types': ['幻系'],
@@ -183,7 +182,7 @@ sprites['pet_789987'] = {
     'def': 183,
     'mdef': 183,
     'spd': 145,
-    'skills': ['skill_000633', 'skill_000635', 'skill_000304', 'skill_000727', 'skill_000742', 'skill_000725'],
+    'skills': ['sk_7150080', 'sk_7150110', 'sk_7020970', 'sk_7190260', 'sk_7190440', 'sk_7190240'],
     'pinyin': 'pintu',
     'pinyin_initials': 'pt',
     'hbid': 789987,
@@ -191,7 +190,7 @@ sprites['pet_789987'] = {
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
-    skill_info['id'] = skill_id
+    skill_info['id'] = f'sk_{skill_info['id']}'
     if skill_info['category'] == '防御':
         if skill_info['desc'].startswith('减伤'):
             match = re.search(r'(\d+)%', skill_info['desc'])
@@ -212,6 +211,8 @@ for skill_id, skill_info in skill_catalog.items():
                 print('no combo:', skill_info['name'])
     if icon_url := skill_icon_urls.get(skill_id):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
+# 技能id作为key
+skill_catalog = {skill_info['id']: skill_info for skill_info in skill_catalog.values()}
 
 
 with open('datas/final/sprites.json', 'w', encoding='utf-8') as f:

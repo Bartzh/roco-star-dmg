@@ -23,6 +23,7 @@ def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
     missing = []
     titles = list(reversed_d.keys())
     while current < len(titles):
+        time.sleep(random.uniform(5, 10))
         params = {
             "action": "query",
             "titles": '|'.join(titles[current:current+step]),
@@ -51,7 +52,7 @@ def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
                     continue
                 urls[owner] = page['imageinfo'][0]['url']
         current += step
-        time.sleep(random.uniform(2, 4))
+        print(f"已处理 {len(urls)+len(missing)+len(duplicates)} 个标题")
     print(f"成功获取 {len(urls)} 个图片 URL")
     print(f"重复的图片owner：{duplicates}")
     print(f"缺失的图片title：{missing}")
