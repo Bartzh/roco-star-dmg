@@ -3296,6 +3296,83 @@ function _toggleChip(chip) {
   return newActive;
 }
 
+// 挑战模式预设配置表。
+//   easy    : 双方精灵常见 / 双方属性、技能均非随机 / 5 题
+//   standard: 双方精灵常见 / 防御方属性与技能随机 / 10 题
+//   hard    : 攻击方精灵常见 + 防御方精灵全部 / 防御方属性与技能随机 / 20 题
+const CHALLENGE_PRESETS = {
+  easy: {
+    pool:        { attacker: 'common', defender: 'common' },
+    randomStats: { attacker: false,    defender: false    },
+    randomSkill: { attacker: false,    defender: false    },
+    count: 5,
+  },
+  standard: {
+    pool:        { attacker: 'common', defender: 'common' },
+    randomStats: { attacker: false,    defender: true     },
+    randomSkill: { attacker: false,    defender: true     },
+    count: 10,
+  },
+  hard: {
+    pool:        { attacker: 'common', defender: 'all'   },
+    randomStats: { attacker: false,    defender: true     },
+    randomSkill: { attacker: false,    defender: true     },
+    count: 20,
+  },
+};
+
+// 取消预设 chip 选中（视觉 + state.challenge.preset = null）。
+// 用户不能通过点击预设 chip 自身来触发；仅由非预设 chip 的点击回调调用，
+// 表示「用户已偏离当前预设，按自定义处理」。
+function _clearPresetSelection() {
+  const group = document.querySelector('.challenge-setup-chips[data-group="preset"]');
+  if (group) {
+    group.querySelectorAll('.label-chip').forEach(c => {
+      c.classList.remove('active');
+      c.setAttribute('aria-pressed', 'false');
+    });
+  }
+  state.challenge.preset = null;
+}
+
+// 同步单侧精灵池 chip 视觉 + state
+function _syncPoolChip(side, value) {
+  const group = document.querySelector(`.label-chip-group[data-kind="pool"][data-side="${side}"]`);
+  if (group) _setSingleChoice(group, value);
+  state.challenge.pool[side] = value;
+}
+
+// 同步单侧 random chip 视觉 + state
+function _syncRandomChip(kind, side, value) {
+  const chip = document.querySelector(`.label-chip-group[data-kind="${kind}"][data-side="${side}"] .label-chip`);
+  if (chip) {
+    chip.classList.toggle('active', !!value);
+    chip.setAttribute('aria-pressed', value ? 'true' : 'false');
+  }
+  const key = kind === 'random-stats' ? 'randomStats' : 'randomSkill';
+  state.challenge[key][side] = !!value;
+}
+
+// 同步题目数 chip 视觉 + state
+function _syncCountChip(value) {
+  const group = document.querySelector('.challenge-setup-chips[data-group="count"]');
+  if (group) _setSingleChoice(group, String(value));
+  state.challenge.count = value;
+}
+
+// 应用预设：写入 state.challenge 并同步所有相关 chip 视觉。
+// 注意：state.challenge.preset 由调用方负责更新；本函数不触碰它。
+function _applyChallengePreset(presetName) {
+  const cfg = CHALLENGE_PRESETS[presetName];
+  if (!cfg) return;
+  for (const side of ['attacker', 'defender']) {
+    _syncPoolChip(side, cfg.pool[side]);
+    _syncRandomChip('random-stats', side, cfg.randomStats[side]);
+    _syncRandomChip('random-skill', side, cfg.randomSkill[side]);
+  }
+  _syncCountChip(cfg.count);
+}
+
 // 初始化挑战模式：挂事件 + 让初始 chip 状态与 state.challenge 同步。
 function initChallengeMode() {
   const btn = document.getElementById('challenge-toggle-btn');
@@ -3325,6 +3402,8 @@ function initChallengeMode() {
       const changed = _setSingleChoice(group, val);
       if (changed) {
         state.challenge.pool[side] = val;
+        // 偏离当前预设 → 取消预设选中
+        _clearPresetSelection();
       }
     });
   });
@@ -3345,6 +3424,8 @@ function initChallengeMode() {
     chip.addEventListener('click', () => {
       const newActive = _toggleChip(chip);
       state.challenge[key][side] = newActive;
+      // 偏离当前预设 → 取消预设选中
+      _clearPresetSelection();
     });
   });
 
@@ -3367,9 +3448,15 @@ function initChallengeMode() {
       if (!changed) return;
       if (groupName === 'preset') {
         state.challenge.preset = val;
+        // 应用预设：覆盖其他相关 chip 与 state（用户主动选预设，不取消选中）
+        _applyChallengePreset(val);
       } else if (groupName === 'count') {
         const n = parseInt(val, 10);
-        if (Number.isFinite(n) && n > 0) state.challenge.count = n;
+        if (Number.isFinite(n) && n > 0) {
+          state.challenge.count = n;
+          // 偏离当前预设 → 取消预设选中
+          _clearPresetSelection();
+        }
       }
     });
   });
