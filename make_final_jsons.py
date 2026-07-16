@@ -136,7 +136,7 @@ for pet_id, pet_info in core.items():
         # 用于排序，随后删除
         'hb': pet_info['hb'],
 
-        'id': pet_id,
+        'id': name,
         'name': name, # str: 精灵的名字。
         'types': pet_info['tp'], # list[str]: 精灵所属系别，如“水系”（任何系别都会带一个“系”字），部分精灵有两个系别。
         'hp': pet_info['st']['hp'], # int: 精灵的生命值。
