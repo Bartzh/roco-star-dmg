@@ -853,7 +853,11 @@ function setStarLayer(value) {
       emitShockwave();
     }
   }
-  calculateDamage();
+  // 挑战模式答题阶段（picking）不实时计算伤害：保持空圆环直到用户提交。
+  // 提交后（answered）或非挑战模式才计算。
+  if (state.challenge.phase !== 'picking') {
+    calculateDamage();
+  }
 }
 
 function updateSealGlow() {
@@ -3660,9 +3664,15 @@ function applyQuestion(index) {
   if (setup) setup.hidden = true;
   const progress = document.getElementById('challenge-progress');
   if (progress) progress.hidden = false;
+  // 10. 答题阶段：把侧栏 label-chip（精灵池单选/随机 chip）淡出，让 label-text
+  //     淡入回归——与「从挑战设置退出挑战」时的视觉一致（见 exitChallengeMode）。
+  //     不然进入答题态后还会看到「全部/常见/自选」「随机」等 chip，干扰注意力。
+  for (const pair of _collectLabelSwapPairs()) {
+    _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: false });
+  }
 }
 
-// 提交答案：二分查找最优层数 → 评分 → 滑块动画到最优点 → 锁定星陨控件。
+// 提交答案：二分查找最优层数 → 评分 → 锁定星陨控件（保持用户提交的层数）。
 function submitAnswer() {
   const c = state.challenge;
   if (c.phase !== 'picking') return;  // 防双击
@@ -3701,14 +3711,14 @@ function submitAnswer() {
   });
   c.totalScore += score;
   c.phase = 'answered';
-  // 滑块动画到最优点（不可击杀时滑到 99：让用户看到"接近 100 也杀不死"）
-  setStarLayer(optimal <= 99 ? optimal : 99);
-  // 锁定星陨层数（提交后不允许再调）
+  // 锁定星陨层数（提交后不允许再调）；滑块保持用户提交的层数（不动），
+  // 下方 calculateDamage 会用此层数算出真实伤害并显示。
   lockStarControls();
   // 刷新按钮 + 进度
   renderChallengeProgress();
   renderSubmitButton();
-  // 提交后才计算伤害（让圆环显示最终结果）
+  // 提交后才计算伤害（让圆环显示最终结果）。
+  // 此时 phase === 'answered'，setStarLayer 的 phase guard 不会阻止 calculateDamage。
   calculateDamage();
 }
 
