@@ -3484,11 +3484,15 @@ function buildQuestionSnapshot(_index) {
 
 // 二分查找：在 [0, 99] 范围内找能击杀的最少星陨层数。
 // 单调性：finalDamage 关于 starLayer 单调非递减（已确认）。
-// 99 层仍不能击杀 → 返回 100（哨兵值，触发不可击杀评分路径）。
+// 99 层仍不能击杀 → 返回 99 作为"不可击杀"哨兵值。
+// 哨兵选 99（不是 100）的原因：配合绝对值公式 |s - 99|，
+//   submit 99 → |99-99|*10 = 0 → 100 分（用户的"不可击杀时提交99得100"语义）。
+//   submit 0 → |0-99|*10 = 990 → 0 分（梯度）。
+// 若用 100 作哨兵，s=99 时 |99-100|*10 = 10 → 90 分，与用户预期不符。
 function findMinKillLayer(snap, q) {
   // 99 层也不能击杀
   const dmg99 = computeFinalDamage({ ...snap, starLayer: 99 }).finalDamage;
-  if (dmg99 < q.defHP) return 100;
+  if (dmg99 < q.defHP) return 99;
   // 0 层即可击杀
   const dmg0 = computeFinalDamage({ ...snap, starLayer: 0 }).finalDamage;
   if (dmg0 >= q.defHP) return 0;
@@ -3721,21 +3725,21 @@ function submitAnswer() {
     starLayer: 0,
   };
   const optimal = findMinKillLayer(baseSnap, q);
-  // 评分关键修复：用用户提交的层数实际跑一次伤害计算，
-  // 判定「是否真的击杀」。之前只看 optimal 是否 ≤99，忽略了
-  // 提交层数 < optimal（用户没打够）和 optimal=100（99层都打不死）
-  // 两种情况，公式 raw = 100 - (s-o)*10 会变成 >100 被封顶到 100，
-  // 导致"没击杀也拿满分"的 bug。
-  // 现在的逻辑：未击杀 → 0 分；击杀 → 100 - (s-o)*10，封顶 100 保底 0。
+  // 评分：score = 100 - |s - o| × 10，截断到 [0, 100]
+  //   用 |s - o|（绝对差）而不是 (s - o)，让公式在击杀/未击杀两种情况下
+  //   都给出合理梯度，与用户的"0层就死 submit 0 得 100、99层都不死
+  //   submit 99 得 100、未击杀按偏离程度扣分"语义一致。
+  //   - 击杀场景（o ∈ [0, 99]）：submit 偏离 o 越远，扣分越多（双向）
+  //   - 不可击杀（哨兵 99）：submit 99 → 100；submit 0 → 0
+  // 计算 userDamage 仅用于 isKill 字段（信息性展示），不影响分数。
   const userDamage = computeFinalDamage({ ...baseSnap, starLayer: submitted }).finalDamage;
   const userKills = userDamage >= q.defHP;
-  const score = userKills
-    ? Math.max(0, Math.min(100, 100 - (submitted - optimal) * 10))
-    : 0;
+  const diff = Math.abs(submitted - optimal);
+  const score = Math.max(0, Math.min(100, 100 - diff * 10));
   c.scores.push({
     layer: submitted,
     optimal,
-    isKill: userKills,        // 改为"用户实际是否击杀"，与分数逻辑保持一致
+    isKill: userKills,        // 信息性字段：用户提交层数是否实际击杀（不影响分数）
     score,
   });
   c.totalScore += score;
