@@ -1177,17 +1177,17 @@ if (document.readyState === 'loading') {
   startPickerToolbarAutoFit();
 }
 
-function renderSpiritArea(side) {
+function renderSpiritArea(side, opts) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   // 处于“选择中”或尚未选精灵 → 渲染选择器
   if (state.spiritPicking[side] || !spirit) {
-    renderSpiritPicker(side);
+    renderSpiritPicker(side, opts);
   } else {
-    renderSpiritCard(side);
+    renderSpiritCard(side, opts);
   }
 }
 
-function renderSpiritPicker(side) {
+function renderSpiritPicker(side, opts) {
   const selectArea = document.getElementById(`${side}-select-area`);
   const skillsSection = document.getElementById(`${side}-skills`);
   const statsSection = document.getElementById(`${side}-stats`);
@@ -1206,9 +1206,12 @@ function renderSpiritPicker(side) {
   const toolbarHTML = renderPickerToolbar(side, filter);
   const filtered = filterSpirits(side, filter);
   const optionsHTML = _renderPickerOptionsHTML(side, filtered);
+  // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
+  // 比 body class 路线可靠（body class 移除时浏览器会重新计算 style，可能反而触发动画）。
+  const animAttr = (opts && opts.skipAnimation) ? ' style="animation: none"' : '';
 
   selectArea.innerHTML = `
-    <div class="spirit-picker">
+    <div class="spirit-picker"${animAttr}>
       <div class="spirit-picker-header">
         <span class="picker-title">${titleText}</span>
         ${cancelBtn}
@@ -1300,7 +1303,7 @@ function resetPickerFilter(side) {
   refreshPickerGrid(side);
 }
 
-function renderSpiritCard(side) {
+function renderSpiritCard(side, opts) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   if (!spirit) return;
   const selectArea = document.getElementById(`${side}-select-area`);
@@ -1315,12 +1318,16 @@ function renderSpiritCard(side) {
   const illus = spirit.illustration_url
     ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
     : `<div class="placeholder" style="--el-color:${primaryColor}">${(spirit.name||'').slice(0,1)}</div>`;
+  // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
+  // 比 body class 路线可靠（见 renderSpiritPicker 注释）。
+  const skipAnim = !!(opts && opts.skipAnimation);
+  const animStyle = skipAnim ? '; animation: none' : '';
   selectArea.innerHTML = `
     <div class="spirit-card" role="button" tabindex="0"
          aria-label="更换${side === 'attacker' ? '攻击方' : '防御方'}精灵（当前：${spirit.name}）"
          onclick="enterSpiritPicker('${side}')"
          onkeydown="onSpiritCardKey(event, '${side}')"
-         style="--el-color:${primaryColor}">
+         style="--el-color:${primaryColor}${animStyle}">
       <div class="spirit-image">${illus}</div>
       <div class="name">${spirit.name}</div>
       <div class="type-tags">${tagsHTML}</div>
@@ -3701,8 +3708,13 @@ function applyQuestion(index) {
   // 10. 答题阶段：把侧栏 label-chip（精灵池单选/随机 chip）淡出，让 label-text
   //     淡入回归——与「从挑战设置退出挑战」时的视觉一致（见 exitChallengeMode）。
   //     不然进入答题态后还会看到「全部/常见/自选」「随机」等 chip，干扰注意力。
-  for (const pair of _collectLabelSwapPairs()) {
-    _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: false });
+  //     **只在第一题播**：后续题目（nextQuestion）的 label 已经在第一题被换回 text，
+  //     再播一次 _swapLabelVisibility 就是无意义的"文字淡入"——文字其实一直在那，
+  //     看起来很奇怪。
+  if (index === 0) {
+    for (const pair of _collectLabelSwapPairs()) {
+      _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: false });
+    }
   }
 }
 
@@ -3835,8 +3847,10 @@ function exitChallenge() {
   c.scores = [];
   c.totalScore = 0;
   // 6. 重渲染（state 已被 applyQuestion 改写——重新渲染以反映当前 state）
-  renderSpiritArea('attacker');
-  renderSpiritArea('defender');
+  // 退出时给 spirit 卡片走 skipAnimation：原地退出不应该播一个 250ms 的 spiritAreaIn。
+  // 走 inline style（见 renderSpiritCard/renderSpiritPicker），element 创建时即抑制动画。
+  renderSpiritArea('attacker', { skipAnimation: true });
+  renderSpiritArea('defender', { skipAnimation: true });
   renderSkills('attacker');
   renderSkills('defender');
   renderStatsConfig('attacker');
