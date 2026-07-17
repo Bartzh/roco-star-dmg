@@ -3565,23 +3565,16 @@ function renderSubmitButton() {
   }
 }
 
-// 全部完成后的结算视图：进度条显示总分；提交按钮消失；在 result-info
-// 区域追加每题明细；星陨控件保持锁定。
+// 全部完成后的结算视图：进度条显示总分；提交按钮消失；星陨控件保持锁定。
+// 原本会在 result-info 区域写每题明细，但发现那个区域在伤害圆环正下方，
+// 文字过长会顶歪伤害明细的"伤害计算明细"按钮，且视觉上很拥挤，故暂时移除。
+// 之后再考虑用更合适的方案展示每题得分（例如弹窗 / 折叠面板 / 单独页面）。
 function renderChallengeResult() {
   const c = state.challenge;
   const info = document.getElementById('challenge-progress-info');
   if (info) info.textContent = `挑战完成 · 总分 ${c.totalScore} / ${c.total * 100}`;
   const btn = document.getElementById('challenge-submit-btn');
   if (btn) btn.hidden = true;
-  const resultInfo = document.getElementById('result-info');
-  if (resultInfo) {
-    const lines = c.scores.map((s, i) => {
-      const optTxt = (s.optimal > 99) ? '>99 (未击杀)' : `${s.optimal}`;
-      const killTxt = s.isKill ? '击杀' : '未击杀';
-      return `第 ${i + 1} 题：提交 ${s.layer} 层 · 最优 ${optTxt} 层（${killTxt}）· 得 ${s.score} 分`;
-    }).join('<br>');
-    resultInfo.innerHTML = `<div class="result-waiting-mini" style="line-height:1.7;text-align:left">${lines}</div>`;
-  }
   lockStarControls();
   c.phase = 'done';
 }
@@ -3589,6 +3582,19 @@ function renderChallengeResult() {
 // ------------------------------------------------------------
 // 核心流程
 // ------------------------------------------------------------
+
+// 答题阶段：自动把技能列表滚动到当前选中的技能（.skill-btn.active）。
+// 精灵面板已锁定交互（pointer-events: none），用户无法自己滚列表，
+// 必须由 JS 在 renderSkills 后代为滚到中心位置，避免选中技能被遮挡。
+function _scrollSkillListToSelected(side) {
+  const list = document.getElementById(side + '-skill-list');
+  if (!list) return;
+  const selected = list.querySelector('.skill-btn.active');
+  if (!selected || typeof selected.scrollIntoView !== 'function') return;
+  // 用 scrollIntoView({ block: 'center' }) 把目标技能居中在可视区域内；
+  // behavior 保持 auto（瞬时）以免拖慢答题节奏。
+  selected.scrollIntoView({ block: 'center', inline: 'nearest' });
+}
 
 // 应用一道题：替换 state 全字段并重渲染。
 // 关键：绕过 selectSpirit / selectAttackSkill / selectDefenseSkill（它们会
@@ -3641,6 +3647,9 @@ function applyQuestion(index) {
   renderSpiritArea('defender');
   renderSkills('attacker');
   renderSkills('defender');
+  // 5b. 滚动技能列表到选中的技能（面板已锁定交互，必须 JS 代滚）
+  _scrollSkillListToSelected('attacker');
+  _scrollSkillListToSelected('defender');
   renderStatsConfig('attacker');
   renderStatsConfig('defender');
   renderBuffChips('attacker');
@@ -3662,8 +3671,11 @@ function applyQuestion(index) {
   document.body.classList.add('challenge-running');
   const setup = document.getElementById('challenge-setup');
   if (setup) setup.hidden = true;
-  const progress = document.getElementById('challenge-progress');
-  if (progress) progress.hidden = false;
+  // 进度信息 + 提交按钮（HTML 里默认 hidden；进入答题态才显示）
+  const info = document.getElementById('challenge-progress-info');
+  if (info) info.hidden = false;
+  const submitBtn = document.getElementById('challenge-submit-btn');
+  if (submitBtn) submitBtn.hidden = false;
   // 10. 答题阶段：把侧栏 label-chip（精灵池单选/随机 chip）淡出，让 label-text
   //     淡入回归——与「从挑战设置退出挑战」时的视觉一致（见 exitChallengeMode）。
   //     不然进入答题态后还会看到「全部/常见/自选」「随机」等 chip，干扰注意力。
@@ -3744,11 +3756,15 @@ function exitChallenge() {
   // 1. 解锁所有面板
   unlockSpiritPanels();
   unlockStarControls();
-  // 2. 隐藏 progress；复位提交按钮
-  const progress = document.getElementById('challenge-progress');
-  if (progress) progress.hidden = true;
+  // 2. 隐藏进度信息 + 提交按钮；复位提交按钮状态
+  const info = document.getElementById('challenge-progress-info');
+  if (info) info.hidden = true;
   const btn = document.getElementById('challenge-submit-btn');
-  if (btn) { btn.hidden = false; btn.classList.remove('is-next'); btn.disabled = true; }
+  if (btn) {
+    btn.hidden = true;
+    btn.classList.remove('is-next');
+    btn.disabled = true;
+  }
   // 3. 还原切换按钮的"挑战模式"状态（不要重新跑 exitChallengeMode 那一套
   //    440ms 过渡动画 — 用户原话"原地退出"）
   const toggleBtn = document.getElementById('challenge-toggle-btn');

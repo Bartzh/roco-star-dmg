@@ -86,17 +86,19 @@
     </p>
   </header>
 
-  <!-- 挑战模式切换条：默认显示「挑战模式」按钮，进入后切换为「退出挑战」；
-       答题阶段右侧追加「进度信息 + 提交/下一题/查看结果」按钮。 -->
+  <!-- 挑战模式切换条：
+       静态布局：进度信息 | 切换按钮（"挑战模式" / "退出挑战"） | 提交按钮
+       ——三个元素都是 #challenge-bar 的直接子节点，靠 flex 排成一行。
+       进度信息与提交按钮默认 hidden，进入答题态（applyQuestion）才显示。
+       切换按钮始终可见。
+  -->
   <section class="challenge-bar" id="challenge-bar" aria-label="挑战模式">
+    <span id="challenge-progress-info" class="challenge-progress-info" hidden>第 1 / 5 题</span>
     <button type="button" class="challenge-toggle-btn" id="challenge-toggle-btn" aria-pressed="false">
       <span class="challenge-toggle-icon" aria-hidden="true">⚔</span>
       <span class="challenge-toggle-text">挑战模式</span>
     </button>
-    <div id="challenge-progress" class="challenge-progress" hidden>
-      <span id="challenge-progress-info" class="challenge-progress-info">第 1 / 5 题</span>
-      <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled>提交答案</button>
-    </div>
+    <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled hidden>提交答案</button>
   </section>
 
   <section class="battle-area" aria-label="对战配置区">
