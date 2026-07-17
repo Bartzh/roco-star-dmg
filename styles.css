@@ -1451,8 +1451,8 @@ body.challenge-running .result-bottom {
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
-  filter: grayscale(0.55) brightness(0.78);
-  opacity: 0.55;
+  /*filter: grayscale(0.55) brightness(0.78);*/
+  opacity: 0.8;
 }
 
 /* label-chip：与 .buff-chip 视觉一致的 chip（替换侧栏 label） */

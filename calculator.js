@@ -3600,8 +3600,7 @@ function _scrollSkillListToSelected(side) {
   const selected = list.querySelector('.skill-btn.active');
   if (!selected || typeof selected.scrollIntoView !== 'function') return;
   // 用 scrollIntoView({ block: 'center' }) 把目标技能居中在可视区域内；
-  // behavior 保持 auto（瞬时）以免拖慢答题节奏。
-  selected.scrollIntoView({ block: 'center', inline: 'nearest' });
+  selected.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
 }
 
 // 应用一道题：替换 state 全字段并重渲染。
