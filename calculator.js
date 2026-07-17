@@ -3787,8 +3787,22 @@ function exitChallenge() {
   if (btn) {
     btn.classList.remove('is-shown');
     btn.setAttribute('aria-hidden', 'true');
-    btn.classList.remove('is-next');
-    btn.disabled = true;
+    // 延迟移除 is-next / 设置 disabled = true：
+    //   exitChallenge 在同一帧内如果同步把这两个也改了，浏览器会把这
+    //   三次状态变更合批为一次过渡（.is-shown → 默认），于是：
+    //     1) color 从 yellow (.is-next) → cyan 走 0.22s 过渡，和
+    //        opacity 渐出同步发生 → 看起来像"淡出最后变蓝";
+    //     2) :disabled 的 opacity: 0.45 覆盖掉默认 0，opacity 实际
+    //        终点是 0.45（不是 0），到 0.22s visibility:hidden 突然
+    //        生效 → 看起来像"卡了一下"。
+    //   解决办法：淡出过程中保持按钮原状态（.is-shown.is-next / enabled），
+    //   等 220ms 过渡结束 + 40ms buffer 再清理。这时按钮已经 visibility:hidden，
+    //   color 变蓝与 disabled 置位都不可见。
+    setTimeout(() => {
+      if (!btn.isConnected) return;   // 防御：节点被移除就不动它
+      btn.classList.remove('is-next');
+      btn.disabled = true;
+    }, 260);
   }
   // 3. 还原切换按钮的"挑战模式"状态（不要重新跑 exitChallengeMode 那一套
   //    440ms 过渡动画 — 用户原话"原地退出"）

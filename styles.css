@@ -1390,22 +1390,25 @@ body.challenge-mode .seal-container {
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  /* 默认隐藏态：opacity 0 + visibility hidden，配合 .is-shown 渐入 */
+  /* 默认隐藏态：opacity 0 + visibility hidden，配合 .is-shown 渐入。
+     关键：所有可视属性的过渡时长统一为 0.22s（与 opacity 一致），
+     否则 background/border/color 在 0.2s 结束、opacity 在 0.22s 结束，
+     在 0.2s→0.22s 这 20ms 会出现"颜色已变蓝但还隐约可见"的卡顿+变色闪烁。 */
   opacity: 0;
   visibility: hidden;
   /* 在原有 background/border/transform 过渡基础上追加 opacity + visibility：
      - 默认（隐藏）→ 移走 .is-shown 时：opacity 0.22s 渐变，visibility 在 0.22s 末尾切到 hidden
      - .is-shown 时：visibility 立即切到 visible，opacity 0.22s 渐入 */
-  transition: background 0.2s, border-color 0.2s, color 0.2s,
-              transform 0.1s, box-shadow 0.2s, opacity 0.22s ease,
+  transition: background 0.22s, border-color 0.22s, color 0.22s,
+              transform 0.1s, box-shadow 0.22s, opacity 0.22s ease,
               visibility 0s linear 0.22s;
 }
 .challenge-submit-btn.is-shown {
   opacity: 1;
   visibility: visible;
   /* 显示时 visibility 立即生效（0s 延迟），opacity 仍用 0.22s 渐入 */
-  transition: background 0.2s, border-color 0.2s, color 0.2s,
-              transform 0.1s, box-shadow 0.2s, opacity 0.22s ease,
+  transition: background 0.22s, border-color 0.22s, color 0.22s,
+              transform 0.1s, box-shadow 0.22s, opacity 0.22s ease,
               visibility 0s linear 0s;
 }
 .challenge-submit-btn:hover:not(:disabled) {
