@@ -168,14 +168,16 @@ let state = {
   // attacker and defender panels.
   attackerSpeed: 0,
   defenderSpeed: 0,
-  // 挑战模式状态（UI 控件 + 用户偏好）
-  //   active    : 是否处于挑战模式（进入设置阶段时为 true，退出为 false）
-  //   preset    : 预设难度：'easy' | 'standard' | 'hard'
-  //   count     : 题目数：3 | 5 | 10 | 20
-  //   pool      : 每侧精灵池单选：'all' | 'common' | 'custom'，不能空选
-  //   randomStats: 每侧是否启用「属性随机」（开关）
-  //   randomSkill: 每侧是否启用「技能随机」（开关）
-  // 本次只承载控件状态；rollScenario / 评分 / 题号推进等业务逻辑后续 PR。
+  // 挑战模式状态（UI 控件 + 用户偏好 + 答题运行时）
+  //   active      : 是否处于挑战设置阶段（chip 可见）
+  //   preset/count/pool/randomStats/randomSkill：用户偏好，退出答题时保留
+  //   running     : 是否处于答题阶段（精灵面板锁定）
+  //   phase       : 'idle' | 'picking'（已出题未提交）| 'answered'（已提交）
+  //   current     : 当前题号（0-based）
+  //   total       : 总题数（备份 = count，便于无依赖显示）
+  //   questions   : 全部题目快照（生成时确定下来），每元素含双方精灵/性格/IVs/buffs/speed/skillId/defHP
+  //   scores      : 每题 {layer, optimal, isKill, score}，提交时 push
+  //   totalScore  : 累计分
   challenge: {
     active: false,
     preset: 'easy',
@@ -183,6 +185,13 @@ let state = {
     pool: { attacker: 'common', defender: 'common' },
     randomStats: { attacker: false, defender: false },
     randomSkill: { attacker: false, defender: false },
+    running: false,
+    phase: 'idle',
+    current: 0,
+    total: 0,
+    questions: [],
+    scores: [],
+    totalScore: 0,
   },
 };
 
@@ -2416,32 +2425,33 @@ function computeSkillDynamicModifiers(
 // ============================================================
 // DAMAGE CALCULATION
 // ============================================================
-function calculateDamage() {
-  if (!state.attacker || !state.defender || !state.attackSkill) {
-    renderWaiting();
-    return;
-  }
-  const atk = state.attacker;
-  const def = state.defender;
-  const skill = state.attackSkill;
-  const defSkill = state.defenseSkill || { reduction: 1, _pseudo: true };
-  const layer = state.starLayer;
-  const n = layer;
+// 伤害计算：拆为两个函数。
+//   computeFinalDamage(ctx) — 纯函数。读 ctx.*（不读全局 state），返回 data 对象。
+//   calculateDamage()      — 副作用层。读 state，构造 ctx 调 computeFinalDamage，
+//                           然后 renderResult + updateAtmosphere。
+// 拆出的好处：挑战模式二分查找/最优点计算可重复调 computeFinalDamage，
+// 不污染 DOM、不污染全局 state。
+function computeFinalDamage(ctx) {
+  const atk = ctx.attacker;
+  const def = ctx.defender;
+  const skill = ctx.attackSkill;
+  const defSkill = ctx.defenseSkill || { reduction: 1, _pseudo: true };
+  const n = ctx.starLayer;
 
   // 伤害类型决定：
   //   - damage_class === '自适应'（愿力冲击）：按精灵当前最终物攻/魔攻
   //     （含 buff）中较高者决定，物攻 ≥ 魔攻 → 物攻，否则魔攻。
   //   - 其他：保持原行为（'魔攻' → 魔攻，其余 → 物攻）。
-  const atkNature = getNature('attacker');
-  const defNature = getNature('defender');
-  const atkIVs    = getIVs('attacker');
-  const defIVs    = getIVs('defender');
+  const atkNature = ctx.attackerNature;
+  const defNature = ctx.defenderNature;
+  const atkIVs    = ctx.attackerIVs;
+  const defIVs    = ctx.defenderIVs;
   const atkBaseNoBuff  = getFinalStat(atk, 'atk',  atkNature, atkIVs);
   const matkBaseNoBuff = getFinalStat(atk, 'matk', atkNature, atkIVs);
   let isMagic;
   if (skill.damage_class === '自适应') {
-    const atkFull  = atkBaseNoBuff  * (1 + getBuff('attacker', 'atk')  / 100);
-    const matkFull = matkBaseNoBuff * (1 + getBuff('attacker', 'matk') / 100);
+    const atkFull  = atkBaseNoBuff  * (1 + (ctx.attackerBuff.atk  || 0) / 100);
+    const matkFull = matkBaseNoBuff * (1 + (ctx.attackerBuff.matk || 0) / 100);
     // 物攻 ≥ 魔攻 → 物攻；只有魔攻严格更高时才用魔攻。
     isMagic = matkFull > atkFull;
   } else {
@@ -2451,8 +2461,8 @@ function calculateDamage() {
   const defStatKey = isMagic ? 'mdef' : 'def';
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
   // nonsensical negative stats from extreme debuffs.
-  const atkBuffPct = getBuff('attacker', atkStatKey);
-  const defBuffPct = getBuff('defender', defStatKey);
+  const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
+  const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
   const atkStat = Math.max(0, Math.round((isMagic ? matkBaseNoBuff : atkBaseNoBuff) * (1 + atkBuffPct / 100)));
   const defStat = Math.max(0, Math.round(getFinalStat(def, defStatKey, defNature, defIVs) * (1 + defBuffPct / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
@@ -2461,9 +2471,9 @@ function calculateDamage() {
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
   const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
   // 威力 chip — flat addition to base power (always shown).
-  const powerBoost = getPowerBoost();
+  const powerBoost = ctx.attackerPowerBoost || 0;
   // 连击数 chip — flat addition to base combo count (always shown).
-  const attackerCombo = getComboBoost();
+  const attackerCombo = ctx.attackerCombo || 0;
   // Effective element for STAB / effectiveness / 幻 checks. Dynamic modifiers
   // (e.g. 展翅) can override the skill's original element (普通 → 翼) without
   // mutating the skill data.
@@ -2479,7 +2489,7 @@ function calculateDamage() {
   // by the chip; they still pick up dyn.comboAdd from skill modifiers
   // (e.g. 多维击打's starLayer-based extra hits) but never the chip.
   const hasCombo = skill.combo != null;
-  const chipCombo = hasCombo ? getComboBoost() : 0;
+  const chipCombo = hasCombo ? attackerCombo : 0;
   const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + chipCombo) * dyn.comboMult);
   const power = Math.max(0, ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
@@ -2505,7 +2515,7 @@ function calculateDamage() {
   const isKill = finalDamage >= defHP;
   const overflow = isKill ? finalDamage - defHP : 0;
 
-  renderResult({
+  return {
     finalDamage, skillDmg, starDmg, starPower,
     skillEff, skillEffRaw, starEff, stab, combo,
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
@@ -2514,8 +2524,35 @@ function calculateDamage() {
     atkStat, defStat, isMagic, dyn,
     atkBuffPct, defBuffPct,
     powerBoost, attackerCombo, hasCombo
+  };
+}
+
+function calculateDamage() {
+  if (!state.attacker || !state.defender || !state.attackSkill) {
+    renderWaiting();
+    return;
+  }
+  // 构造 ctx 并调纯计算函数。挑战模式下，state 可能反映"上一题提交时的快照"，
+  // 但 state.starLayer 仍随用户拖滑块实时变化，因此正常计算路径无需特殊处理。
+  const data = computeFinalDamage({
+    attacker: state.attacker,
+    defender: state.defender,
+    attackSkill: state.attackSkill,
+    defenseSkill: state.defenseSkill,
+    attackerNature: state.attackerNature,
+    defenderNature: state.defenderNature,
+    attackerIVs: state.attackerIVs,
+    defenderIVs: state.defenderIVs,
+    attackerBuff: state.attackerBuff,
+    defenderBuff: state.defenderBuff,
+    attackerSpeed: state.attackerSpeed,
+    defenderSpeed: state.defenderSpeed,
+    attackerPowerBoost: state.attackerPowerBoost,
+    attackerCombo: state.attackerCombo,
+    starLayer: state.starLayer,
   });
-  updateAtmosphere(hpPercent, isKill);
+  renderResult(data);
+  updateAtmosphere(data.hpPercent, data.isKill);
 }
 
 // ============================================================
@@ -2873,6 +2910,14 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>挑战模式 · 答题流程 <span class="modal-date">· 2026-07-17</span></h3>
+      <ul>
+        <li>挑战模式答题流程上线：开始挑战 → 自动出题 → 拖动星陨层数 → 提交答案 → 评分 → 下一题 / 结算。</li>
+        <li>双方精灵池支持「全部 / 常见 / 自选」；属性配置与技能选择支持「固定当前 / 随机每题」；防御技能按相同减伤率兜底匹配。</li>
+        <li>评分公式：100 - (提交层数 - 最优层数) × 10，最小 0 分；99 层仍无法击杀时仍按公式评分。</li>
+        <li>答题阶段精灵面板自动锁定（灰显、不可点），仅星陨层数可调；随时可「退出挑战」回到计算器状态。</li>
+      </ul>
+      <hr>
       <h3>信息弹窗 <span class="modal-date">· 2026-07-13</span></h3>
       <ul>
         <li>新增「使用说明」与「更新公告」信息弹窗（就是你现在看到的这个）。</li>
@@ -3246,6 +3291,534 @@ function exitChallengeMode() {
   }
 }
 
+// ============================================================
+// CHALLENGE MODE (业务逻辑层：题目池 / 答题流程 / 评分)
+// ------------------------------------------------------------
+// 题目池生成（解耦的 3 个工厂 + 1 个 orchestrator）。每个工厂返回一个
+// 生成器 () => 本题具体值，便于后续调整每个维度的"随机策略"而不动其他维度。
+// 业务逻辑（startChallenge / applyQuestion / submitAnswer / nextQuestion /
+// exitChallenge / findMinKillLayer）也放在本段。
+// ============================================================
+
+// 工具：从数组里等概率随机一个元素。防御技能"无"权重更大的随机：把
+// __none__ 在候选数组里重复多份实现加权采样。
+function _pickRandom(arr) {
+  if (!arr || arr.length === 0) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// ------------------------------------------------------------
+// 题目池生成：3 个独立工厂 + 1 个 orchestrator
+// ------------------------------------------------------------
+
+// 精灵池工厂：返回 () => 精灵 id
+//   pool[side] = 'all'    : 从所有 SPRITES 中等概率采样
+//   pool[side] = 'common' : 从 OTHERS.common_attackers/defenders 中等概率采样
+//   pool[side] = 'custom' : 固定返回 state[side].id（自选必须已选好精灵）
+function buildSpiritRng(side) {
+  const mode = state.challenge.pool[side];
+  if (mode === 'all') {
+    const allIds = Object.keys(SPRITES);
+    return () => _pickRandom(allIds);
+  }
+  if (mode === 'common') {
+    const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
+                                       : (OTHERS.common_defenders || []);
+    const ids = list.slice();
+    return () => _pickRandom(ids);
+  }
+  // 'custom' — 固定当前用户选的精灵
+  const fixedId = (side === 'attacker') ? state.attacker?.id : state.defender?.id;
+  if (!fixedId) {
+    // 自选池但精灵未选：兜底用常见池（避免抛错）
+    const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
+                                       : (OTHERS.common_defenders || []);
+    return () => _pickRandom(list);
+  }
+  return () => fixedId;
+}
+
+// 属性配置工厂：返回 () => { nature, ivs, buff, speed }
+//   randomStats[side] = false: 深拷贝当前 state（不污染用户原值）
+//   randomStats[side] = true : 全新随机性格/IVs；buff 永远为 0；速度 chip 永远为 0
+function buildStatsRng(side) {
+  if (!state.challenge.randomStats[side]) {
+    // 固定：从当前 state 深拷贝
+    return () => ({
+      nature: side === 'attacker'
+        ? { ...state.attackerNature }
+        : { ...state.defenderNature },
+      ivs: side === 'attacker'
+        ? state.attackerIVs.slice()
+        : state.defenderIVs.slice(),
+      buff: side === 'attacker'
+        ? { ...state.attackerBuff }
+        : { ...state.defenderBuff },
+      speed: side === 'attacker' ? state.attackerSpeed : state.defenderSpeed,
+    });
+  }
+  // 随机：全新生成
+  return () => {
+    // 性格：从 6 个 statKey 里抽 2 个不同（up != down）
+    const keys = STAT_KEYS.slice();
+    const upIdx = Math.floor(Math.random() * keys.length);
+    let downIdx = Math.floor(Math.random() * (keys.length - 1));
+    if (downIdx >= upIdx) downIdx += 1;
+    const nature = { up: keys[upIdx], down: keys[downIdx] };
+    // IVs：从 6 个 statKey 里抽 3 个不同
+    const ivKeys = keys.slice();
+    const ivs = [];
+    for (let i = 0; i < MAX_IV; i++) {
+      const idx = Math.floor(Math.random() * ivKeys.length);
+      ivs.push(ivKeys.splice(idx, 1)[0]);
+    }
+    // buff: 永远为 0（用户描述：buff 仅在固定时才会考虑；随机不涉及 buff）
+    const buff = side === 'attacker'
+      ? { atk: 0, matk: 0 }
+      : { def: 0, mdef: 0 };
+    return { nature, ivs, buff, speed: 0 };
+  };
+}
+
+// 技能选择工厂：返回 () => 技能 id
+// 攻击方：
+//   randomSkill=false (固定)：优先 state.attackSkill.id；该 id 不在新精灵可用列表
+//                            中时回退到随机
+//   randomSkill=true  (随机)：在 getAttackSkillOptions(attacker) 中等概率
+// 防御方：
+//   randomSkill=false (固定)：优先 state.defenseSkill.id；找不到时按 reduction
+//                            四舍五入容差匹配；都失败回退到随机
+//   randomSkill=true  (随机)：在 getDefenseSkillOptions(defender) 中采样；
+//                            "无"（__none__）权重更大（5/6）
+function buildSkillRng(side) {
+  const isRandom = state.challenge.randomSkill[side];
+  if (side === 'attacker') {
+    if (!isRandom) {
+      // 固定：先尝试用户的技能；不匹配回退到随机
+      const userId = state.attackSkill?.id;
+      return () => {
+        const opts = getAttackSkillOptions(state.attacker);
+        if (userId && opts.some(s => s.id === userId)) return userId;
+        const picked = _pickRandom(opts);
+        return picked ? picked.id : YUANLI_SKILLS[0].id;
+      };
+    }
+    // 随机：等概率
+    return () => {
+      const opts = getAttackSkillOptions(state.attacker);
+      const picked = _pickRandom(opts);
+      return picked ? picked.id : YUANLI_SKILLS[0].id;
+    };
+  }
+  // 防御方
+  if (!isRandom) {
+    const userId = state.defenseSkill?.id;
+    const userReduction = state.defenseSkill?.reduction;
+    return () => {
+      const opts = getDefenseSkillOptions(state.defender);
+      // 1. 优先：完全相同 id
+      if (userId) {
+        const hit = opts.find(s => s.id === userId);
+        if (hit) return hit.id;
+      }
+      // 2. reduction 四舍五入容差匹配（容差=整数百分比相等）
+      if (userReduction != null) {
+        const userPct = Math.round(userReduction * 100);
+        const hit = opts.find(s => s.reduction != null
+          && Math.round(s.reduction * 100) === userPct);
+        if (hit) return hit.id;
+      }
+      // 3. 兜底：随机
+      const picked = _pickRandom(opts);
+      return picked ? picked.id : '__none__';
+    };
+  }
+  // 随机：加权——"无"（__none__）占 5/6 权重
+  return () => {
+    const opts = getDefenseSkillOptions(state.defender);
+    const weighted = [];
+    for (const s of opts) {
+      if (s.id === '__none__') {
+        for (let i = 0; i < 5; i++) weighted.push(s);
+      } else {
+        weighted.push(s);
+      }
+    }
+    const picked = _pickRandom(weighted);
+    return picked ? picked.id : '__none__';
+  };
+}
+
+// Orchestrator：取 6 个工厂各调用一次，组装成一道题快照。
+// 快照中防御方最终 HP 也存起来，避免后续评分时再算一次。
+function buildQuestionSnapshot(_index) {
+  const atkId    = buildSpiritRng('attacker')();
+  const defId    = buildSpiritRng('defender')();
+  const atkStats = buildStatsRng('attacker')();
+  const defStats = buildStatsRng('defender')();
+  const atkSkId  = buildSkillRng('attacker')();
+  const defSkId  = buildSkillRng('defender')();
+  const attacker = { id: atkId, ...(SPRITES[atkId] || {}) };
+  const defender = { id: defId, ...(SPRITES[defId] || {}) };
+  const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
+  return {
+    attacker,
+    defender,
+    attackerNature: atkStats.nature,
+    defenderNature: defStats.nature,
+    attackerIVs: atkStats.ivs,
+    defenderIVs: defStats.ivs,
+    attackerBuff: atkStats.buff,
+    defenderBuff: defStats.buff,
+    attackerSpeed: atkStats.speed,
+    defenderSpeed: defStats.speed,
+    attackSkillId: atkSkId,
+    defenseSkillId: defSkId,
+    defHP,
+  };
+}
+
+// 二分查找：在 [0, 99] 范围内找能击杀的最少星陨层数。
+// 单调性：finalDamage 关于 starLayer 单调非递减（已确认）。
+// 99 层仍不能击杀 → 返回 100（哨兵值，触发不可击杀评分路径）。
+function findMinKillLayer(snap, q) {
+  // 99 层也不能击杀
+  const dmg99 = computeFinalDamage({ ...snap, starLayer: 99 }).finalDamage;
+  if (dmg99 < q.defHP) return 100;
+  // 0 层即可击杀
+  const dmg0 = computeFinalDamage({ ...snap, starLayer: 0 }).finalDamage;
+  if (dmg0 >= q.defHP) return 0;
+  // 二分 [1, 99]
+  let lo = 1, hi = 99;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const dmg = computeFinalDamage({ ...snap, starLayer: mid }).finalDamage;
+    if (dmg >= q.defHP) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
+// ------------------------------------------------------------
+// 答题流程辅助函数
+// ------------------------------------------------------------
+
+// 锁定 / 解锁精灵面板：仅影响 .spirit-panel 及其后代；星陨层数控件不受影响。
+function lockSpiritPanels() {
+  for (const id of ['attacker-panel', 'defender-panel']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('challenge-locked');
+  }
+}
+function unlockSpiritPanels() {
+  for (const id of ['attacker-panel', 'defender-panel']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('challenge-locked');
+  }
+}
+
+// 锁定 / 解锁星陨层数控件（#seal-wrapper 拖拽 + #seal-slider 滑块）。
+// 锁定后：拖拽失效、滚轮失效、滑块 disabled。
+function lockStarControls() {
+  const wrapper = document.getElementById('seal-wrapper');
+  const slider = document.getElementById('seal-slider');
+  if (wrapper) wrapper.classList.add('challenge-locked');
+  if (slider) slider.disabled = true;
+}
+function unlockStarControls() {
+  const wrapper = document.getElementById('seal-wrapper');
+  const slider = document.getElementById('seal-slider');
+  if (wrapper) wrapper.classList.remove('challenge-locked');
+  if (slider) slider.disabled = false;
+}
+
+// 渲染进度信息（"第 N / M 题 · 累计 X 分"）
+function renderChallengeProgress() {
+  const el = document.getElementById('challenge-progress-info');
+  if (!el) return;
+  const c = state.challenge;
+  el.textContent = `第 ${c.current + 1} / ${c.total} 题 · 累计 ${c.totalScore} 分`;
+}
+
+// 渲染提交/下一题/查看结果按钮文案 + 启用状态。
+function renderSubmitButton() {
+  const btn = document.getElementById('challenge-submit-btn');
+  if (!btn) return;
+  const c = state.challenge;
+  const isLast = c.current >= c.total - 1;
+  btn.classList.remove('is-next');
+  if (c.phase === 'picking') {
+    btn.textContent = '提交答案';
+    btn.disabled = false;
+  } else if (c.phase === 'answered') {
+    btn.textContent = isLast ? '查看结果' : '下一题';
+    btn.disabled = false;
+    btn.classList.add('is-next');
+  } else {
+    // 'idle' / 'done'
+    btn.textContent = '提交答案';
+    btn.disabled = true;
+  }
+}
+
+// 全部完成后的结算视图：进度条显示总分；提交按钮消失；在 result-info
+// 区域追加每题明细；星陨控件保持锁定。
+function renderChallengeResult() {
+  const c = state.challenge;
+  const info = document.getElementById('challenge-progress-info');
+  if (info) info.textContent = `挑战完成 · 总分 ${c.totalScore} / ${c.total * 100}`;
+  const btn = document.getElementById('challenge-submit-btn');
+  if (btn) btn.hidden = true;
+  const resultInfo = document.getElementById('result-info');
+  if (resultInfo) {
+    const lines = c.scores.map((s, i) => {
+      const optTxt = (s.optimal > 99) ? '>99 (未击杀)' : `${s.optimal}`;
+      const killTxt = s.isKill ? '击杀' : '未击杀';
+      return `第 ${i + 1} 题：提交 ${s.layer} 层 · 最优 ${optTxt} 层（${killTxt}）· 得 ${s.score} 分`;
+    }).join('<br>');
+    resultInfo.innerHTML = `<div class="result-waiting-mini" style="line-height:1.7;text-align:left">${lines}</div>`;
+  }
+  lockStarControls();
+  c.phase = 'done';
+}
+
+// ------------------------------------------------------------
+// 核心流程
+// ------------------------------------------------------------
+
+// 应用一道题：替换 state 全字段并重渲染。
+// 关键：绕过 selectSpirit / selectAttackSkill / selectDefenseSkill（它们会
+// 清空 nature/IVs/buff/speed/powerBoost/combo，并触发 calculateDamage 副作用）。
+function applyQuestion(index) {
+  const q = state.challenge.questions[index];
+  if (!q) return;
+  // 1. 替换 state 全部相关字段（深拷贝避免污染快照）
+  state.attacker = { ...q.attacker };
+  state.defender = { ...q.defender };
+  state.attackerNature = { ...q.attackerNature };
+  state.defenderNature = { ...q.defenderNature };
+  state.attackerIVs = q.attackerIVs.slice();
+  state.defenderIVs = q.defenderIVs.slice();
+  state.attackerBuff = { ...q.attackerBuff };
+  state.defenderBuff = { ...q.defenderBuff };
+  state.attackerSpeed = q.attackerSpeed;
+  state.defenderSpeed = q.defenderSpeed;
+  state.attackerPowerBoost = 0;   // 威力 chip 每题重置
+  state.attackerCombo = 0;        // 连击 chip 每题重置
+  state.spiritPicking.attacker = false;
+  state.spiritPicking.defender = false;
+  // 2. 攻击技能：在新精灵的可用列表中找对应 id
+  const atkOpts = getAttackSkillOptions(state.attacker);
+  const atkIdx = atkOpts.findIndex(s => s.id === q.attackSkillId);
+  if (atkIdx >= 0) {
+    state.attackSkillIdx = atkIdx;
+    state.attackSkill = atkOpts[atkIdx];
+  } else {
+    // 题目的 id 在新精灵里不可用 → 用 opts[0] 兜底
+    state.attackSkillIdx = 0;
+    state.attackSkill = atkOpts[0] || null;
+  }
+  // 3. 防御技能
+  const defOpts = getDefenseSkillOptions(state.defender);
+  const defIdx = defOpts.findIndex(s => s.id === q.defenseSkillId);
+  if (defIdx >= 0) {
+    state.defenseSkillIdx = defIdx;
+    state.defenseSkill = defOpts[defIdx];
+  } else {
+    state.defenseSkillIdx = 0;
+    state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', reduction: 1, _pseudo: true };
+  }
+  // 4. 重置星陨层数 + 题目元数据
+  state.starLayer = 0;
+  state.challenge.current = index;
+  state.challenge.phase = 'picking';
+  // 5. 同步 UI
+  renderSpiritArea('attacker');
+  renderSpiritArea('defender');
+  renderSkills('attacker');
+  renderSkills('defender');
+  renderStatsConfig('attacker');
+  renderStatsConfig('defender');
+  renderBuffChips('attacker');
+  renderBuffChips('defender');
+  renderPowerBoostChip();
+  setStarLayer(0);
+  // 6. 答题阶段不计算伤害：保持空圆环 + 等待提交
+  renderWaiting();
+  // 7. 进度条 + 提交按钮
+  renderChallengeProgress();
+  renderSubmitButton();
+  // 8. 解锁星陨层数（每题开始都让用户能拖）
+  unlockStarControls();
+  // 9. 切到答题态：先移除 challenge-mode 让 seal/结果回归显示（避免其 CSS
+  //    display:none 把星陨/伤害结果钉死），再加 challenge-running。
+  //    设置阶段（enterChallengeMode）时 body 有 challenge-mode，applyQuestion
+  //    需要同时清理掉，否则星陨盘 + 伤害圆环不会显示。
+  document.body.classList.remove('challenge-mode');
+  document.body.classList.add('challenge-running');
+  const setup = document.getElementById('challenge-setup');
+  if (setup) setup.hidden = true;
+  const progress = document.getElementById('challenge-progress');
+  if (progress) progress.hidden = false;
+}
+
+// 提交答案：二分查找最优层数 → 评分 → 滑块动画到最优点 → 锁定星陨控件。
+function submitAnswer() {
+  const c = state.challenge;
+  if (c.phase !== 'picking') return;  // 防双击
+  const q = c.questions[c.current];
+  if (!q) return;
+  const submitted = state.starLayer;
+  // 临时 ctx 用于二分查找最优层数（不污染 state）
+  const baseSnap = {
+    attacker: q.attacker,
+    defender: q.defender,
+    attackSkill: state.attackSkill,   // 此时 state 已被 applyQuestion 同步
+    defenseSkill: state.defenseSkill,
+    attackerNature: q.attackerNature,
+    defenderNature: q.defenderNature,
+    attackerIVs: q.attackerIVs,
+    defenderIVs: q.defenderIVs,
+    attackerBuff: q.attackerBuff,
+    defenderBuff: q.defenderBuff,
+    attackerSpeed: q.attackerSpeed,
+    defenderSpeed: q.defenderSpeed,
+    attackerPowerBoost: state.attackerPowerBoost,
+    attackerCombo: state.attackerCombo,
+    starLayer: 0,
+  };
+  const optimal = findMinKillLayer(baseSnap, q);
+  // 评分：score = 100 - (submitted - optimal) * 10，截断到 [0, 100]
+  //   - 可击杀 (optimal <= 99)：按公式算
+  //   - 不可击杀 (optimal = 100 哨兵)：100 - (s-100)*10 通常 > 100，封顶 100
+  const raw = 100 - (submitted - optimal) * 10;
+  const score = Math.max(0, Math.min(100, raw));
+  c.scores.push({
+    layer: submitted,
+    optimal,
+    isKill: optimal <= 99,
+    score,
+  });
+  c.totalScore += score;
+  c.phase = 'answered';
+  // 滑块动画到最优点（不可击杀时滑到 99：让用户看到"接近 100 也杀不死"）
+  setStarLayer(optimal <= 99 ? optimal : 99);
+  // 锁定星陨层数（提交后不允许再调）
+  lockStarControls();
+  // 刷新按钮 + 进度
+  renderChallengeProgress();
+  renderSubmitButton();
+  // 提交后才计算伤害（让圆环显示最终结果）
+  calculateDamage();
+}
+
+// 进入下一题 / 最后一题显示结算
+function nextQuestion() {
+  const c = state.challenge;
+  const next = c.current + 1;
+  if (next >= c.total) {
+    renderChallengeResult();
+    return;
+  }
+  // 重置滑块控件
+  unlockStarControls();
+  setStarLayer(0);
+  applyQuestion(next);
+}
+
+// 退出挑战：解除所有锁定、回到正常计算器状态。
+// 不备份 state —— applyQuestion 期间会改写 state 字段，退出后 state 残留
+// 的是最后提交的题目快照；用户重新调整即可，不专门设计"恢复原状态"。
+function exitChallenge() {
+  const c = state.challenge;
+  // 1. 解锁所有面板
+  unlockSpiritPanels();
+  unlockStarControls();
+  // 2. 隐藏 progress；复位提交按钮
+  const progress = document.getElementById('challenge-progress');
+  if (progress) progress.hidden = true;
+  const btn = document.getElementById('challenge-submit-btn');
+  if (btn) { btn.hidden = false; btn.classList.remove('is-next'); btn.disabled = true; }
+  // 3. 还原切换按钮的"挑战模式"状态（不要重新跑 exitChallengeMode 那一套
+  //    440ms 过渡动画 — 用户原话"原地退出"）
+  const toggleBtn = document.getElementById('challenge-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.classList.remove('is-active');
+    toggleBtn.setAttribute('aria-pressed', 'false');
+    const text = toggleBtn.querySelector('.challenge-toggle-text');
+    const icon = toggleBtn.querySelector('.challenge-toggle-icon');
+    if (text) text.textContent = '挑战模式';
+    if (icon) icon.textContent = '⚔';
+  }
+  // 4. body 退出 running（同时清理可能残留的 challenge-mode）
+  document.body.classList.remove('challenge-running');
+  document.body.classList.remove('challenge-mode');
+  // 5. 重置 running 状态字段
+  c.running = false;
+  c.active = false;   // 同步把 setup 状态也清掉，让 toggle 按钮 3 路分支落到 "enter"
+  c.phase = 'idle';
+  c.current = 0;
+  c.total = 0;
+  c.questions = [];
+  c.scores = [];
+  c.totalScore = 0;
+  // 6. 重渲染（state 已被 applyQuestion 改写——重新渲染以反映当前 state）
+  renderSpiritArea('attacker');
+  renderSpiritArea('defender');
+  renderSkills('attacker');
+  renderSkills('defender');
+  renderStatsConfig('attacker');
+  renderStatsConfig('defender');
+  renderBuffChips('attacker');
+  renderBuffChips('defender');
+  renderPowerBoostChip();
+  setStarLayer(state.starLayer);
+  // 7. 重新计算伤害（恢复实时显示）
+  calculateDamage();
+  const breakdownSection = document.getElementById('breakdown-section');
+  if (breakdownSection) breakdownSection.style.display = 'none';
+}
+
+// 开始挑战：生成题目池 + 启动第一题
+function startChallenge() {
+  const c = state.challenge;
+  // 1. 校验自选池精灵已选
+  for (const side of ['attacker', 'defender']) {
+    if (c.pool[side] === 'custom') {
+      const has = side === 'attacker' ? !!state.attacker : !!state.defender;
+      if (!has) {
+        // 简单提示：复用现有信息弹窗
+        const modal = document.getElementById('info-modal');
+        const title = document.getElementById('modal-title');
+        const body = document.getElementById('modal-body');
+        if (modal && title && body) {
+          title.textContent = '无法开始挑战';
+          const whichSide = side === 'attacker' ? '攻击方' : '防御方';
+          body.innerHTML = `<div style="line-height:1.7">「自选」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 常见」池。</div>`;
+          modal.classList.add('is-open');
+          modal.setAttribute('aria-hidden', 'false');
+        }
+        return;
+      }
+    }
+  }
+  // 2. 生成题目
+  c.questions = [];
+  for (let i = 0; i < c.count; i++) {
+    c.questions.push(buildQuestionSnapshot(i));
+  }
+  c.total = c.count;
+  c.current = 0;
+  c.scores = [];
+  c.totalScore = 0;
+  c.running = true;
+  c.phase = 'idle';
+  // 3. 锁定精灵面板
+  lockSpiritPanels();
+  // 4. 应用第一题（applyQuestion 内部会切到 challenge-running / 显示 progress）
+  applyQuestion(0);
+}
+
 // 给 .label-chip 挂按压特效（pointerdown/pointerup/cancel）。
 // 用 capturing=false 即可，chip 内部不再消费 pointerdown。
 function _attachLabelChipPressEffect(chip) {
@@ -3375,11 +3948,20 @@ function _applyChallengePreset(presetName) {
 
 // 初始化挑战模式：挂事件 + 让初始 chip 状态与 state.challenge 同步。
 function initChallengeMode() {
+  // —— 切换按钮：3 路分支（running / active / enter）——
   const btn = document.getElementById('challenge-toggle-btn');
   if (btn) {
     btn.addEventListener('click', () => {
-      if (state.challenge.active) exitChallengeMode();
-      else enterChallengeMode();
+      if (state.challenge.running) {
+        // 答题阶段：原地退出（不弹 setup 过渡动画）
+        exitChallenge();
+      } else if (state.challenge.active) {
+        // 设置阶段：退出设置
+        exitChallengeMode();
+      } else {
+        // 首次进入挑战模式
+        enterChallengeMode();
+      }
     });
   }
 
@@ -3460,6 +4042,27 @@ function initChallengeMode() {
       }
     });
   });
+
+  // —— 「开始挑战」按钮 ——
+  const startBtn = document.getElementById('challenge-start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      if (state.challenge.running) return;   // 已在答题：忽略（防御性）
+      startChallenge();
+    });
+  }
+
+  // —— 「提交答案 / 下一题 / 查看结果」按钮（按 phase 路由）——
+  const submitBtn = document.getElementById('challenge-submit-btn');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      const c = state.challenge;
+      if (!c.running) return;                // 非答题阶段：忽略
+      if (c.phase === 'picking') submitAnswer();
+      else if (c.phase === 'answered') nextQuestion();
+      // 'done' 阶段按钮已 hidden，不触发
+    });
+  }
 }
 
 function init() {

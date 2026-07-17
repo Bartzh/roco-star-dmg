@@ -1321,6 +1321,92 @@ body.challenge-mode .seal-container {
   justify-content: center;
 }
 
+/* ============================================================
+   挑战模式 · 答题阶段（progress / submit-btn / lock / running）
+   必须在 body.challenge-mode 规则之后写，让同特异性的 .seal-* 规则
+   后写覆盖前写（CSS 同特异性、晚写的胜出）。
+   ============================================================ */
+
+/* 进度条 + 提交按钮容器：与 #challenge-toggle-btn 同一行 */
+.challenge-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.challenge-progress[hidden] { display: none; }
+.challenge-progress-info {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  /* 防止题号/分数变化时按钮抖动：min-width 留出 3 位数 + 标题 + 累计分 */
+  min-width: 220px;
+  font-variant-numeric: tabular-nums;
+}
+.challenge-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 22px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--accent-cyan, #00e5ff);
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 20px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.2s, border-color 0.2s, color 0.2s,
+              transform 0.1s, box-shadow 0.2s, opacity 0.2s;
+}
+.challenge-submit-btn:hover:not(:disabled) {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+}
+.challenge-submit-btn:active:not(:disabled) { transform: scale(0.97); }
+.challenge-submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.challenge-submit-btn[hidden] { display: none; }
+/* 答完一题后切换为"下一题 / 查看结果"：用黄色区分 */
+.challenge-submit-btn.is-next {
+  color: #ffeb3b;
+  background: rgba(255, 235, 59, 0.08);
+  border-color: rgba(255, 235, 59, 0.4);
+}
+.challenge-submit-btn.is-next:hover:not(:disabled) {
+  background: rgba(255, 235, 59, 0.15);
+  border-color: rgba(255, 235, 59, 0.6);
+  box-shadow: 0 0 12px rgba(255, 235, 59, 0.25);
+}
+
+/* 答题态：setup 隐藏、progress 显示、seal/result 回归显示
+   （放在 body.challenge-mode 之后覆盖其 display:none） */
+body.challenge-running .challenge-setup { display: none; }
+body.challenge-running .challenge-progress { display: inline-flex; }
+body.challenge-running .challenge-progress[hidden] { display: none; }
+/* 覆盖 body.challenge-mode 的 hide，让星陨/滑块/伤害结果在 running 时显示 */
+body.challenge-running .seal-top,
+body.challenge-running .seal-middle,
+body.challenge-running .result-bottom {
+  display: flex;
+}
+
+/* 答题态：精灵面板锁定（不可点、灰显）。仅作用于 .spirit-panel 内部，
+   星陨层数控件（#seal-wrapper / #seal-slider）独立加 .challenge-locked，
+   不受 spirit-panel 锁影响。 */
+.challenge-locked {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  filter: grayscale(0.55) brightness(0.78);
+  opacity: 0.55;
+}
+
 /* label-chip：与 .buff-chip 视觉一致的 chip（替换侧栏 label） */
 .label-chip {
   display: inline-flex;
