@@ -3573,8 +3573,12 @@ function renderChallengeResult() {
   const c = state.challenge;
   const info = document.getElementById('challenge-progress-info');
   if (info) info.textContent = `挑战完成 · 总分 ${c.totalScore} / ${c.total * 100}`;
+  // 提交按钮淡出（220ms），不直接 display:none 避免突兀。
   const btn = document.getElementById('challenge-submit-btn');
-  if (btn) btn.hidden = true;
+  if (btn) {
+    btn.classList.remove('is-shown');
+    btn.setAttribute('aria-hidden', 'true');
+  }
   lockStarControls();
   c.phase = 'done';
 }
@@ -3671,11 +3675,18 @@ function applyQuestion(index) {
   document.body.classList.add('challenge-running');
   const setup = document.getElementById('challenge-setup');
   if (setup) setup.hidden = true;
-  // 进度信息 + 提交按钮（HTML 里默认 hidden；进入答题态才显示）
+  // 进度信息 + 提交按钮：CSS 控透明度（220ms 淡入），aria-hidden 与可见性同步
+  // — 之前用 `hidden = true/false` 是二值切换，没有过渡，体验突兀。
   const info = document.getElementById('challenge-progress-info');
-  if (info) info.hidden = false;
+  if (info) {
+    info.classList.add('is-shown');
+    info.setAttribute('aria-hidden', 'false');
+  }
   const submitBtn = document.getElementById('challenge-submit-btn');
-  if (submitBtn) submitBtn.hidden = false;
+  if (submitBtn) {
+    submitBtn.classList.add('is-shown');
+    submitBtn.setAttribute('aria-hidden', 'false');
+  }
   // 10. 答题阶段：把侧栏 label-chip（精灵池单选/随机 chip）淡出，让 label-text
   //     淡入回归——与「从挑战设置退出挑战」时的视觉一致（见 exitChallengeMode）。
   //     不然进入答题态后还会看到「全部/常见/自选」「随机」等 chip，干扰注意力。
@@ -3710,15 +3721,21 @@ function submitAnswer() {
     starLayer: 0,
   };
   const optimal = findMinKillLayer(baseSnap, q);
-  // 评分：score = 100 - (submitted - optimal) * 10，截断到 [0, 100]
-  //   - 可击杀 (optimal <= 99)：按公式算
-  //   - 不可击杀 (optimal = 100 哨兵)：100 - (s-100)*10 通常 > 100，封顶 100
-  const raw = 100 - (submitted - optimal) * 10;
-  const score = Math.max(0, Math.min(100, raw));
+  // 评分关键修复：用用户提交的层数实际跑一次伤害计算，
+  // 判定「是否真的击杀」。之前只看 optimal 是否 ≤99，忽略了
+  // 提交层数 < optimal（用户没打够）和 optimal=100（99层都打不死）
+  // 两种情况，公式 raw = 100 - (s-o)*10 会变成 >100 被封顶到 100，
+  // 导致"没击杀也拿满分"的 bug。
+  // 现在的逻辑：未击杀 → 0 分；击杀 → 100 - (s-o)*10，封顶 100 保底 0。
+  const userDamage = computeFinalDamage({ ...baseSnap, starLayer: submitted }).finalDamage;
+  const userKills = userDamage >= q.defHP;
+  const score = userKills
+    ? Math.max(0, Math.min(100, 100 - (submitted - optimal) * 10))
+    : 0;
   c.scores.push({
     layer: submitted,
     optimal,
-    isKill: optimal <= 99,
+    isKill: userKills,        // 改为"用户实际是否击杀"，与分数逻辑保持一致
     score,
   });
   c.totalScore += score;
@@ -3756,12 +3773,16 @@ function exitChallenge() {
   // 1. 解锁所有面板
   unlockSpiritPanels();
   unlockStarControls();
-  // 2. 隐藏进度信息 + 提交按钮；复位提交按钮状态
+  // 2. 进度信息 + 提交按钮淡出（220ms），aria-hidden 同步更新
   const info = document.getElementById('challenge-progress-info');
-  if (info) info.hidden = true;
+  if (info) {
+    info.classList.remove('is-shown');
+    info.setAttribute('aria-hidden', 'true');
+  }
   const btn = document.getElementById('challenge-submit-btn');
   if (btn) {
-    btn.hidden = true;
+    btn.classList.remove('is-shown');
+    btn.setAttribute('aria-hidden', 'true');
     btn.classList.remove('is-next');
     btn.disabled = true;
   }

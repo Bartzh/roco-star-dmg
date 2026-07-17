@@ -1354,7 +1354,9 @@ body.challenge-mode .seal-container {
    后写覆盖前写（CSS 同特异性、晚写的胜出）。
    ============================================================ */
 
-/* 进度信息：显示当前题号与累计分。min-width 防止数字变化时按钮抖动。 */
+/* 进度信息：显示当前题号与累计分。min-width 防止数字变化时按钮抖动。
+   淡入淡出：默认 opacity:0 + visibility:hidden；进入答题态后由 .is-shown
+   触发 220ms 渐变；visibility 用 transition-delay 配合，避免动画期间被点击。 */
 .challenge-progress-info {
   font-size: 0.78rem;
   color: var(--text-secondary);
@@ -1362,6 +1364,15 @@ body.challenge-mode .seal-container {
   /* 防止题号/分数变化时按钮抖动：min-width 留出 3 位数 + 标题 + 累计分 */
   min-width: 220px;
   font-variant-numeric: tabular-nums;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.22s ease, visibility 0s linear 0.22s;
+}
+.challenge-progress-info.is-shown {
+  opacity: 1;
+  visibility: visible;
+  /* 显示时 visibility 立即生效，避免被卡在 hidden 状态 */
+  transition: opacity 0.22s ease, visibility 0s linear 0s;
 }
 .challenge-submit-btn {
   display: inline-flex;
@@ -1379,8 +1390,23 @@ body.challenge-mode .seal-container {
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  /* 默认隐藏态：opacity 0 + visibility hidden，配合 .is-shown 渐入 */
+  opacity: 0;
+  visibility: hidden;
+  /* 在原有 background/border/transform 过渡基础上追加 opacity + visibility：
+     - 默认（隐藏）→ 移走 .is-shown 时：opacity 0.22s 渐变，visibility 在 0.22s 末尾切到 hidden
+     - .is-shown 时：visibility 立即切到 visible，opacity 0.22s 渐入 */
   transition: background 0.2s, border-color 0.2s, color 0.2s,
-              transform 0.1s, box-shadow 0.2s, opacity 0.2s;
+              transform 0.1s, box-shadow 0.2s, opacity 0.22s ease,
+              visibility 0s linear 0.22s;
+}
+.challenge-submit-btn.is-shown {
+  opacity: 1;
+  visibility: visible;
+  /* 显示时 visibility 立即生效（0s 延迟），opacity 仍用 0.22s 渐入 */
+  transition: background 0.2s, border-color 0.2s, color 0.2s,
+              transform 0.1s, box-shadow 0.2s, opacity 0.22s ease,
+              visibility 0s linear 0s;
 }
 .challenge-submit-btn:hover:not(:disabled) {
   background: rgba(0, 229, 255, 0.15);
@@ -1389,10 +1415,10 @@ body.challenge-mode .seal-container {
 }
 .challenge-submit-btn:active:not(:disabled) { transform: scale(0.97); }
 .challenge-submit-btn:disabled {
+  /* disabled 但仍 is-shown 时：保持可见但灰显（极少触发，仅作防御） */
   opacity: 0.45;
   cursor: not-allowed;
 }
-.challenge-submit-btn[hidden] { display: none; }
 /* 答完一题后切换为"下一题 / 查看结果"：用黄色区分 */
 .challenge-submit-btn.is-next {
   color: #ffeb3b;
