@@ -2916,7 +2916,7 @@ const MODAL_CONTENT = {
     html: `
       <h3>挑战模式 · 答题流程 <span class="modal-date">· 2026-07-17</span></h3>
       <ul>
-        <li>挑战模式答题流程上线：开始挑战 → 自动出题 → 拖动星陨层数 → 提交答案 → 评分 → 下一题 / 结算。</li>
+        <li>挑战模式答题流程上线：开始挑战 → 自动出题 → 拖动星陨层数 → 提交答案 → 评分 → 下一道题 / 结算。</li>
         <li>双方精灵池支持「全部 / 常见 / 自选」；属性配置与技能选择支持「固定当前 / 随机每题」；防御技能按相同减伤率兜底匹配。</li>
         <li>评分公式：100 - (提交层数 - 最优层数) × 10，最小 0 分；99 层仍无法击杀时仍按公式评分。</li>
         <li>答题阶段精灵面板自动锁定（灰显、不可点），仅星陨层数可调；随时可「退出挑战」回到计算器状态。</li>
@@ -3544,7 +3544,7 @@ function renderChallengeProgress() {
   el.textContent = `第 ${c.current + 1} / ${c.total} 题 · 累计 ${c.totalScore} 分`;
 }
 
-// 渲染提交/下一题/查看结果按钮文案 + 启用状态。
+// 渲染提交/下一道题/查看结果按钮文案 + 启用状态。
 function renderSubmitButton() {
   const btn = document.getElementById('challenge-submit-btn');
   if (!btn) return;
@@ -3555,7 +3555,7 @@ function renderSubmitButton() {
     btn.textContent = '提交答案';
     btn.disabled = false;
   } else if (c.phase === 'answered') {
-    btn.textContent = isLast ? '查看结果' : '下一题';
+    btn.textContent = isLast ? '查看结果' : '下一道题';
     btn.disabled = false;
     btn.classList.add('is-next');
   } else {
@@ -3734,7 +3734,7 @@ function submitAnswer() {
   calculateDamage();
 }
 
-// 进入下一题 / 最后一题显示结算
+// 进入下一道题 / 最后一题显示结算
 function nextQuestion() {
   const c = state.challenge;
   const next = c.current + 1;
@@ -4078,7 +4078,7 @@ function initChallengeMode() {
     });
   }
 
-  // —— 「提交答案 / 下一题 / 查看结果」按钮（按 phase 路由）——
+  // —— 「提交答案 / 下一道题 / 查看结果」按钮（按 phase 路由）——
   const submitBtn = document.getElementById('challenge-submit-btn');
   if (submitBtn) {
     submitBtn.addEventListener('click', () => {

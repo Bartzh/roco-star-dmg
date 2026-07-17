@@ -1172,16 +1172,35 @@ body {
    本段只承载"控件外壳 + 过渡动画"；业务逻辑（出题、评分等）后续 PR 实现。 */
 
 /* 挑战模式切换条：副标题之下、battle-area 之上
-   默认 1 个子元素（切换按钮），进入答题态后追加 2 个（信息 + 提交）。
-   用 align-items + gap 让三者在视觉上对齐且间隔合理。 */
+   三列网格 `1fr | auto | 1fr`：
+     - 第 1 列：进度信息（justify-self: end → 浮在右侧紧贴切换按钮）
+     - 第 2 列：切换按钮（auto → 始终居中，宽度变化不影响位置）
+     - 第 3 列：提交按钮（justify-self: start → 浮在左侧紧贴切换按钮）
+   切换按钮用 grid-column: 2 显式钉在中间列，不受两侧元素显隐影响。
+   信息/提交默认 hidden，display:none 会被 grid 跳过，但 1fr 1fr 的空列
+   仍存在，切换按钮始终位于容器几何中心。 */
 .challenge-bar {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  column-gap: 14px;
   margin: -16px 0 20px;
-  /* 允许在窄屏下换行，避免三元素挤成一行导致按钮被截 */
-  flex-wrap: wrap;
+}
+.challenge-toggle-btn {
+  /* 显式钉在中间列，避免被 grid auto-flow 放到第 1 列（导致偏左） */
+  grid-column: 2;
+  justify-self: center;
+}
+.challenge-progress-info {
+  /* 显式钉在第 1 列，靠右对齐（紧贴切换按钮左侧） */
+  grid-column: 1;
+  justify-self: end;
+  text-align: right;
+}
+.challenge-submit-btn {
+  /* 显式钉在第 3 列，靠左对齐（紧贴切换按钮右侧） */
+  grid-column: 3;
+  justify-self: start;
 }
 .challenge-toggle-btn {
   display: inline-flex;
