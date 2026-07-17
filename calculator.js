@@ -3384,7 +3384,11 @@ function buildStatsRng(side) {
   };
 }
 
-// 技能选择工厂：返回 () => 技能 id
+// 技能选择工厂：返回 (spirit) => 技能 id
+//   关键：必须传入"本道题新生成的精灵"作为参数（而不是闭包 state.[side]），
+//   因为题目池模式下（新精灵 != state.[side]）如果用 state，random
+//   兜底会从旧精灵的技能表里挑，导致选出来的 id 在新精灵里查不到，
+//   applyQuestion 触发 opts[0] 兜底——看起来"必然选第一个技能"。
 // 攻击方：
 //   randomSkill=false (固定)：优先 state.attackSkill.id；该 id 不在新精灵可用列表
 //                            中时回退到随机
@@ -3400,16 +3404,16 @@ function buildSkillRng(side) {
     if (!isRandom) {
       // 固定：先尝试用户的技能；不匹配回退到随机
       const userId = state.attackSkill?.id;
-      return () => {
-        const opts = getAttackSkillOptions(state.attacker);
+      return (attacker) => {
+        const opts = getAttackSkillOptions(attacker);
         if (userId && opts.some(s => s.id === userId)) return userId;
         const picked = _pickRandom(opts);
         return picked ? picked.id : YUANLI_SKILLS[0].id;
       };
     }
     // 随机：等概率
-    return () => {
-      const opts = getAttackSkillOptions(state.attacker);
+    return (attacker) => {
+      const opts = getAttackSkillOptions(attacker);
       const picked = _pickRandom(opts);
       return picked ? picked.id : YUANLI_SKILLS[0].id;
     };
@@ -3418,8 +3422,8 @@ function buildSkillRng(side) {
   if (!isRandom) {
     const userId = state.defenseSkill?.id;
     const userReduction = state.defenseSkill?.reduction;
-    return () => {
-      const opts = getDefenseSkillOptions(state.defender);
+    return (defender) => {
+      const opts = getDefenseSkillOptions(defender);
       // 1. 优先：完全相同 id
       if (userId) {
         const hit = opts.find(s => s.id === userId);
@@ -3438,8 +3442,8 @@ function buildSkillRng(side) {
     };
   }
   // 随机：加权——"无"（__none__）占 5/6 权重
-  return () => {
-    const opts = getDefenseSkillOptions(state.defender);
+  return (defender) => {
+    const opts = getDefenseSkillOptions(defender);
     const weighted = [];
     for (const s of opts) {
       if (s.id === '__none__') {
@@ -3460,10 +3464,14 @@ function buildQuestionSnapshot(_index) {
   const defId    = buildSpiritRng('defender')();
   const atkStats = buildStatsRng('attacker')();
   const defStats = buildStatsRng('defender')();
-  const atkSkId  = buildSkillRng('attacker')();
-  const defSkId  = buildSkillRng('defender')();
+  // 关键：先构造本题新精灵对象，再让技能工厂用新精灵的技能表去选/兜底，
+  // 避免 buildSkillRng 误用 state.[side]（上一个题目 / 用户在普通计算器里
+  // 选的精灵）的旧技能表——那会导致选出来的 id 在新精灵里查不到，
+  // 触发 applyQuestion 的 opts[0] 兜底，看起来像"必然选第一个技能"。
   const attacker = { id: atkId, ...(SPRITES[atkId] || {}) };
   const defender = { id: defId, ...(SPRITES[defId] || {}) };
+  const atkSkId  = buildSkillRng('attacker')(attacker);
+  const defSkId  = buildSkillRng('defender')(defender);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
   return {
     attacker,
