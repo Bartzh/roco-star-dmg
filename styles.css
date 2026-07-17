@@ -546,6 +546,8 @@ body {
   min-height: 141px;
   max-height: 141px;
   overflow-y: auto;
+  /* 始终为滚动条预留 gutter，避免技能数 ≤4 时滚动条消失导致内容宽度抖动 */
+  scrollbar-gutter: stable;
   padding-right: 2px;
   align-content: start;
   /* 避免动画遮挡边框 */
@@ -1523,6 +1525,8 @@ body.challenge-running .result-bottom {
     grid-template-columns: repeat(2, 1fr);
     min-height: 125px;
     max-height: 125px;
+    /* 移动端：同样始终为滚动条预留 gutter，避免列表抖动 */
+    scrollbar-gutter: stable;
   }
   .skill-btn {
     min-height: 54px;
