@@ -178,6 +178,21 @@ let state = {
   //   questions   : 全部题目快照（生成时确定下来），每元素含双方精灵/性格/IVs/buffs/speed/skillId/defHP
   //   scores      : 每题 {layer, optimal, isKill, score}，提交时 push
   //   totalScore  : 累计分
+  //   transitionGen  : 启动任何"挑战相关过渡动画"时 +1；onfinish 回调里检查 token
+  //                    是否还匹配，不匹配说明已被新动画接管、本次回调 no-op。
+  //                    修复快速连点 toggle / submit 时多组 onfinish 互相反扑。
+  //   answerShown    : 答题结果区（.challenge-answer-result）是否"应在显示中"。
+  //                    替代原来"body.classList.contains('challenge-answered')"判断——
+  //                    后者在 _showAnswerResult 的 fadeOut 还没结束时为 false，
+  //                    导致 _hideAnswerResult 早返回 → exitChallenge 提前清 body class
+  //                    → 220ms 后 _showAnswerResult 反向加回 → 答案信息残留。
+  //   answerAnimating: _showAnswerResult / _hideAnswerResult 正在播 220ms 过渡动画。
+  //                    submit/toggle 按钮 click handler 在此期间忽略点击，
+  //                    防止快速连点串起"submit → nextQuestion → 下一题 submit"链。
+  //   toggleAnimating: enterChallengeMode / exitChallengeMode 正在播 440ms 过渡动画。
+  //                    toggle 按钮 click handler 在此期间忽略点击（2026-07-18 加），
+  //                    防止连点触发"enter + exit 完整 880ms 动画、视觉上闪两次"。
+  //                    末尾 onfinish 内释放（gen 守卫，与 transitionGen 配套）。
   challenge: {
     active: false,
     preset: 'easy',
@@ -192,6 +207,10 @@ let state = {
     questions: [],
     scores: [],
     totalScore: 0,
+    transitionGen: 0,
+    answerShown: false,
+    answerAnimating: false,
+    toggleAnimating: false,
   },
 };
 
@@ -3225,6 +3244,23 @@ function _cancelAnimations(el) {
   }
 }
 
+// 统一取消挑战模式相关元素的所有 Web Animations。
+// 在 enter / exit / show / hide 启动新动画前调用，避免新旧 .animate() 互相
+// 反向覆盖同一元素（Element.animate() 不会自动取消旧 animation，必须显式 cancel）。
+//   - 中心区域：.seal-top / .seal-middle / .result-bottom / #challenge-setup /
+//     #challenge-answer-result
+//   - 侧栏：所有 .label-text ↔ .label-chip-group 对
+function _cancelChallengeAnimations() {
+  document.querySelectorAll(
+    '.seal-top, .seal-middle, .result-bottom, ' +
+    '#challenge-setup, #challenge-answer-result'
+  ).forEach(el => _cancelAnimations(el));
+  for (const pair of _collectLabelSwapPairs()) {
+    _cancelAnimations(pair.textEl);
+    _cancelAnimations(pair.chipEl);
+  }
+}
+
 // 收集挑战模式下需要切换的 (text, chip) 对：
 //   - 攻击方 / 防御方 的 panel-label
 //   - 属性配置 / 攻击技能 / 防御技能 的 section-title
@@ -3245,9 +3281,24 @@ function _collectLabelSwapPairs() {
 //   t=440  全部完成
 //   旧实现：body.challenge-mode 立即加上 → 星陨/伤害结果瞬间消失 → 挑战设置 220ms 淡入。
 //   这导致中心比两侧 chip 早 220ms 完成（侧栏是 text 淡出 220 + chip 淡入 220 = 440ms）。
+//
+// 快速连点防御（2026-07-18）：
+//   1) 进入前先 _cancelChallengeAnimations() 取消所有 sections / setup / label
+//      pairs 上正在跑的 animation——避免与"上次 exit 留下的 fade"反向覆盖。
+//   2) 启动时 transitionGen++ 并快照 myGen；Promise.all 回调里检查
+//      transitionGen === myGen，不等则 no-op（已被新的 enter/exit 接管）。
+//      这覆盖了"用户在 220ms 内点退出"导致的旧回调反扑。
 function enterChallengeMode() {
   if (state.challenge.active) return;
+  // 进入前先清理所有相关元素上正在跑的 animation（修复连点 toggle 时
+  // 上一次 enter 留下的 .animate() 反向动画的 bug）。
+  _cancelChallengeAnimations();
+  const myGen = ++state.challenge.transitionGen;
   state.challenge.active = true;
+  // 锁住 toggle click handler（2026-07-18）：440ms 完整动画期间忽略点击，
+  // 防止"enter + exit 各 440ms、视觉上闪两次"。末尾 setup 淡入 onfinish
+  // 释放（带 gen 守卫，cancel 时不释放，被新动画接管时由新动画释放）。
+  state.challenge.toggleAnimating = true;
 
   // 切换按钮文案 + 视觉
   const btn = document.getElementById('challenge-toggle-btn');
@@ -3273,6 +3324,9 @@ function enterChallengeMode() {
     )
   );
   Promise.all(sectionAnims.map(a => a.finished)).then(() => {
+    // gen 守卫：回调触发时若 transitionGen 已变化（用户在淡出期间点了退出），
+    // 说明已被 exit 接管，本次回调 no-op，避免 body 状态被反向写入。
+    if (state.challenge.transitionGen !== myGen) return;
     sections.forEach(s => {
       s.style.opacity = '';
       s.style.transform = '';
@@ -3289,13 +3343,21 @@ function enterChallengeMode() {
       setup.style.opacity = '';
       setup.style.transform = '';
       setup.hidden = false;
-      setup.animate(
+      const setupAnim = setup.animate(
         [
           { opacity: 0, transform: 'translateY(6px)' },
           { opacity: 1, transform: 'translateY(0)' },
         ],
         { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
+      // 完整 440ms 动画结束（sections 淡出 220 + setup 淡入 220）后释放
+      // toggle 锁；gen 守卫确保只在"本次 enter 没被抢断"时释放——
+      // 若已被 exit 接管（transitionGen 变了），由 exit 自己的 onfinish 释放。
+      setupAnim.onfinish = () => {
+        if (state.challenge.transitionGen !== myGen) { setupAnim.cancel(); return; }
+        setupAnim.cancel();
+        state.challenge.toggleAnimating = false;
+      };
     }
   });
 
@@ -3309,9 +3371,23 @@ function enterChallengeMode() {
 // 关键顺序：1) setup 淡出 → 2) hidden → 3) body.challenge-mode 移除（星陨/伤害结果
 // 重新出现）→ 4) 星陨/伤害结果淡入。**不能**先移除 body.challenge-mode 再淡出 setup，
 // 否则两者会同时存在导致布局挤兑（星陨/伤害结果被 setup 顶到下面挤在一起）。
+//
+// 快速连点防御（2026-07-18）：
+//   1) 进入前 _cancelChallengeAnimations() 取消 sections / setup / label pairs 上
+//      正在跑的 animation——避免与"上次 enter 留下的 fade"反向覆盖。
+//   2) transitionGen++ 并快照 myGen；setup.animate 与 sections.animate 的 onfinish
+//      内检查 transitionGen === myGen，不等则 no-op。
 function exitChallengeMode() {
   if (!state.challenge.active) return;
+  // 进入前先清理所有相关元素上正在跑的 animation（修复连点 toggle 时
+  // 上一次 enter 留下的 .animate() 反向动画的 bug）。
+  _cancelChallengeAnimations();
+  const myGen = ++state.challenge.transitionGen;
   state.challenge.active = false;
+  // 锁住 toggle click handler（2026-07-18）：440ms 完整动画期间忽略点击，
+  // 防止"enter + exit 各 440ms、视觉上闪两次"。末尾 sections 淡入 onfinish
+  // 释放（带 gen 守卫，被新动画接管时由新动画释放）。
+  state.challenge.toggleAnimating = true;
 
   const btn = document.getElementById('challenge-toggle-btn');
   const text = btn && btn.querySelector('.challenge-toggle-text');
@@ -3340,6 +3416,9 @@ function exitChallengeMode() {
       { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
     a.onfinish = () => {
+      // gen 守卫：若已被新的 enter 接管（用户在淡出期间点了"挑战模式"），
+      // 不再继续改 body class 与启动 sections 淡入——避免两者打架。
+      if (state.challenge.transitionGen !== myGen) { a.cancel(); return; }
       setup.hidden = true;
       setup.style.opacity = '';
       setup.style.transform = '';
@@ -3353,8 +3432,14 @@ function exitChallengeMode() {
           { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
         );
         anim.onfinish = () => {
+          // 同样的 gen 守卫
+          if (state.challenge.transitionGen !== myGen) { anim.cancel(); return; }
           s.style.opacity = '';
           s.style.transform = '';
+          anim.cancel();
+          // 完整 440ms 动画结束（setup 淡出 220 + sections 淡入 220）后释放
+          // toggle 锁；只在"本次 exit 没被抢断"时释放。
+          state.challenge.toggleAnimating = false;
         };
       });
     };
@@ -3630,6 +3715,20 @@ function _showAnswerResult({ score, optimal }) {
   const optimalEl = document.getElementById('challenge-answer-optimal');
   if (!middle || !result || !scoreEl || !optimalEl) return;
 
+  // 快速连点防御（2026-07-18）：
+  //   - 进入前先取消 answerAnimating 期间可能存在的 _hideAnswerResult fade
+  //   - 启动 transitionGen++ 并快照 myGen；fadeOut.onfinish 内检查 token，
+  //     不等则 no-op——防止 _hideAnswerResult 抢在 fadeOut 完成前退出后，
+  //     本回调反向把 body 重新加上 challenge-answered。
+  //   - answerShown/answerAnimating 立即置 true，让 race 窗口内的
+  //     _hideAnswerResult 能正确识别"结果已显示"（不再误判"还没加 body class"
+  //     而早返回）。
+  _cancelAnimations(middle);
+  _cancelAnimations(result);
+  const myGen = ++state.challenge.transitionGen;
+  state.challenge.answerShown = true;
+  state.challenge.answerAnimating = true;
+
   // 1. 填充内容 + 分数等级（高分绿/中分黄/低分红）
   scoreEl.textContent = score;
   optimalEl.textContent = optimal;
@@ -3641,7 +3740,6 @@ function _showAnswerResult({ score, optimal }) {
   // 2. 淡出滑条 → body.challenge-answered 触发 CSS 隐藏 + 显示结果 → 淡入
   // 关键：先做完淡出再加 body class，否则 body class 的 display:none 会让
   // 淡出动画"瞬间消失"，看起来像没动画。
-  _cancelAnimations(middle);
   const fadeOut = middle.animate(
     [
       { opacity: 1, transform: 'translateY(0)' },
@@ -3650,6 +3748,10 @@ function _showAnswerResult({ score, optimal }) {
     { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
   );
   fadeOut.onfinish = () => {
+    // gen 守卫：若 _hideAnswerResult / _showAnswerResult 已被新调用接管
+    // （transitionGen 已变），不再继续——避免 body 状态被反向写入导致
+    // 答案信息残留与滑条共存。
+    if (state.challenge.transitionGen !== myGen) return;
     // 淡出完成才切 display：CSS 让 .seal-middle 隐藏、.challenge-answer-result 显示
     document.body.classList.add('challenge-answered');
     result.hidden = false;
@@ -3661,33 +3763,53 @@ function _showAnswerResult({ score, optimal }) {
       ],
       { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
+    // 整个 show 流程（淡出滑条 + 切 display + 淡入结果）完成；
+    // 答题结果区稳定显示，answerAnimating 复位。
+    state.challenge.answerAnimating = false;
   };
 }
 
-// 返回 Promise：resolve 时表示"答题结果 → 滑条"的 swap（淡出 220ms + 淡入 220ms）
-// 已全部完成。exitChallenge 用 .then() 把 body.challenge-running / body.challenge-mode
-// 的移除推迟到 swap 之后——
-// 否则 CSS 规则 `body.challenge-running.challenge-answered .seal-middle { display:none }`
-// 会在淡出过程中失效，.seal-middle 立即显形，与正在淡出的 .challenge-answer-result
-// 同时出现在 .seal-container 内（flex column 上下排），看起来"上下挤在一起"。
-// 非 answered 态早返回时 Promise 立即 resolve，下游 .then() 等价于同步执行。
+// 答题结果 → 滑条 切换。
+// 快速连点防御（2026-07-18）：
+//   - 早返回判断改用 state.challenge.answerShown（与 c.phase 同步设置），
+//     替代 "body.classList.contains('challenge-answered')"——后者在
+//     _showAnswerResult 的 fadeOut 还没结束时为 false，会让 race 窗口内的
+//     _hideAnswerResult 误判"已隐藏"而早返回，导致 body class 被提前移除。
+//   - transitionGen++ 快照 myGen；fadeOut/fadeIn 的 onfinish 内 gen 守卫，
+//     防止 _showAnswerResult 抢在 fadeOut 完成后反向写入 body 状态。
+//   - answerShown/answerAnimating 立即维护为 hide 流程的最新状态。
 function _hideAnswerResult({ animated = true } = {}) {
   const middle = document.getElementById('seal-middle');
   const result = document.getElementById('challenge-answer-result');
   if (!middle || !result) return Promise.resolve();
-  // 已经在"滑条态"就直接返回（防重复调用）
-  if (!document.body.classList.contains('challenge-answered')) return Promise.resolve();
+  // 已经在"滑条态"就直接返回（防重复调用）。**用 answerShown 而非 body class**：
+  // _showAnswerResult 的 fadeOut 未结束时 body 还没有 challenge-answered，
+  // 但 answerShown 已在调用入口置 true（与 c.phase 同步），能正确识别
+  // "结果区在显示中"这一语义。
+  if (!state.challenge.answerShown) return Promise.resolve();
 
-  // 原地退出：不播动画，立即换回滑条（用于 exitChallenge）
+  // 原地退出：不播动画，立即换回滑条（用于 exitChallenge 等"立即收尾"场景）
   if (!animated) {
+    const myGen = ++state.challenge.transitionGen;
+    state.challenge.answerShown = false;
+    state.challenge.answerAnimating = false;
     document.body.classList.remove('challenge-answered');
     result.hidden = true;
     return Promise.resolve();
   }
 
   // 淡出答题结果 → 切回滑条 → 淡入滑条
+  // 进入前先清理 answerAnimating 期间可能存在的 _showAnswerResult fadeOut
+  // （虽然 _showAnswerResult 自己有 gen 守卫不再反扑，但保险起见清掉）
+  _cancelAnimations(result);
+  _cancelAnimations(middle);
+  const myGen = ++state.challenge.transitionGen;
+  state.challenge.answerAnimating = true;
+  // 立即清 answerShown——这样若 race 窗口内 _showAnswerResult 被再次调用
+  // （理论上不会，但防御），它会自己重新置 true + 启动新动画。
+  state.challenge.answerShown = false;
+
   return new Promise(resolve => {
-    _cancelAnimations(result);
     const fadeOut = result.animate(
       [
         { opacity: 1, transform: 'translateY(0)' },
@@ -3696,11 +3818,14 @@ function _hideAnswerResult({ animated = true } = {}) {
       { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
     fadeOut.onfinish = () => {
+      // gen 守卫：若 _showAnswerResult / _hideAnswerResult 已被新调用接管
+      // （用户在淡出期间又点了 submit），不再继续——避免 body 状态被
+      // 错误地覆盖为 hide 终态（导致 result 残留或被强行隐藏）。
+      if (state.challenge.transitionGen !== myGen) { fadeOut.cancel(); return; }
       // 切回滑条：移除 body class + 隐藏结果节点
       document.body.classList.remove('challenge-answered');
       result.hidden = true;
       // 淡入滑条
-      _cancelAnimations(middle);
       const fadeIn = middle.animate(
         [
           { opacity: 0, transform: 'translateY(4px)' },
@@ -3709,7 +3834,12 @@ function _hideAnswerResult({ animated = true } = {}) {
         { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
       // 等淡入完成再 resolve：调用方此时移除 body.challenge-running / .challenge-mode 才安全
-      fadeIn.onfinish = resolve;
+      fadeIn.onfinish = () => {
+        // gen 守卫：同样防止后续新动画接管后这个 callback 反向 reset state
+        if (state.challenge.transitionGen !== myGen) { fadeIn.cancel(); return; }
+        state.challenge.answerAnimating = false;
+        resolve();
+      };
     };
   });
 }
@@ -3856,10 +3986,24 @@ function applyQuestion(index) {
   //    已经在并行播，seal 区域补上同样的 Web Animations 即可。
   //    **后续题**：body 类与 setup.hidden 都在第一题设置过，这里就是 no-op，
   //    不用再走动画。
+  //
+  // 快速连点防御（2026-07-18）：
+  //   - 第一题启动前 _cancelChallengeAnimations() + transitionGen++；setup
+  //     淡出与 sections 淡入的 onfinish 内 gen 守卫——防止用户在 220ms 内点
+  //     退出（exitChallenge 会 cancel 这些 animation + bump gen），即便
+  //     onfinish 仍然 fire，gen 失配也会 no-op。
+  //
+  //   **不在这里清 answerShown/answerAnimating**：nextQuestion 路径下
+  //     _hideAnswerResult 入口立即把 answerAnimating 设为 true（防 submit
+  //     click 在 440ms 内重入），紧接着 applyQuestion(next) 同步执行——
+  //     如果这里再设 false，next 之后那 440ms 的锁立即被吃掉，user 可以
+  //     连点 submit/退出挑战再次触发链式动画。改为：_hideAnswerResult
+  //     自己的 fadeIn.onfinish 负责设 false。
   if (index === 0) {
     const setup = document.getElementById('challenge-setup');
     if (setup) {
       _cancelAnimations(setup);
+      const myGen = ++state.challenge.transitionGen;
       const fadeOut = setup.animate(
         [
           { opacity: 1, transform: 'translateY(0)' },
@@ -3868,6 +4012,9 @@ function applyQuestion(index) {
         { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
       fadeOut.onfinish = () => {
+        // gen 守卫：若已被新的 enter/exit 接管（用户在 220ms 内点退出），
+        // 不再继续——避免 body 状态被反向写入。
+        if (state.challenge.transitionGen !== myGen) { fadeOut.cancel(); return; }
         // 此时才让 body 切到 running 态：先隐藏 setup + swap class，
         // 再淡入 seal-*，避免两者在 .seal-container（flex column）里同时存在造成挤兑。
         setup.hidden = true;
@@ -3886,6 +4033,8 @@ function applyQuestion(index) {
             { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
           );
           anim.onfinish = () => {
+            // 同样的 gen 守卫
+            if (state.challenge.transitionGen !== myGen) { anim.cancel(); return; }
             s.style.opacity = '';
             s.style.transform = '';
           };
@@ -3933,6 +4082,10 @@ function applyQuestion(index) {
 function submitAnswer() {
   const c = state.challenge;
   if (c.phase !== 'picking') return;  // 防双击
+  // 快速连点防御（2026-07-18）：如果 _showAnswerResult / _hideAnswerResult 还在
+  // 播 220ms 过渡动画，忽略本次点击。否则会与上一次提交未完成的"结果区切换"
+  // 动画叠加，触发 answer 信息残留 + body class 反向写入。
+  if (c.answerAnimating) return;
   const q = c.questions[c.current];
   if (!q) return;
   const submitted = state.starLayer;
@@ -3992,6 +4145,10 @@ function submitAnswer() {
 // 进入下一道题 / 最后一题显示结算
 function nextQuestion() {
   const c = state.challenge;
+  // 快速连点防御（2026-07-18）：如果 _showAnswerResult / _hideAnswerResult 还在
+  // 播 220ms 过渡动画，忽略本次点击。否则会与未完成的"结果区切换"动画叠加，
+  // 导致 applyQuestion 与 hide 的 body class 状态互相覆盖。
+  if (c.answerAnimating) return;
   const next = c.current + 1;
   if (next >= c.total) {
     renderChallengeResult();
@@ -4009,8 +4166,34 @@ function nextQuestion() {
 // 退出挑战：解除所有锁定、回到正常计算器状态。
 // 不备份 state —— applyQuestion 期间会改写 state 字段，退出后 state 残留
 // 的是最后提交的题目快照；用户重新调整即可，不专门设计"恢复原状态"。
+//
+// 快速连点防御（2026-07-18）：
+//   1) 入口处 running 守卫：第二次点击的 exitChallenge 调用直接 no-op，
+//      避免第一次未跑完就第二次进。
+//   2) 先 transitionGen++ + _cancelChallengeAnimations()，确保 _showAnswerResult
+//      / applyQuestion(0) 留下的 220ms onfinish 回调的 gen 失配、no-op，
+//      不会再反向加回 body class。
+//   3) 显式重置 answerAnimating。
+//
+//   **不要**在这里把 c.answerShown = false：_hideAnswerResult 入口用
+//   `if (!answerShown) return Promise.resolve();` 早返回；这里清掉后
+//   _hideAnswerResult 不会走完整流程，.challenge-answer-result 不会被
+//   hidden=true、body 也不会 remove('challenge-answered')——最终 result
+//   与 .seal-middle 同时显示（"答案信息留在这里 + 滑条瞬间出现"）。
+//   answerShown 由 _showAnswerResult 入口设为 true，让 _hideAnswerResult
+//   检测到它存在、走完整淡出 → 切 display → 淡入流程。
 function exitChallenge() {
   const c = state.challenge;
+  if (!c.running) return;  // 快速连点防御：第二次点击 no-op
+  // 取消所有挑战相关元素上正在跑的 animation（含 _showAnswerResult 的
+  // fadeOut.onfinish / applyQuestion(0) 的 setup 淡出 onfinish 等），
+  // 并 bump transitionGen 让残留的 onfinish 回调 gen 失配、no-op。
+  c.transitionGen++;
+  _cancelChallengeAnimations();
+  // 不清 c.answerShown：让 _hideAnswerResult 检测到"结果区在显示中"、
+  // 走完整淡出 → 切 display → 淡入滑条流程（修复 2026-07-18 答案残留 bug）。
+  c.answerAnimating = false;
+
   // 1. 解锁所有面板
   unlockSpiritPanels();
   unlockStarControls();
@@ -4276,10 +4459,21 @@ function initChallengeMode() {
   const btn = document.getElementById('challenge-toggle-btn');
   if (btn) {
     btn.addEventListener('click', () => {
-      if (state.challenge.running) {
+      // 快速连点防御（2026-07-18）：
+      //   - answerAnimating 守卫：答题结果区还在播 220ms 切换动画时，
+      //     忽略 toggle 点击，避免动画进行中切模式状态导致 body class
+      //     被反向写入。
+      //   - **toggleAnimating 守卫（新增）**：enter/exit 正在播 440ms
+      //     过渡动画时忽略 click——避免"enter 220ms sections 淡出 + exit
+      //     220ms sections 淡入"在 880ms 内连续播放、视觉上闪两次。
+      //     由 enter/exit 末尾 onfinish 释放。
+      const c = state.challenge;
+      if (c.answerAnimating) return;
+      if (c.toggleAnimating) return;
+      if (c.running) {
         // 答题阶段：原地退出（不弹 setup 过渡动画）
         exitChallenge();
-      } else if (state.challenge.active) {
+      } else if (c.active) {
         // 设置阶段：退出设置
         exitChallengeMode();
       } else {
@@ -4382,6 +4576,10 @@ function initChallengeMode() {
     submitBtn.addEventListener('click', () => {
       const c = state.challenge;
       if (!c.running) return;                // 非答题阶段：忽略
+      // 快速连点防御（2026-07-18）：submitAnswer / nextQuestion 自身已经有
+      // answerAnimating 守卫，这里再叠一层：动画进行中按钮直接 no-op，
+      // 防止 click 事件多次入队导致 setTimeout 链错乱。
+      if (c.answerAnimating) return;
       if (c.phase === 'picking') submitAnswer();
       else if (c.phase === 'answered') nextQuestion();
       // 'done' 阶段按钮已 hidden，不触发
