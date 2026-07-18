@@ -2023,7 +2023,7 @@ function isFirstStrike(ctx) {
 }
 const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
-  sk_7190260(ctx, fromAttacker) {
+  多维击打(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     return {
       comboAdd: ctx.starLayer,
@@ -2031,7 +2031,7 @@ const SKILL_MODS = {
     };
   },
   // 观星：地系技能威力每层星陨 +20%
-  sk_200106(ctx, fromAttacker) {
+  观星(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (stripXi(ctx.attackSkill.element) !== '地') return null;
     const multAdd = 0.2 * ctx.starLayer;
@@ -2041,7 +2041,7 @@ const SKILL_MODS = {
     };
   },
   // 坠星：全技能威力每层星陨 +20%
-  sk_280011(ctx, fromAttacker) {
+  坠星(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const multAdd = 0.2 * ctx.starLayer;
     return {
@@ -2050,7 +2050,7 @@ const SKILL_MODS = {
     };
   },
   // 天体吸积：每 1 层星陨印记，技能威力 +20
-  sk_7190440(ctx, fromAttacker) {
+  天体吸积(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const add = 20 * ctx.starLayer;
     return {
@@ -2059,7 +2059,7 @@ const SKILL_MODS = {
     };
   },
   // 狂欢开始：本精灵受到的克制伤害+25%
-  sk_200286(ctx, fromAttacker) {
+  狂欢开始(ctx, fromAttacker) {
     if (fromAttacker) return null;
     if (effectiveness(ctx.attackSkill.element, ctx.defender.types) <= 1) return null;
     return {
@@ -2073,7 +2073,7 @@ const SKILL_MODS = {
   //   (b) 攻击方有效速度严格大于防御方有效速度（平速在游戏内会拼速，在这里直接不算）
   //   (c) 防御方没有使用防御技能（应对成功必定先手）
   // 有效速度 = 性格/个体修正后的最终速度 + 速度 chip 调整。
-  sk_200124(ctx, fromAttacker) {
+  顺风(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2083,7 +2083,7 @@ const SKILL_MODS = {
     };
   },
   // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
-  sk_280023(ctx, fromAttacker) {
+  破空(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2093,7 +2093,7 @@ const SKILL_MODS = {
     };
   },
   // 扇风：若先于敌方攻击，本次技能威力 +50%
-  sk_7150060(ctx, fromAttacker) {
+  扇风(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2103,7 +2103,7 @@ const SKILL_MODS = {
     };
   },
   // 疾风刺：若先于敌方攻击，改为3连击
-  sk_7150090(ctx, fromAttacker) {
+  疾风刺(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2113,7 +2113,7 @@ const SKILL_MODS = {
     };
   },
   // 展翅：自己携带的普通系技能变为翼系技能，若后于对手行动，自己受到的伤害+25%
-  sk_200127(ctx, fromAttacker) {
+  展翅(ctx, fromAttacker) {
     if (fromAttacker) {
       // 通过 elementOverride 在伤害计算时把 effective element 替换为翼系，
       if (stripXi(ctx.attackSkill.element) !== '普通') return null;
@@ -2132,7 +2132,7 @@ const SKILL_MODS = {
     }
   },
   // 铁蒺藜：应对状态：本次伤害翻倍
-  sk_7070240(ctx, fromAttacker) {
+  铁蒺藜(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2141,7 +2141,7 @@ const SKILL_MODS = {
     };
   },
   // 龙卷风：应对状态：本次技能威力变为1.5倍
-  sk_7150110(ctx, fromAttacker) {
+  龙卷风(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2150,7 +2150,7 @@ const SKILL_MODS = {
     };
   },
   // 追打：应对状态：本技能变为3连击
-  sk_7020470(ctx, fromAttacker) {
+  追打(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2159,7 +2159,7 @@ const SKILL_MODS = {
     };
   },
   // 炙热波动：应对状态：本次技能威力和赋予灼烧翻倍
-  sk_7040380(ctx, fromAttacker) {
+  炙热波动(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2168,7 +2168,7 @@ const SKILL_MODS = {
     };
   },
   // 虫击：应对状态：本次技能威力变为2倍，无视敌方系别抵抗
-  sk_7130150(ctx, fromAttacker) {
+  虫击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2178,7 +2178,7 @@ const SKILL_MODS = {
     };
   },
   // 突袭：应对状态：本次技能威力变为3倍
-  sk_7020450(ctx, fromAttacker) {
+  突袭(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2187,7 +2187,7 @@ const SKILL_MODS = {
     };
   },
   // 暗突袭：应对状态：本次技能威力翻倍
-  sk_7180120(ctx, fromAttacker) {
+  暗突袭(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2196,7 +2196,7 @@ const SKILL_MODS = {
     };
   },
   // 爆冲：应对状态：本次技能威力变为5倍
-  sk_7140220(ctx, fromAttacker) {
+  爆冲(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2205,7 +2205,7 @@ const SKILL_MODS = {
     };
   },
   // 技巧打击：应对状态：本次技能威力变为10倍
-  sk_7140120(ctx, fromAttacker) {
+  技巧打击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2214,7 +2214,7 @@ const SKILL_MODS = {
     };
   },
   // 无影脚：应对状态：本次技能威力变为2倍
-  sk_7140080(ctx, fromAttacker) {
+  无影脚(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2223,7 +2223,7 @@ const SKILL_MODS = {
     };
   },
   // 偷袭：应对状态：本次技能威力变为3倍
-  sk_7020490(ctx, fromAttacker) {
+  偷袭(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2232,7 +2232,7 @@ const SKILL_MODS = {
     };
   },
   // 散手：应对状态：本技能改为6连击
-  sk_7140070(ctx, fromAttacker) {
+  散手(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2241,7 +2241,7 @@ const SKILL_MODS = {
     };
   },
   // 连续爪击：应对状态：本次技能连击数翻倍
-  sk_7020460(ctx, fromAttacker) {
+  连续爪击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2250,7 +2250,7 @@ const SKILL_MODS = {
     };
   },
   // 滚雪球：应对状态：额外获得2层，本次技能威力翻倍
-  sk_7090270(ctx, fromAttacker) {
+  滚雪球(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2259,7 +2259,7 @@ const SKILL_MODS = {
     };
   },
   // 吹炎：应对状态：本次技能威力翻倍
-  sk_7100130(ctx, fromAttacker) {
+  吹炎(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2268,7 +2268,7 @@ const SKILL_MODS = {
     };
   },
   // 地陷：应对状态：本次技能威力翻倍，且物防额外+70%
-  sk_7080330(ctx, fromAttacker) {
+  地陷(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2277,7 +2277,7 @@ const SKILL_MODS = {
     };
   },
   // 闪燃：应对状态：本次技能威力变为4倍
-  sk_7040180(ctx, fromAttacker) {
+  闪燃(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2286,7 +2286,7 @@ const SKILL_MODS = {
     };
   },
   // 灾厄：对自己造成物伤，应对状态：改为对敌方造成物伤，且本次技能威力+120
-  sk_7180140(ctx, fromAttacker) {
+  灾厄(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') {
       return {
@@ -2303,7 +2303,7 @@ const SKILL_MODS = {
     }
   },
   // 变形活画：敌方每有1层增益，本次技能威力+10%
-  sk_200243(ctx, fromAttacker) {
+  变形活画(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const speedLayers = Math.max(0, Math.floor(ctx.defenderSpeedBonus / 10));
     const defLayers   = Math.max(0, Math.floor(getBuff('defender', 'def')  / 10));
@@ -2316,7 +2316,7 @@ const SKILL_MODS = {
     };
   },
   // 闪击：速度比敌方越高，本次技能威力越高
-  sk_7150250(ctx, fromAttacker) {
+  闪击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const spdGap = ctx.attackerEffectiveSpeed - ctx.defenderEffectiveSpeed;
     if (spdGap <= 0) return null;
@@ -2333,7 +2333,7 @@ const SKILL_MODS = {
     };
   },
   // 鸣沙陷阱：物防比敌方越高，本次技能威力越高
-  sk_7080320(ctx, fromAttacker) {
+  鸣沙陷阱(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const attackerDef = Math.max(0, Math.round(getFinalStat(ctx.attacker, 'def', ctx.attackerNature, ctx.attackerIVs) * (1 + getBuff('attacker', 'def') / 100)));
     const defenderDef = Math.max(0, Math.round(getFinalStat(ctx.defender, 'def', ctx.defenderNature, ctx.defenderIVs) * (1 + getBuff('defender', 'def') / 100)));

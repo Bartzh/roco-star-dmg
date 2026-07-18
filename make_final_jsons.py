@@ -18,6 +18,35 @@ with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f
 
 
 # ============================================================
+# Build source-id → final-name mapping for skills, handling
+# duplicate names by appending a numeric suffix to disambiguate.
+# Skills with the same `name` are very rare but do exist; for
+# each duplicate group we sort by the source int id and let the
+# smallest keep the base name, while the rest get `name2`,
+# `name3`, …  The resulting name is what shows up as the key
+# in skills.json, as the value of `id` inside each skill, and
+# as the entries in sprites.json's `skills` field.
+# ============================================================
+from collections import defaultdict
+_name_to_source_ids: dict[str, list[str]] = defaultdict(list)
+for _source_id, _info in skill_catalog.items():
+    _name_to_source_ids[_info['name']].append(_source_id)
+id_to_final_name: dict[str, str] = {}
+for _base_name, _source_ids in _name_to_source_ids.items():
+    if len(_source_ids) == 1:
+        id_to_final_name[_source_ids[0]] = _base_name
+    else:
+        # 用技能数据里真正的 int id 排序，catalog 的 key 是 `skill_xxxxxx` 字符串。
+        _sorted = sorted(_source_ids, key=lambda x: int(skill_catalog[x]['id']))
+        for _i, _sid in enumerate(_sorted):
+            id_to_final_name[_sid] = _base_name if _i == 0 else f'{_base_name}{_i + 1}'
+        print(
+            f'重名技能 "{_base_name}"：共 {len(_sorted)} 个，已加后缀区分：'
+            + ', '.join(f'{skill_catalog[_sid]['id']}→{id_to_final_name[_sid]}' for _sid in _sorted)
+        )
+
+
+# ============================================================
 # Picker presets — hard-coded lists of "common" sprites shown in
 # the spirit picker's quick-filter chip. These are placeholders;
 # please edit them to taste.  Both sides may include the same
@@ -113,15 +142,15 @@ for pet_id, pet_info in core.items():
     skills = []
     learnset = learnset_catalog[learnsets[pet_id]]
     if fs := learnset.get('fs'):
-        skills.append(f'sk_{skill_catalog[fs]['id']}')
+        skills.append(id_to_final_name[fs])
     if ns := learnset.get('ns'):
-        skills.extend(f'sk_{skill_catalog[s['sk']]['id']}' for s in ns)
+        skills.extend(id_to_final_name[s['sk']] for s in ns)
     if lg := learnset.get('lg'):
-        skills.append(f'sk_{skill_catalog[lg['sk']]['id']}')
+        skills.append(id_to_final_name[lg['sk']])
     if ss := learnset.get('ss'):
-        skills.extend(f'sk_{skill_catalog[s]['id']}' for s in ss)
+        skills.extend(id_to_final_name[s] for s in ss)
     if bs := learnset.get('bs'):
-        skills.extend(f'sk_{skill_catalog[s['sk']]['id']}' for s in bs)
+        skills.extend(id_to_final_name[s['sk']] for s in bs)
     if not skills:
         no_skills.append(pet_id)
         continue
@@ -182,7 +211,7 @@ sprites['拼图'] = {
     'def': 183,
     'mdef': 183,
     'spd': 145,
-    'skills': ['sk_7150080', 'sk_7150110', 'sk_7020970', 'sk_7190260', 'sk_7190440', 'sk_7190240'],
+    'skills': ['翼击', '龙卷风', '先发制人', '多维击打', '天体吸积'],
     'pinyin': 'pintu',
     'pinyin_initials': 'pt',
     'hbid': 789987,
@@ -190,7 +219,8 @@ sprites['拼图'] = {
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
-    skill_info['id'] = f'sk_{skill_info['id']}'
+    # 技能的 key 与 id 都用最终名（重名时已加数字后缀），更便于使用。
+    skill_info['id'] = id_to_final_name[skill_id]
     if skill_info['category'] == '防御':
         if skill_info['desc'].startswith('减伤'):
             match = re.search(r'(\d+)%', skill_info['desc'])
@@ -211,7 +241,7 @@ for skill_id, skill_info in skill_catalog.items():
                 print('no combo:', skill_info['name'])
     if icon_url := skill_icon_urls.get(skill_id):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
-# 技能id作为key
+# 以技能最终名作为 key（重名时已加数字后缀以保证唯一）
 skill_catalog = {skill_info['id']: skill_info for skill_info in skill_catalog.values()}
 
 
