@@ -3773,8 +3773,8 @@ function _scrollSkillListToSelected(side) {
   if (!list) return;
   const selected = list.querySelector('.skill-btn.active');
   if (!selected || typeof selected.scrollIntoView !== 'function') return;
-  // 用 scrollIntoView({ block: 'center' }) 把目标技能居中在可视区域内；
-  selected.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+  // 用 scrollIntoView({ block: 'start' }) 把目标技能滚动到顶部；
+  selected.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' });
 }
 
 // 应用一道题：替换 state 全字段并重渲染。
