@@ -365,11 +365,11 @@ body {
 
 /* 卡片 ↔ 选择器 切换时的过渡动画 */
 @keyframes spiritAreaIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .spirit-picker, .spirit-card {
-  animation: spiritAreaIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: spiritAreaIn 0.44s cubic-bezier(0.4, 1, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   .spirit-picker, .spirit-card { animation: none; }
