@@ -2815,6 +2815,44 @@ function renderBreakdownList(breakdownList, data) {
 }
 
 function renderWaiting() {
+  // 挑战模式答题阶段（c.running && c.phase === 'picking'）：双方精灵已就位、
+  // 攻击技能也已确定，伤害要等用户点"提交答案"才计算。
+  //   - 复用空圆环 + "—" 占位（用户调星陨层数时 ring 仍空、不闪烁）
+  //   - 但提示语必须换成"提交答案后计算结果"，否则会沿用普通模式的
+  //     "选择双方精灵开始计算"，与"双方已就位"的当前状态矛盾，误导用户。
+  //   - 这条 check 放在最前面：进 if 后直接 return（不落到下面的 fallback 链），
+  //     避免被 "state.attacker && state.defender && state.attackSkill 都在"
+  //     的逻辑又覆盖回"选择双方精灵开始计算"。
+  if (state.challenge.running && state.challenge.phase === 'picking') {
+    // Reset ring
+    const ringFill = document.getElementById('result-ring-fill');
+    if (ringFill) {
+      ringFill.style.strokeDashoffset = String(RESULT_RING_CIRC);
+      ringFill.style.stroke = 'rgba(255,255,255,0.15)';
+      ringFill.style.filter = 'none';
+    }
+    // Reset center text
+    const pctEl = document.getElementById('result-pct');
+    if (pctEl) {
+      pctEl.textContent = '—';
+      pctEl.style.textShadow = 'none';
+      pctEl.classList.remove('number-pop');
+    }
+    const dmgEl = document.getElementById('result-dmg');
+    if (dmgEl) dmgEl.textContent = '—';
+    // Info 文案：覆盖默认"选择双方精灵开始计算"
+    const infoEl = document.getElementById('result-info');
+    if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">提交答案后计算结果</div>`;
+    // Hide breakdown
+    const breakdownSection = document.getElementById('breakdown-section');
+    if (breakdownSection) breakdownSection.style.display = 'none';
+    const breakdownContent = document.getElementById('breakdown-content');
+    if (breakdownContent) breakdownContent.classList.remove('open');
+    updateAtmosphere(0, false);
+    return;
+  }
+
+  // 普通模式（不在挑战答题中）的提示语
   let msg = '选择双方精灵开始计算';
   if (state.attacker && !state.defender) msg = '选择防御方精灵';
   if (!state.attacker && state.defender) msg = '选择攻击方精灵';
