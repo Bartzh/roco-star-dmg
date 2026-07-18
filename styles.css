@@ -1006,6 +1006,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  /* Pin the waiting line to the same y position as .result-dmg-line
+     (below the 24px chips row) so the text does not visually shift
+     up/down when switching between "选择双方精灵" and "技能 N · 星陨 M".
+     Without this, the single-child waiting state is vertically centered
+     inside the 50px box (y≈14..36), while the calculated state puts
+     the dmg-line at y≈28..50 — a ~14px jump on every switch. */
+  margin-top: auto;
 }
 
 /* Kill confirmation (compact) */
