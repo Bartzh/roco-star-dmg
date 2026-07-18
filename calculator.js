@@ -3612,43 +3612,54 @@ function _showAnswerResult({ score, optimal }) {
   };
 }
 
+// 返回 Promise：resolve 时表示"答题结果 → 滑条"的 swap（淡出 220ms + 淡入 220ms）
+// 已全部完成。exitChallenge 用 .then() 把 body.challenge-running / body.challenge-mode
+// 的移除推迟到 swap 之后——
+// 否则 CSS 规则 `body.challenge-running.challenge-answered .seal-middle { display:none }`
+// 会在淡出过程中失效，.seal-middle 立即显形，与正在淡出的 .challenge-answer-result
+// 同时出现在 .seal-container 内（flex column 上下排），看起来"上下挤在一起"。
+// 非 answered 态早返回时 Promise 立即 resolve，下游 .then() 等价于同步执行。
 function _hideAnswerResult({ animated = true } = {}) {
   const middle = document.getElementById('seal-middle');
   const result = document.getElementById('challenge-answer-result');
-  if (!middle || !result) return;
+  if (!middle || !result) return Promise.resolve();
   // 已经在"滑条态"就直接返回（防重复调用）
-  if (!document.body.classList.contains('challenge-answered')) return;
+  if (!document.body.classList.contains('challenge-answered')) return Promise.resolve();
 
   // 原地退出：不播动画，立即换回滑条（用于 exitChallenge）
   if (!animated) {
     document.body.classList.remove('challenge-answered');
     result.hidden = true;
-    return;
+    return Promise.resolve();
   }
 
   // 淡出答题结果 → 切回滑条 → 淡入滑条
-  _cancelAnimations(result);
-  const fadeOut = result.animate(
-    [
-      { opacity: 1, transform: 'translateY(0)' },
-      { opacity: 0, transform: 'translateY(-4px)' },
-    ],
-    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
-  );
-  fadeOut.onfinish = () => {
-    // 切回滑条：移除 body class + 隐藏结果节点
-    document.body.classList.remove('challenge-answered');
-    result.hidden = true;
-    // 淡入滑条
-    _cancelAnimations(middle);
-    middle.animate(
+  return new Promise(resolve => {
+    _cancelAnimations(result);
+    const fadeOut = result.animate(
       [
-        { opacity: 0, transform: 'translateY(4px)' },
         { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-4px)' },
       ],
-      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
     );
-  };
+    fadeOut.onfinish = () => {
+      // 切回滑条：移除 body class + 隐藏结果节点
+      document.body.classList.remove('challenge-answered');
+      result.hidden = true;
+      // 淡入滑条
+      _cancelAnimations(middle);
+      const fadeIn = middle.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      );
+      // 等淡入完成再 resolve：调用方此时移除 body.challenge-running / .challenge-mode 才安全
+      fadeIn.onfinish = resolve;
+    };
+  });
 }
 
 // 渲染进度信息（"第 N / M 题 · 累计 X 分"）
@@ -3904,7 +3915,22 @@ function exitChallenge() {
   //     淡入过渡（与每道题之间的切换保持一致）。其余退出逻辑（重置状态、
   //     重渲染精灵面板等）与动画并行执行，中心区域的 swap 是用户视线焦点，
   //     周围 UI 的瞬时变化不会干扰体验。
-  _hideAnswerResult();
+  //
+  //     **关键**：必须等 swap 全部完成（淡出 220 + 淡入 220 ≈ 440ms）后再
+  //     移除 body.challenge-running / body.challenge-mode。否则 CSS 规则
+  //       body.challenge-running.challenge-answered .seal-middle { display:none }
+  //     在淡出过程中就失效——.seal-middle 立即显形（opacity:1、translateY:0），
+  //     与正在淡出的 .challenge-answer-result 同时出现在 .seal-container
+  //     （flex column）里上下排，呈现"上下挤在一起"的瞬态。
+  //     _hideAnswerResult 现在返回 Promise：非 answered 态早返回时立即 resolve，
+  //     下面 .then() 相当于同步执行（行为不变）。
+  _hideAnswerResult().then(() => {
+    // 4. body 退出 running（同时清理可能残留的 challenge-mode）
+    //    放在 .then 末尾：等淡入滑条也播完再移除，让 CSS 规则覆盖期
+    //    与 .seal-middle 的 220ms 淡入动画完整对齐。
+    document.body.classList.remove('challenge-running');
+    document.body.classList.remove('challenge-mode');
+  });
   // 2. 进度信息 + 提交按钮淡出（220ms），aria-hidden 同步更新
   const info = document.getElementById('challenge-progress-info');
   if (info) {
@@ -3943,9 +3969,8 @@ function exitChallenge() {
     if (text) text.textContent = '挑战模式';
     if (icon) icon.textContent = '⚔';
   }
-  // 4. body 退出 running（同时清理可能残留的 challenge-mode）
-  document.body.classList.remove('challenge-running');
-  document.body.classList.remove('challenge-mode');
+  // 4. body 退出 running（同时清理可能残留的 challenge-mode）—— 已移至
+  //    上面 _hideAnswerResult().then() 里延后到 swap 动画完成后再移除。
   // 5. 重置 running 状态字段
   c.running = false;
   c.active = false;   // 同步把 setup 状态也清掉，让 toggle 按钮 3 路分支落到 "enter"
