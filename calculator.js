@@ -2921,6 +2921,13 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>挑战模式 · 答题结果展示 <span class="modal-date">· 2026-07-18</span></h3>
+      <ul>
+        <li>提交答案后，原星陨滑条区域会替换为答题结果，显示本次得分与最优层数（按分数段自动配色：高分绿、中分黄、低分红）。</li>
+        <li>切换使用 220ms 淡入淡出过渡（与挑战模式其他过渡保持一致），滑条与结果区域高度统一，切换时不会顶歪上方星陨盘或下方伤害圆环。</li>
+        <li>点击「下一道题」或「退出挑战」会自动把答题结果换回星陨滑条；退出挑战时立即切换（不播动画），与 toggle 按钮"原地退出"语义一致。</li>
+      </ul>
+      <hr>
       <h3>挑战模式 · 答题流程 <span class="modal-date">· 2026-07-17</span></h3>
       <ul>
         <li>挑战模式答题流程上线：开始挑战 → 自动出题 → 拖动星陨层数 → 提交答案 → 评分 → 下一道题 / 结算。</li>
@@ -3555,6 +3562,95 @@ function unlockStarControls() {
   if (slider) slider.disabled = false;
 }
 
+// ------------------------------------------------------------
+// 答题结果切换：把 .seal-middle（滑条）替换为 .challenge-answer-result。
+// 与 enterChallengeMode / exitChallengeMode 共用同一套 Web Animations API
+// 风格（220ms opacity + translateY 4-6px）。
+//   - _showAnswerResult(opts): 答完一题后调用，淡出滑条 → 显示结果
+//   - _hideAnswerResult(opts): 切到下一题 / 退出挑战时调用，淡出结果 → 淡入滑条
+// 两个函数都接受 { animated } 选项；exitChallenge 会传 animated:false 走
+// 原地退出（不播动画），与 toggle 按钮的"原地退出"语义一致。
+// ------------------------------------------------------------
+function _showAnswerResult({ score, optimal }) {
+  const middle = document.getElementById('seal-middle');
+  const result = document.getElementById('challenge-answer-result');
+  const scoreEl = document.getElementById('challenge-answer-score');
+  const optimalEl = document.getElementById('challenge-answer-optimal');
+  if (!middle || !result || !scoreEl || !optimalEl) return;
+
+  // 1. 填充内容 + 分数等级（高分绿/中分黄/低分红）
+  scoreEl.textContent = score;
+  optimalEl.textContent = optimal;
+  let grade = 'low';
+  if (score >= 80) grade = 'high';
+  else if (score >= 50) grade = 'mid';
+  scoreEl.dataset.grade = grade;
+
+  // 2. 淡出滑条 → body.challenge-answered 触发 CSS 隐藏 + 显示结果 → 淡入
+  // 关键：先做完淡出再加 body class，否则 body class 的 display:none 会让
+  // 淡出动画"瞬间消失"，看起来像没动画。
+  _cancelAnimations(middle);
+  const fadeOut = middle.animate(
+    [
+      { opacity: 1, transform: 'translateY(0)' },
+      { opacity: 0, transform: 'translateY(-4px)' },
+    ],
+    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+  );
+  fadeOut.onfinish = () => {
+    // 淡出完成才切 display：CSS 让 .seal-middle 隐藏、.challenge-answer-result 显示
+    document.body.classList.add('challenge-answered');
+    result.hidden = false;
+    _cancelAnimations(result);
+    result.animate(
+      [
+        { opacity: 0, transform: 'translateY(4px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+    );
+  };
+}
+
+function _hideAnswerResult({ animated = true } = {}) {
+  const middle = document.getElementById('seal-middle');
+  const result = document.getElementById('challenge-answer-result');
+  if (!middle || !result) return;
+  // 已经在"滑条态"就直接返回（防重复调用）
+  if (!document.body.classList.contains('challenge-answered')) return;
+
+  // 原地退出：不播动画，立即换回滑条（用于 exitChallenge）
+  if (!animated) {
+    document.body.classList.remove('challenge-answered');
+    result.hidden = true;
+    return;
+  }
+
+  // 淡出答题结果 → 切回滑条 → 淡入滑条
+  _cancelAnimations(result);
+  const fadeOut = result.animate(
+    [
+      { opacity: 1, transform: 'translateY(0)' },
+      { opacity: 0, transform: 'translateY(-4px)' },
+    ],
+    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+  );
+  fadeOut.onfinish = () => {
+    // 切回滑条：移除 body class + 隐藏结果节点
+    document.body.classList.remove('challenge-answered');
+    result.hidden = true;
+    // 淡入滑条
+    _cancelAnimations(middle);
+    middle.animate(
+      [
+        { opacity: 0, transform: 'translateY(4px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+    );
+  };
+}
+
 // 渲染进度信息（"第 N / M 题 · 累计 X 分"）
 function renderChallengeProgress() {
   const el = document.getElementById('challenge-progress-info');
@@ -3766,6 +3862,10 @@ function submitAnswer() {
   // 锁定星陨层数（提交后不允许再调）；滑块保持用户提交的层数（不动），
   // 下方 calculateDamage 会用此层数算出真实伤害并显示。
   lockStarControls();
+  // 把 .seal-middle（滑条）替换为 .challenge-answer-result，显示"得分"与"最优层数"。
+  // 内部用 Web Animations API 淡出滑条 + 淡入结果（220ms + translateY），
+  // 不直接 display:none 切换以避免突兀。
+  _showAnswerResult({ score, optimal });
   // 刷新按钮 + 进度
   renderChallengeProgress();
   renderSubmitButton();
@@ -3782,6 +3882,9 @@ function nextQuestion() {
     renderChallengeResult();
     return;
   }
+  // 把答题结果切回滑条（在切题之前完成淡出 → 淡入，避免"切题后滑条突然出现"）。
+  // 内部走 Web Animations API：淡出结果 → 切 display → 淡入滑条（220ms + translateY）。
+  _hideAnswerResult();
   // 重置滑块控件
   unlockStarControls();
   setStarLayer(0);
@@ -3796,6 +3899,12 @@ function exitChallenge() {
   // 1. 解锁所有面板
   unlockSpiritPanels();
   unlockStarControls();
+  // 1b. 如果当前在"已提交"态，答题结果区域正显示得分/最优层数；
+  //     退出挑战时把它换回星陨滑条。走与 nextQuestion 同样的 220ms 淡出 →
+  //     淡入过渡（与每道题之间的切换保持一致）。其余退出逻辑（重置状态、
+  //     重渲染精灵面板等）与动画并行执行，中心区域的 swap 是用户视线焦点，
+  //     周围 UI 的瞬时变化不会干扰体验。
+  _hideAnswerResult();
   // 2. 进度信息 + 提交按钮淡出（220ms），aria-hidden 同步更新
   const info = document.getElementById('challenge-progress-info');
   if (info) {

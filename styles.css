@@ -1449,6 +1449,84 @@ body.challenge-running .result-bottom {
   display: flex;
 }
 
+/* 答题态 · 已提交：把 .seal-middle（滑条）替换为 .challenge-answer-result。
+   用 .challenge-answered 复合类（与 .challenge-running 一起生效）：
+   - .seal-middle → display: none（隐藏滑条 + hint + labels）
+   - .challenge-answer-result → display: flex（接管 .seal-middle 的位置）
+   切换时不抖动：两个元素在 CSS 上都设置 min-height: 64px（接近
+   .seal-middle 自然高度 50-70px），让外层 .seal-container 的 flex
+   布局在校准后保持高度稳定。 */
+.challenge-answer-result {
+  flex: 0 0 auto;
+  padding: 6px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  /* 与 .seal-middle 同步：保证两者互换时 .seal-container 高度不变 */
+  min-height: 64px;
+}
+.challenge-answer-result[hidden] { display: none; }
+.challenge-answer-result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.challenge-answer-result-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+.challenge-answer-result-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px rgba(0,229,255,0.35);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+  /* 关键：固定宽度 + 右对齐，让"分/层"单位始终在固定位置。
+  - 固定 width: 1.8em（容纳 3 位数字 "100"，配合 tabular-nums），
+    不论数字是 0 / 28 / 100，value 列右边缘位置一致 */
+  width: 1.8em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* 分数等级：高分绿、中分黄、低分红。
+   用 data-grade 标记（JS 在 submitAnswer 时按分数段设置）。 */
+.challenge-answer-result-value[data-grade="high"] {
+  color: var(--accent-green);
+  text-shadow: 0 0 10px rgba(0,230,118,0.4);
+}
+.challenge-answer-result-value[data-grade="mid"] {
+  color: #ffeb3b;
+  text-shadow: 0 0 10px rgba(255,235,59,0.4);
+}
+.challenge-answer-result-value[data-grade="low"] {
+  color: var(--accent-red);
+  text-shadow: 0 0 10px rgba(255,59,59,0.4);
+}
+.challenge-answer-result-unit {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+/* 答完一题后：隐藏滑条 + 显示答题结果。
+   放在 body.challenge-running 规则之后覆盖其 display:flex。 */
+body.challenge-running.challenge-answered .seal-middle { display: none; }
+body.challenge-running.challenge-answered .challenge-answer-result { display: flex; }
+
+/* 同步 .seal-middle 的 min-height，确保两者高度一致。 */
+.seal-middle {
+  min-height: 66px;
+}
+
 /* 答题态：精灵面板锁定（不可点、灰显）。仅作用于 .spirit-panel 内部，
    星陨层数控件（#seal-wrapper / #seal-slider）独立加 .challenge-locked，
    不受 spirit-panel 锁影响。 */

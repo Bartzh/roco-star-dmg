@@ -156,12 +156,30 @@
         </div>
       </div>
 
-      <div class="seal-section seal-middle">
+      <div class="seal-section seal-middle" id="seal-middle">
         <div class="seal-hint">↔ 拖拽 · 滚轮 · 或滑块调节</div>
         <div class="seal-slider-container">
           <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0"
                  aria-label="星陨层数（数值滑块）">
           <div class="slider-labels" aria-hidden="true"><span>0</span><span>50</span><span>99</span></div>
+        </div>
+      </div>
+
+      <!-- 答题结果：默认 hidden；答完一题后由 JS 替换 .seal-middle 显示。
+           min-height 与 .seal-middle 保持一致，避免切换时高度抖动。
+           显示/隐藏用 JS Web Animations API（与 enterChallengeMode / exitChallengeMode
+           一致：opacity 0.22s + translateY 4-6px）。 -->
+      <div class="seal-section challenge-answer-result" id="challenge-answer-result" hidden
+           aria-label="答题结果" aria-live="polite">
+        <div class="challenge-answer-result-row">
+          <span class="challenge-answer-result-label">你的得分</span>
+          <span class="challenge-answer-result-value" id="challenge-answer-score">—</span>
+          <span class="challenge-answer-result-unit">分</span>
+        </div>
+        <div class="challenge-answer-result-row">
+          <span class="challenge-answer-result-label">最优层数</span>
+          <span class="challenge-answer-result-value" id="challenge-answer-optimal">—</span>
+          <span class="challenge-answer-result-unit">层</span>
         </div>
       </div>
 
