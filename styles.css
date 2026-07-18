@@ -753,6 +753,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   border-radius: 50%;
+  transition: opacity 0.22s ease;
 }
 .seal-wrapper canvas {
   position: absolute;
