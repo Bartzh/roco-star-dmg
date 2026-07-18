@@ -3081,6 +3081,20 @@ function initInfoModal() {
 
 const CHALLENGE_LABEL_TRANSITION_MS = 220;   // label ↔ chip 淡入淡出时长
 
+// 缓动曲线（Material Design 命名）
+// EASING_STANDARD：cubic-bezier(0.4, 0, 0.2, 1) — Material "standard" 缓动
+//   加速进入、减速退出，曲线对称、视觉中性。
+//   用于：
+//     - 所有动画
+//
+// EASING_DECELERATE：cubic-bezier(0.16, 1, 0.3, 1) — Material "deceleration" 缓动
+//   极速进入（前 25% 进度就跑完 ~70%），最后慢慢"落定"，模拟物理减速到位。
+//   让"新内容进场"有一种"轻盈落定"的感觉。
+//   用于：
+//     - 暂时不使用
+const EASING_STANDARD = 'cubic-bezier(0.4, 0, 0.2, 1)';
+const EASING_DECELERATE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+
 // 工具：用 Web Animations API 播放「淡出 → 隐藏 → 淡出对方/淡入自己」序列。
 //   fadeOut: true 时把元素淡出后 display:none；fadeIn: true 时把元素从 display:none
 //   切到 inline-flex 后淡入。两个参数可同时为 false（仅同步样式）。
@@ -3101,7 +3115,7 @@ function _swapLabelVisibility(textEl, chipEl, opts) {
           { opacity: 1, transform: 'translateY(0)' },
           { opacity: 0, transform: 'translateY(-4px)' },
         ],
-        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
       a.onfinish = () => {
         textEl.style.display = 'none';
@@ -3112,7 +3126,7 @@ function _swapLabelVisibility(textEl, chipEl, opts) {
               { opacity: 0, transform: 'translateY(4px)' },
               { opacity: 1, transform: 'translateY(0)' },
             ],
-            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
           );
         }
       };
@@ -3124,7 +3138,7 @@ function _swapLabelVisibility(textEl, chipEl, opts) {
           { opacity: 0, transform: 'translateY(4px)' },
           { opacity: 1, transform: 'translateY(0)' },
         ],
-        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
     }
   } else {
@@ -3135,7 +3149,7 @@ function _swapLabelVisibility(textEl, chipEl, opts) {
           { opacity: 1, transform: 'translateY(0)' },
           { opacity: 0, transform: 'translateY(-4px)' },
         ],
-        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
       a.onfinish = () => {
         chipEl.hidden = true;
@@ -3146,7 +3160,7 @@ function _swapLabelVisibility(textEl, chipEl, opts) {
               { opacity: 0, transform: 'translateY(4px)' },
               { opacity: 1, transform: 'translateY(0)' },
             ],
-            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
           );
         }
       };
@@ -3158,7 +3172,7 @@ function _swapLabelVisibility(textEl, chipEl, opts) {
           { opacity: 0, transform: 'translateY(4px)' },
           { opacity: 1, transform: 'translateY(0)' },
         ],
-        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
     }
   }
@@ -3217,7 +3231,7 @@ function enterChallengeMode() {
         { opacity: 1, transform: 'translateY(0)' },
         { opacity: 0, transform: 'translateY(-4px)' },
       ],
-      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     )
   );
   Promise.all(sectionAnims.map(a => a.finished)).then(() => {
@@ -3242,7 +3256,7 @@ function enterChallengeMode() {
           { opacity: 0, transform: 'translateY(6px)' },
           { opacity: 1, transform: 'translateY(0)' },
         ],
-        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
     }
   });
@@ -3285,7 +3299,7 @@ function exitChallengeMode() {
         { opacity: 1, transform: 'translateY(0)' },
         { opacity: 0, transform: 'translateY(-6px)' },
       ],
-      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
     a.onfinish = () => {
       setup.hidden = true;
@@ -3298,7 +3312,7 @@ function exitChallengeMode() {
       sections.forEach(s => {
         const anim = s.animate(
           [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }],
-          { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+          { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
         );
         anim.onfinish = () => {
           s.style.opacity = '';
@@ -3595,7 +3609,7 @@ function _showAnswerResult({ score, optimal }) {
       { opacity: 1, transform: 'translateY(0)' },
       { opacity: 0, transform: 'translateY(-4px)' },
     ],
-    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
   );
   fadeOut.onfinish = () => {
     // 淡出完成才切 display：CSS 让 .seal-middle 隐藏、.challenge-answer-result 显示
@@ -3607,7 +3621,7 @@ function _showAnswerResult({ score, optimal }) {
         { opacity: 0, transform: 'translateY(4px)' },
         { opacity: 1, transform: 'translateY(0)' },
       ],
-      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
   };
 }
@@ -3641,7 +3655,7 @@ function _hideAnswerResult({ animated = true } = {}) {
         { opacity: 1, transform: 'translateY(0)' },
         { opacity: 0, transform: 'translateY(-4px)' },
       ],
-      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
     fadeOut.onfinish = () => {
       // 切回滑条：移除 body class + 隐藏结果节点
@@ -3654,7 +3668,7 @@ function _hideAnswerResult({ animated = true } = {}) {
           { opacity: 0, transform: 'translateY(4px)' },
           { opacity: 1, transform: 'translateY(0)' },
         ],
-        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
       );
       // 等淡入完成再 resolve：调用方此时移除 body.challenge-running / .challenge-mode 才安全
       fadeIn.onfinish = resolve;
