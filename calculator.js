@@ -3848,10 +3848,62 @@ function applyQuestion(index) {
   //    display:none 把星陨/伤害结果钉死），再加 challenge-running。
   //    设置阶段（enterChallengeMode）时 body 有 challenge-mode，applyQuestion
   //    需要同时清理掉，否则星陨盘 + 伤害圆环不会显示。
-  document.body.classList.remove('challenge-mode');
-  document.body.classList.add('challenge-running');
-  const setup = document.getElementById('challenge-setup');
-  if (setup) setup.hidden = true;
+  //
+  //    **第一题**（setup → running 首次切换）：seal 区域需要走"setup 淡出 →
+  //    swap body class → seal 淡入"的 440ms 过渡，与 exitChallengeMode 对称。
+  //    之前是同步切换：.seal-* 元素从 display:none 直接变 display:flex，
+  //    看起来"突然出现"。其他 UI（spirit 卡 spiritAreaIn、label-chip→label）
+  //    已经在并行播，seal 区域补上同样的 Web Animations 即可。
+  //    **后续题**：body 类与 setup.hidden 都在第一题设置过，这里就是 no-op，
+  //    不用再走动画。
+  if (index === 0) {
+    const setup = document.getElementById('challenge-setup');
+    if (setup) {
+      _cancelAnimations(setup);
+      const fadeOut = setup.animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-6px)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+      fadeOut.onfinish = () => {
+        // 此时才让 body 切到 running 态：先隐藏 setup + swap class，
+        // 再淡入 seal-*，避免两者在 .seal-container（flex column）里同时存在造成挤兑。
+        setup.hidden = true;
+        setup.style.opacity = '';
+        setup.style.transform = '';
+        fadeOut.cancel();  // 主动取消，避免 fill 残留到下次 enter
+        document.body.classList.remove('challenge-mode');
+        document.body.classList.add('challenge-running');
+        const sections = document.querySelectorAll('.seal-top, .seal-middle, .result-bottom');
+        sections.forEach(s => {
+          const anim = s.animate(
+            [
+              { opacity: 0, transform: 'translateY(4px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+          );
+          anim.onfinish = () => {
+            s.style.opacity = '';
+            s.style.transform = '';
+          };
+        });
+      };
+    } else {
+      // 兜底：找不到 setup 时直接切（不应该发生）
+      document.body.classList.remove('challenge-mode');
+      document.body.classList.add('challenge-running');
+    }
+  } else {
+    // 后续题：body 类已经在第一次 applyQuestion 设置好（remove/add 都是 no-op），
+    // setup 也已经 hidden，不再动它。
+    document.body.classList.remove('challenge-mode');
+    document.body.classList.add('challenge-running');
+    const setup = document.getElementById('challenge-setup');
+    if (setup) setup.hidden = true;
+  }
   // 进度信息 + 提交按钮：CSS 控透明度（220ms 淡入），aria-hidden 与可见性同步
   // — 之前用 `hidden = true/false` 是二值切换，没有过渡，体验突兀。
   const info = document.getElementById('challenge-progress-info');
