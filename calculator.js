@@ -1812,9 +1812,6 @@ function renderPowerBoostChip() {
 // stores its own value). Reuses the .buff-chip visual style;
 // behaviour mirrors the buff chips (press-and-drag horizontal,
 // wheel, dblclick to reset). Range [-990, +990], step 10.
-//
-// The speed value is currently NOT used in damage calculation; it
-// is stored so that future features can read it.
 // ============================================================
 const SPEED_LABEL = '速度';
 const SPEED_MIN = -990;
@@ -3568,11 +3565,11 @@ function buildSpiritRng(side) {
   return () => fixedId;
 }
 
-// 属性配置工厂：返回 (spirit) => { nature, ivs, buff, speed }
+// 属性配置工厂：返回 (spirit) => { nature, ivs, buff, speed, power, combo }
 //   randomStats[side] = false: 深拷贝当前 state（不污染用户原值，spirit 参数忽略）
-//   randomStats[side] = true : 先按 spirit 的随机池抽 nature+ivs / buff；
-//                              未命中预设（落入 default_weight 区间）则走普通随机；
-//                              speed 永远为 0
+//   randomStats[side] = true : 先按 spirit 的随机池抽 nature+ivs / buff-spd /
+//                              power / combo（落入 default_weight 区间则走普通随机）；
+//                              威力/连击仅攻击方，防御方恒为 0
 //   关键：必须传入"本道题新生成的精灵"——与 buildSkillRng 一致，避免误用
 //   state.[side]（上一个题目 / 用户在普通计算器里选的精灵）的旧 pool。
 function buildStatsRng(side) {
@@ -3589,6 +3586,9 @@ function buildStatsRng(side) {
         ? { ...state.attackerBuff }
         : { ...state.defenderBuff },
       speed: side === 'attacker' ? state.attackerSpeed : state.defenderSpeed,
+      // 威力 / 连击：仅攻击方有意义；防御方恒 0（其状态字段也不存在）
+      power: side === 'attacker' ? state.attackerPowerBoost : 0,
+      combo: side === 'attacker' ? state.attackerCombo : 0,
     });
   }
   // 随机：先看 spirit 的随机池，再走普通兜底
@@ -3615,16 +3615,29 @@ function buildStatsRng(side) {
         ivs.push(ivKeys.splice(idx, 1)[0]);
       }
     }
-    // 2. buff（来自 pool.buffs；未命中则全 0）
-    //    pool.buffs.combo 是 list[dict]，逐条 merge 到基础 buff（后写覆盖前写）
+    // 2. buff / spd / power / combo（来自 pool.buffs；未命中则全 0）
+    //    pool.buffs.combo 是 list[dict]，每个 dict 的 key 分流：
+    //      - atk / matk / def / mdef → 写入"常量 buff"对象（由 side 决定哪些 key 有效）
+    //      - spd / power / combo      → 独立字段；威力/连击仅攻击方
     const buffPicked = _pickFromPool(pool?.buffs);
     const buff = side === 'attacker'
       ? { atk: 0, matk: 0 }
       : { def: 0, mdef: 0 };
+    let spd = 0, power = 0, combo = 0;
     if (buffPicked) {
-      for (const b of buffPicked) Object.assign(buff, b);
+      for (const b of buffPicked) {
+        // 独立字段
+        if (b.spd   != null) spd = b.spd;
+        if (side === 'attacker') {
+          if (b.power != null) power = b.power;
+          if (b.combo != null) combo = b.combo;
+        }
+        // 常量 buff：从 b 复制一份去掉 spd/power/combo 的版本写入
+        const { spd: _s, power: _p, combo: _c, ...rest } = b;
+        Object.assign(buff, rest);
+      }
     }
-    return { nature, ivs, buff, speed: 0 };
+    return { nature, ivs, buff, speed: spd, power, combo };
   };
 }
 
@@ -3727,6 +3740,9 @@ function buildQuestionSnapshot(_index) {
     defenderBuff: defStats.buff,
     attackerSpeed: atkStats.speed,
     defenderSpeed: defStats.speed,
+    // 威力 / 连击作为题目配置的一部分（仅攻击方；防御方无对应 state 字段）
+    attackerPowerBoost: atkStats.power,
+    attackerCombo: atkStats.combo,
     attackSkillId: atkSkId,
     defenseSkillId: defSkId,
     defHP,
@@ -4001,7 +4017,7 @@ function _scrollSkillListToSelected(side) {
 
 // 应用一道题：替换 state 全字段并重渲染。
 // 关键：绕过 selectSpirit / selectAttackSkill / selectDefenseSkill（它们会
-// 清空 nature/IVs/buff/speed/powerBoost/combo，并触发 calculateDamage 副作用）。
+// 清空 nature/IVs/buff/speed/power/combo，并触发 calculateDamage 副作用）。
 function applyQuestion(index) {
   const q = state.challenge.questions[index];
   if (!q) return;
@@ -4016,8 +4032,9 @@ function applyQuestion(index) {
   state.defenderBuff = { ...q.defenderBuff };
   state.attackerSpeed = q.attackerSpeed;
   state.defenderSpeed = q.defenderSpeed;
-  state.attackerPowerBoost = 0;   // 威力 chip 每题重置
-  state.attackerCombo = 0;        // 连击 chip 每题重置
+  // 威力 / 连击：题目配置的一部分（与双攻/双防/速度同级），不再每题重置
+  state.attackerPowerBoost = q.attackerPowerBoost;
+  state.attackerCombo = q.attackerCombo;
   state.spiritPicking.attacker = false;
   state.spiritPicking.defender = false;
   // 2. 攻击技能：在新精灵的可用列表中找对应 id

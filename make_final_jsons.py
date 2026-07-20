@@ -368,6 +368,42 @@ attacker_random_pools: dict[str, RandomPool] = {
                 )
             ]
         )
+    ),
+    '落陨星兔': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                )
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=40,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'power': 40}],
+                    weight=60
+                ),
+                WeightedBuffCombo(
+                    combo=[{'power': 80}],
+                    weight=10
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='多维击打',
+                    weight=8
+                )
+            ]
+        )
     )
 }
 attacker_random_pools = {k: asdict(v) for k, v in attacker_random_pools.items()}
