@@ -3468,6 +3468,38 @@ function _pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// 取本道题新精灵的挑战模式随机池（可能为 null）。
+//   side    : 'attacker' | 'defender'
+//   spriteId: 精灵 id
+// 池数据来自 OTHERS.attacker_random_pools / OTHERS.defender_random_pools，
+// 由 make_final_jsons.py 产出。每个池含 default_weight 与 combos：
+//   - 总权重 = sum(combos.weight) + default_weight
+//   - 抽到 default_weight 区间 → 走"普通随机"（未命中预设组合）
+//   - 抽到 combo → 返回 combo.combo
+function _getRandomPool(side, spriteId) {
+  if (!spriteId) return null;
+  const pools = (side === 'attacker')
+    ? OTHERS.attacker_random_pools
+    : OTHERS.defender_random_pools;
+  return pools?.[spriteId] || null;
+}
+
+// 按权重从池里抽一个 combo；落在 default_weight 区间或池为空时返回 null。
+// 返回 null 表示"未命中预设组合"，由调用方走普通随机兜底。
+function _pickFromPool(pool) {
+  if (!pool) return null;
+  const combos = pool.combos || [];
+  const defaultW = pool.default_weight || 0;
+  const totalW = combos.reduce((s, c) => s + c.weight, 0) + defaultW;
+  if (totalW <= 0) return null;
+  let r = Math.random() * totalW;
+  for (const c of combos) {
+    r -= c.weight;
+    if (r < 0) return c.combo;
+  }
+  return null;
+}
+
 // ------------------------------------------------------------
 // 题目池生成：3 个独立工厂 + 1 个 orchestrator
 // ------------------------------------------------------------
@@ -3499,13 +3531,17 @@ function buildSpiritRng(side) {
   return () => fixedId;
 }
 
-// 属性配置工厂：返回 () => { nature, ivs, buff, speed }
-//   randomStats[side] = false: 深拷贝当前 state（不污染用户原值）
-//   randomStats[side] = true : 全新随机性格/IVs；buff 永远为 0；速度 chip 永远为 0
+// 属性配置工厂：返回 (spirit) => { nature, ivs, buff, speed }
+//   randomStats[side] = false: 深拷贝当前 state（不污染用户原值，spirit 参数忽略）
+//   randomStats[side] = true : 先按 spirit 的随机池抽 nature+ivs / buff；
+//                              未命中预设（落入 default_weight 区间）则走普通随机；
+//                              speed 永远为 0
+//   关键：必须传入"本道题新生成的精灵"——与 buildSkillRng 一致，避免误用
+//   state.[side]（上一个题目 / 用户在普通计算器里选的精灵）的旧 pool。
 function buildStatsRng(side) {
   if (!state.challenge.randomStats[side]) {
     // 固定：从当前 state 深拷贝
-    return () => ({
+    return (_spirit) => ({
       nature: side === 'attacker'
         ? { ...state.attackerNature }
         : { ...state.defenderNature },
@@ -3518,25 +3554,39 @@ function buildStatsRng(side) {
       speed: side === 'attacker' ? state.attackerSpeed : state.defenderSpeed,
     });
   }
-  // 随机：全新生成
-  return () => {
-    // 性格：从 6 个 statKey 里抽 2 个不同（up != down）
-    const keys = STAT_KEYS.slice();
-    const upIdx = Math.floor(Math.random() * keys.length);
-    let downIdx = Math.floor(Math.random() * (keys.length - 1));
-    if (downIdx >= upIdx) downIdx += 1;
-    const nature = { up: keys[upIdx], down: keys[downIdx] };
-    // IVs：从 6 个 statKey 里抽 3 个不同
-    const ivKeys = keys.slice();
-    const ivs = [];
-    for (let i = 0; i < MAX_IV; i++) {
-      const idx = Math.floor(Math.random() * ivKeys.length);
-      ivs.push(ivKeys.splice(idx, 1)[0]);
+  // 随机：先看 spirit 的随机池，再走普通兜底
+  return (spirit) => {
+    const pool = _getRandomPool(side, spirit?.id);
+    // 1. nature + ivs（来自 pool.stats；未命中走普通随机）
+    const statsPicked = _pickFromPool(pool?.stats);
+    let nature, ivs;
+    if (statsPicked) {
+      nature = { up: statsPicked.nature.up, down: statsPicked.nature.down };
+      ivs = statsPicked.ivs.slice();
+    } else {
+      // 兜底：性格从 6 个 statKey 里抽 2 个不同（up != down）
+      const keys = STAT_KEYS.slice();
+      const upIdx = Math.floor(Math.random() * keys.length);
+      let downIdx = Math.floor(Math.random() * (keys.length - 1));
+      if (downIdx >= upIdx) downIdx += 1;
+      nature = { up: keys[upIdx], down: keys[downIdx] };
+      // 兜底：IVs 从 6 个 statKey 里抽 3 个不同
+      const ivKeys = keys.slice();
+      ivs = [];
+      for (let i = 0; i < MAX_IV; i++) {
+        const idx = Math.floor(Math.random() * ivKeys.length);
+        ivs.push(ivKeys.splice(idx, 1)[0]);
+      }
     }
-    // buff: 永远为 0（用户描述：buff 仅在固定时才会考虑；随机不涉及 buff）
+    // 2. buff（来自 pool.buffs；未命中则全 0）
+    //    pool.buffs.combo 是 list[dict]，逐条 merge 到基础 buff（后写覆盖前写）
+    const buffPicked = _pickFromPool(pool?.buffs);
     const buff = side === 'attacker'
       ? { atk: 0, matk: 0 }
       : { def: 0, mdef: 0 };
+    if (buffPicked) {
+      for (const b of buffPicked) Object.assign(buff, b);
+    }
     return { nature, ivs, buff, speed: 0 };
   };
 }
@@ -3549,12 +3599,13 @@ function buildStatsRng(side) {
 // 攻击方：
 //   randomSkill=false (固定)：优先 state.attackSkill.id；该 id 不在新精灵可用列表
 //                            中时回退到随机
-//   randomSkill=true  (随机)：在 getAttackSkillOptions(attacker) 中等概率
+//   randomSkill=true  (随机)：先看 spirit 的 pool.skills（命中且落在 opts 中采纳），
+//                            未命中走均匀随机
 // 防御方：
 //   randomSkill=false (固定)：优先 state.defenseSkill.id；找不到时按 reduction
 //                            四舍五入容差匹配；都失败回退到随机
-//   randomSkill=true  (随机)：在 getDefenseSkillOptions(defender) 中采样；
-//                            "无"（__none__）权重更大（5/6）
+//   randomSkill=true  (随机)：先看 spirit 的 pool.skills（命中且落在 opts 中采纳），
+//                            未命中走"无"占 5/6 权重的加权随机
 function buildSkillRng(side) {
   const isRandom = state.challenge.randomSkill[side];
   if (side === 'attacker') {
@@ -3568,11 +3619,14 @@ function buildSkillRng(side) {
         return picked ? picked.id : YUANLI_SKILLS[0].id;
       };
     }
-    // 随机：等概率
+    // 随机：先看 spirit 池；未命中/不合法走均匀随机
     return (attacker) => {
       const opts = getAttackSkillOptions(attacker);
-      const picked = _pickRandom(opts);
-      return picked ? picked.id : YUANLI_SKILLS[0].id;
+      const pool = _getRandomPool('attacker', attacker?.id);
+      const picked = _pickFromPool(pool?.skills);
+      if (picked && opts.some(s => s.id === picked)) return picked;
+      const fallback = _pickRandom(opts);
+      return fallback ? fallback.id : YUANLI_SKILLS[0].id;
     };
   }
   // 防御方
@@ -3598,9 +3652,12 @@ function buildSkillRng(side) {
       return picked ? picked.id : '__none__';
     };
   }
-  // 随机：加权——"无"（__none__）占 5/6 权重
+  // 随机：先看 spirit 池；未命中/不合法走"无"占 5/6 权重的加权随机
   return (defender) => {
     const opts = getDefenseSkillOptions(defender);
+    const pool = _getRandomPool('defender', defender?.id);
+    const picked = _pickFromPool(pool?.skills);
+    if (picked && opts.some(s => s.id === picked)) return picked;
     const weighted = [];
     for (const s of opts) {
       if (s.id === '__none__') {
@@ -3609,8 +3666,8 @@ function buildSkillRng(side) {
         weighted.push(s);
       }
     }
-    const picked = _pickRandom(weighted);
-    return picked ? picked.id : '__none__';
+    const fallback = _pickRandom(weighted);
+    return fallback ? fallback.id : '__none__';
   };
 }
 
@@ -3619,14 +3676,15 @@ function buildSkillRng(side) {
 function buildQuestionSnapshot(_index) {
   const atkId    = buildSpiritRng('attacker')();
   const defId    = buildSpiritRng('defender')();
-  const atkStats = buildStatsRng('attacker')();
-  const defStats = buildStatsRng('defender')();
-  // 关键：先构造本题新精灵对象，再让技能工厂用新精灵的技能表去选/兜底，
-  // 避免 buildSkillRng 误用 state.[side]（上一个题目 / 用户在普通计算器里
-  // 选的精灵）的旧技能表——那会导致选出来的 id 在新精灵里查不到，
-  // 触发 applyQuestion 的 opts[0] 兜底，看起来像"必然选第一个技能"。
+  // 关键：先构造本题新精灵对象，再让属性/技能工厂用新精灵的 pool 与技能表
+  // 去选/兜底，避免 buildStatsRng / buildSkillRng 误用 state.[side]（上一个题目
+  // / 用户在普通计算器里选的精灵）的旧 pool 或技能表——那会导致选出来的 id
+  // 在新精灵里查不到，触发 applyQuestion 的 opts[0] 兜底，看起来像"必然选
+  // 第一个技能"。
   const attacker = { id: atkId, ...(SPRITES[atkId] || {}) };
   const defender = { id: defId, ...(SPRITES[defId] || {}) };
+  const atkStats = buildStatsRng('attacker')(attacker);
+  const defStats = buildStatsRng('defender')(defender);
   const atkSkId  = buildSkillRng('attacker')(attacker);
   const defSkId  = buildSkillRng('defender')(defender);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);

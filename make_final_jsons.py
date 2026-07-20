@@ -2,6 +2,8 @@ import json
 import re
 
 from pypinyin import Style, lazy_pinyin
+from dataclasses import dataclass, field, asdict
+from typing import Literal, Optional
 
 with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
@@ -251,6 +253,132 @@ with open('datas/final/skills.json', 'w', encoding='utf-8') as f:
     json.dump(skill_catalog, f, ensure_ascii=False)
 
 
+
+@dataclass
+class Nature:
+    up: Literal['hp', 'atk', 'def', 'matk', 'mdef', 'spd']
+    down: Literal['hp', 'atk', 'def', 'matk', 'mdef', 'spd']
+
+@dataclass
+class StatsCombo:
+    nature: Nature
+    ivs: list[Literal['hp', 'atk', 'def', 'matk', 'mdef', 'spd']]
+
+@dataclass
+class WeightedStatsCombo:
+    combo: StatsCombo
+    weight: int
+
+@dataclass
+class StatsPool:
+    default_weight: int
+    combos: list[WeightedStatsCombo]
+
+@dataclass
+class WeightedBuffCombo:
+    combo: list[dict[str, int]]  # 例如 [{'atk': 100}]
+    weight: int
+
+@dataclass
+class BuffsPool:
+    default_weight: int
+    combos: list[WeightedBuffCombo]
+
+@dataclass
+class WeightedSkillCombo:
+    combo: str  # 技能名（重名时带数字后缀），例如 '先发制人' / '腾挪2'
+    weight: int
+
+@dataclass
+class SkillsPool:
+    default_weight: int
+    combos: list[WeightedSkillCombo]
+
+@dataclass
+class RandomPool:
+    stats: Optional[StatsPool] = None
+    buffs: Optional[BuffsPool] = None
+    skills: Optional[SkillsPool] = None
+
+
+attacker_random_pools: dict[str, RandomPool] = {
+    '龙息帕尔': RandomPool(
+        stats=StatsPool(
+            default_weight=20,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=80
+                )
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=70,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'atk': 100}],
+                    weight=30
+                )
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=70,
+            combos=[
+                WeightedSkillCombo(
+                    combo='先发制人',
+                    weight=30
+                )
+            ]
+        )
+    ),
+    '暮星辰': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                )
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=10,
+            combos=[
+                WeightedSkillCombo(
+                    combo='翼击',
+                    weight=65
+                ),
+                WeightedSkillCombo(
+                    combo='追打',
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='倾泻',
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='先发制人',
+                    weight=5
+                )
+            ]
+        )
+    )
+}
+attacker_random_pools = {k: asdict(v) for k, v in attacker_random_pools.items()}
+
+defender_random_pools: dict[str, RandomPool] = {
+
+}
+defender_random_pools = {k: asdict(v) for k, v in defender_random_pools.items()}
+
+
+
 # ============================================================
 # Others — exported as a small JSON consumed by calculator.html.
 # Currently just the two "common" sprite lists;
@@ -260,6 +388,8 @@ with open('datas/final/skills.json', 'w', encoding='utf-8') as f:
 others = {
     'common_attackers': COMMON_ATTACKERS,
     'common_defenders': COMMON_DEFENDERS,
+    'attacker_random_pools': attacker_random_pools,
+    'defender_random_pools': defender_random_pools,
 }
 with open('datas/final/others.json', 'w', encoding='utf-8') as f:
     json.dump(others, f, ensure_ascii=False, indent=2)
