@@ -3500,6 +3500,43 @@ function _pickFromPool(pool) {
   return null;
 }
 
+// 挑战模式技能随机兜底的权重表（具体数值可调）。
+//  - 攻击方：愿力冲击（id 以 __yuanli_ 开头，共 18 个变体）权重低；
+//    精灵自身攻击技能权重高。
+//  - 防御方：__none__（无）> __state__（聚能）> 精灵自身防御技能。
+// 概率 = weight / sum(weights)，精灵自身技能数量越多，其总占比越高。
+const CHALLENGE_SKILL_WEIGHTS = {
+  attacker: { yuanli: 4, other: 5 },
+  defender: { none:   5, state: 4, other: 2 },
+};
+
+// 按 CHALLENGE_SKILL_WEIGHTS 从 opts 抽一个技能对象（调用方取 .id）。
+//   side = 'attacker' | 'defender'
+//   全部权重 ≤ 0 时返回 null（调用方需有兜底）
+function _pickWeightedSkill(opts, side) {
+  if (!opts || opts.length === 0) return null;
+  const W = CHALLENGE_SKILL_WEIGHTS[side];
+  const weighted = opts.map(s => {
+    let w;
+    if (side === 'attacker') {
+      w = s.id.startsWith('__yuanli_') ? W.yuanli : W.other;
+    } else {
+      if (s.id === '__none__')       w = W.none;
+      else if (s.id === '__state__') w = W.state;
+      else                           w = W.other;
+    }
+    return { s, w };
+  });
+  const totalW = weighted.reduce((sum, x) => sum + x.w, 0);
+  if (totalW <= 0) return null;
+  let r = Math.random() * totalW;
+  for (const x of weighted) {
+    r -= x.w;
+    if (r < 0) return x.s;
+  }
+  return weighted[weighted.length - 1].s; // 浮点累加误差兜底
+}
+
 // ------------------------------------------------------------
 // 题目池生成：3 个独立工厂 + 1 个 orchestrator
 // ------------------------------------------------------------
@@ -3593,40 +3630,44 @@ function buildStatsRng(side) {
 
 // 技能选择工厂：返回 (spirit) => 技能 id
 //   关键：必须传入"本道题新生成的精灵"作为参数（而不是闭包 state.[side]），
-//   因为题目池模式下（新精灵 != state.[side]）如果用 state，random
-//   兜底会从旧精灵的技能表里挑，导致选出来的 id 在新精灵里查不到，
+//   因为题目池模式下（新精灵 != state.[side]）如果用 state，pool/opts
+//   兜底会从旧精灵的数据里挑，导致选出来的 id 在新精灵里查不到，
 //   applyQuestion 触发 opts[0] 兜底——看起来"必然选第一个技能"。
+// 兜底路径（"固定"分支用户技能找不到时 / "随机"分支）共享：
+//   spirit 池 → 加权随机（CHALLENGE_SKILL_WEIGHTS）
 // 攻击方：
 //   randomSkill=false (固定)：优先 state.attackSkill.id；该 id 不在新精灵可用列表
-//                            中时回退到随机
-//   randomSkill=true  (随机)：先看 spirit 的 pool.skills（命中且落在 opts 中采纳），
-//                            未命中走均匀随机
+//                            中时走兜底
+//   randomSkill=true  (随机)：直接走兜底
 // 防御方：
 //   randomSkill=false (固定)：优先 state.defenseSkill.id；找不到时按 reduction
-//                            四舍五入容差匹配；都失败回退到随机
-//   randomSkill=true  (随机)：先看 spirit 的 pool.skills（命中且落在 opts 中采纳），
-//                            未命中走"无"占 5/6 权重的加权随机
+//                            四舍五入容差匹配；都失败走兜底
+//   randomSkill=true  (随机)：直接走兜底
 function buildSkillRng(side) {
   const isRandom = state.challenge.randomSkill[side];
+  // 4 个分支共享的兜底：先看 spirit 池；未命中/不合法走加权随机
+  const fallback = (spirit, opts, noneId) => {
+    const pool = _getRandomPool(side, spirit?.id);
+    const picked = _pickFromPool(pool?.skills);
+    if (picked && opts.some(s => s.id === picked)) return picked;
+    const weighted = _pickWeightedSkill(opts, side);
+    return weighted ? weighted.id : noneId;
+  };
+
   if (side === 'attacker') {
     if (!isRandom) {
-      // 固定：先尝试用户的技能；不匹配回退到随机
+      // 固定：先尝试用户的技能；不匹配走兜底
       const userId = state.attackSkill?.id;
       return (attacker) => {
         const opts = getAttackSkillOptions(attacker);
         if (userId && opts.some(s => s.id === userId)) return userId;
-        const picked = _pickRandom(opts);
-        return picked ? picked.id : YUANLI_SKILLS[0].id;
+        return fallback(attacker, opts, YUANLI_SKILLS[0].id);
       };
     }
-    // 随机：先看 spirit 池；未命中/不合法走均匀随机
+    // 随机：直接走兜底
     return (attacker) => {
       const opts = getAttackSkillOptions(attacker);
-      const pool = _getRandomPool('attacker', attacker?.id);
-      const picked = _pickFromPool(pool?.skills);
-      if (picked && opts.some(s => s.id === picked)) return picked;
-      const fallback = _pickRandom(opts);
-      return fallback ? fallback.id : YUANLI_SKILLS[0].id;
+      return fallback(attacker, opts, YUANLI_SKILLS[0].id);
     };
   }
   // 防御方
@@ -3647,27 +3688,14 @@ function buildSkillRng(side) {
           && Math.round(s.reduction * 100) === userPct);
         if (hit) return hit.id;
       }
-      // 3. 兜底：随机
-      const picked = _pickRandom(opts);
-      return picked ? picked.id : '__none__';
+      // 3. 兜底：与"随机"分支共享
+      return fallback(defender, opts, '__none__');
     };
   }
-  // 随机：先看 spirit 池；未命中/不合法走"无"占 5/6 权重的加权随机
+  // 随机：直接走兜底
   return (defender) => {
     const opts = getDefenseSkillOptions(defender);
-    const pool = _getRandomPool('defender', defender?.id);
-    const picked = _pickFromPool(pool?.skills);
-    if (picked && opts.some(s => s.id === picked)) return picked;
-    const weighted = [];
-    for (const s of opts) {
-      if (s.id === '__none__') {
-        for (let i = 0; i < 5; i++) weighted.push(s);
-      } else {
-        weighted.push(s);
-      }
-    }
-    const fallback = _pickRandom(weighted);
-    return fallback ? fallback.id : '__none__';
+    return fallback(defender, opts, '__none__');
   };
 }
 
