@@ -2022,6 +2022,7 @@ const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
   多维击打(ctx, fromAttacker) {
     if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
     return {
       comboAdd: ctx.starLayer,
       notes: [`连击 +${ctx.starLayer}（星陨 ${ctx.starLayer} 层）`],
@@ -2031,6 +2032,7 @@ const SKILL_MODS = {
   观星(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (stripXi(ctx.attackSkill.element) !== '地') return null;
+    if (!ctx.starLayer) return null;
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
@@ -2040,6 +2042,7 @@ const SKILL_MODS = {
   // 坠星：全技能威力每层星陨 +20%
   坠星(ctx, fromAttacker) {
     if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
@@ -2049,6 +2052,7 @@ const SKILL_MODS = {
   // 天体吸积：每 1 层星陨印记，技能威力 +20
   天体吸积(ctx, fromAttacker) {
     if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
     const add = 20 * ctx.starLayer;
     return {
       powerAdd: add,
