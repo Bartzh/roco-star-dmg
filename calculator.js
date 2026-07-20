@@ -2937,6 +2937,11 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>性格个体自动保存 <span class="modal-date">· 2026-07-20</span></h3>
+      <ul>
+        <li>现在在每次修改性格和个体后都会自动保存（到localStorage），下次选择精灵时会自动加载。</li>
+      </ul>
+      <hr>
       <h3>S3 数据更新 <span class="modal-date">· 2026-07-16</span></h3>
       <ul>
         <li>同步更新 S3 精灵与技能数据。</li>
