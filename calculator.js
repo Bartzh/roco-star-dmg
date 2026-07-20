@@ -127,6 +127,65 @@ const DEFAULT_IVS = {
   defender: ['hp',  'def',  'mdef']
 };
 
+// ============================================================
+// 按精灵维度的性格 / 个体值自动保存（localStorage）。无 UI：
+// 每次修改后写入，下次选中同一只精灵时优先加载；若该精灵
+// 无存档则回退到对应侧的默认值（如攻击方 +SPD/-HP）。
+// 存储键带版本号，方便以后迁移时不会破坏旧数据。
+// ============================================================
+const SPIRIT_CONFIG_STORAGE_KEY = 'roco-star-dmg:spirit-config:v1';
+const VALID_STAT_KEYS = new Set(['hp', 'atk', 'matk', 'def', 'mdef', 'spd']);
+
+function _readSpiritConfigStore() {
+  try {
+    const raw = localStorage.getItem(SPIRIT_CONFIG_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function _writeSpiritConfigStore(store) {
+  try {
+    localStorage.setItem(SPIRIT_CONFIG_STORAGE_KEY, JSON.stringify(store));
+  } catch (_) { /* 配额超限 / 存储被禁用 —— 静默忽略 */ }
+}
+
+// 返回 { nature: {up, down}, ivs: [statKey,...] }；无存档或数据
+// 格式不合法时返回 null。
+function loadSpiritConfig(id) {
+  if (!id) return null;
+  const entry = _readSpiritConfigStore()[id];
+  if (!entry || typeof entry !== 'object') return null;
+  const natureRaw = entry.nature;
+  if (!natureRaw || typeof natureRaw !== 'object') return null;
+  const up   = VALID_STAT_KEYS.has(natureRaw.up)   ? natureRaw.up   : null;
+  const down = VALID_STAT_KEYS.has(natureRaw.down) ? natureRaw.down : null;
+  // 合法性格要求 up ≠ down（两者都可为 null 表示"未设置"）。
+  if (up && up === down) return null;
+  const ivsRaw = Array.isArray(entry.ivs) ? entry.ivs : null;
+  if (!ivsRaw) return null;
+  const ivs = [];
+  for (const k of ivsRaw) {
+    if (VALID_STAT_KEYS.has(k) && ivs.length < MAX_IV && !ivs.includes(k)) {
+      ivs.push(k);
+    }
+  }
+  return { nature: { up, down }, ivs };
+}
+
+function saveSpiritConfig(id, nature, ivs) {
+  if (!id) return;
+  const store = _readSpiritConfigStore();
+  store[id] = {
+    nature: { up: nature.up ?? null, down: nature.down ?? null },
+    ivs: ivs.slice()
+  };
+  _writeSpiritConfigStore(store);
+}
+
 let state = {
   attacker: null,        // {id, ...SPRITES[id]}
   defender: null,
@@ -1327,9 +1386,15 @@ function selectSpirit(side, id) {
     const opts = getAttackSkillOptions(spirit);
     state.attackSkill = opts[0] || null;
     state.attackSkillIdx = state.attackSkill ? 0 : -1;
-    // Apply default nature/IVs for attacker
-    state.attackerNature = { ...DEFAULT_NATURE.attacker };
-    state.attackerIVs    = DEFAULT_IVS.attacker.slice();
+    // 应用攻击方的性格 / 个体值（若该精灵有本地存档则优先加载）
+    const savedA = loadSpiritConfig(id);
+    if (savedA) {
+      state.attackerNature = { up: savedA.nature.up, down: savedA.nature.down };
+      state.attackerIVs    = savedA.ivs.slice();
+    } else {
+      state.attackerNature = { ...DEFAULT_NATURE.attacker };
+      state.attackerIVs    = DEFAULT_IVS.attacker.slice();
+    }
     // Reset attacker buffs on spirit change
     state.attackerBuff   = { atk: 0, matk: 0 };
     // Reset 威力 chip value
@@ -1350,9 +1415,15 @@ function selectSpirit(side, id) {
     const opts = getDefenseSkillOptions(spirit);
     state.defenseSkill = opts[0]; // "无"
     state.defenseSkillIdx = 0;
-    // Apply default nature/IVs for defender
-    state.defenderNature = { ...DEFAULT_NATURE.defender };
-    state.defenderIVs    = DEFAULT_IVS.defender.slice();
+    // 应用防御方的性格 / 个体值（若该精灵有本地存档则优先加载）
+    const savedD = loadSpiritConfig(id);
+    if (savedD) {
+      state.defenderNature = { up: savedD.nature.up, down: savedD.nature.down };
+      state.defenderIVs    = savedD.ivs.slice();
+    } else {
+      state.defenderNature = { ...DEFAULT_NATURE.defender };
+      state.defenderIVs    = DEFAULT_IVS.defender.slice();
+    }
     // Reset defender buffs on spirit change
     state.defenderBuff   = { def: 0, mdef: 0 };
     // Reset defender 速度 chip value (should not carry over to a new pet).
@@ -1452,6 +1523,9 @@ function onNatureSlotClick(side, statKey, ev) {
     }
   }
   setNature(side, nature);
+  // 写入该精灵的性格 / 个体值存档（未选精灵时为 no-op）。
+  const id = state[side] && state[side].id;
+  if (id) saveSpiritConfig(id, getNature(side), getIVs(side));
   renderStatsConfig(side);
   calculateDamage();
 }
@@ -1468,6 +1542,9 @@ function onIVSlotClick(side, statKey, ev) {
     ivs.push(statKey);
   }
   setIVs(side, ivs);
+  // 写入该精灵的性格 / 个体值存档（未选精灵时为 no-op）。
+  const id = state[side] && state[side].id;
+  if (id) saveSpiritConfig(id, getNature(side), getIVs(side));
   renderStatsConfig(side);
   calculateDamage();
 }
