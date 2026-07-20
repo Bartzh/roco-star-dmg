@@ -2059,6 +2059,15 @@ const SKILL_MODS = {
       notes: [`威力 +${add}（星陨 ${ctx.starLayer} 层 ×20）`],
     };
   },
+  // 星痕：若对手有印记，本次技能威力 +40
+  星痕(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
+    return {
+      powerAdd: 40,
+      notes: ['威力 +40（有至少一层印记）'],
+    };
+  },
   // 狂欢开始：本精灵受到的克制伤害+25%
   狂欢开始(ctx, fromAttacker) {
     if (fromAttacker) return null;
@@ -2315,6 +2324,24 @@ const SKILL_MODS = {
       powerMultAdd: layers * 0.1,
       notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）`],
     };
+  },
+  // 急中生智：自己有减益时，本次技能威力 +40
+  急中生智(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    const speed = ctx.attackerSpeedBonus;
+    const atk   = getBuff('attacker', 'atk');
+    const matk  = getBuff('attacker', 'matk');
+    const powerBoost = state.attackerPowerBoost;
+    const combo = state.attackerCombo;
+    for (const b of [speed, atk, matk, powerBoost, combo]) {
+      if (b < 0) {
+        return {
+          powerAdd: 40,
+          notes: ['威力 +40（自身有减益）'],
+        };
+      }
+    }
+    return null;
   },
   // 闪击：速度比敌方越高，本次技能威力越高
   闪击(ctx, fromAttacker) {
