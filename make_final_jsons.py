@@ -304,14 +304,21 @@ class RandomPool:
 attacker_random_pools: dict[str, RandomPool] = {
     '龙息帕尔': RandomPool(
         stats=StatsPool(
-            default_weight=20,
+            default_weight=1,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='atk', down='matk'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=80
+                    weight=10
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=3
                 )
             ]
         ),
