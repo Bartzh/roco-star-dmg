@@ -2033,7 +2033,7 @@ function renderSkills(side) {
         ? `<div class="placeholder" style="--el-color:#666">—</div>`
         : renderSkillIconHTML(sk, el);
       return `
-        <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${isNone ? 'none-skill' : ''}"
+        <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''}"
                 data-idx="${idx}"
                 onclick="selectDefenseSkill(${idx})">
           <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${iconHTML}</div>

@@ -574,10 +574,23 @@ body {
   border-radius: 10px;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.25s ease;
+  /* 不写 transition: all —— iOS Safari 点击 button 时 :focus-visible 会
+     给元素加 box-shadow，紧接着 .active 又换成自己的 box-shadow，
+     transition: all 会让两个 box-shadow（4px 焦点环 vs 12px 主动光晕 +
+     3px 内阴影）相互插值 250ms，造成"整个元素抖一下"的闪烁。手动列出
+     真正需要过渡的属性：背景、边框色、transform（hover 用），box-shadow。 */
+  transition: background 0.22s ease, border-color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
   text-align: left;
   position: relative;
   font-size: 0.85rem;
+  /* 其它交互元素（spirit-panel / stat-cell / chip / picker-btn /
+     challenge-* 等）都有这一组 iOS 触控防护；skill-btn 之前漏了，导致
+     长按选词、iOS 灰色 tap-highlight、300ms 延迟都会让点选瞬间多一层
+     视觉抖动。补齐后与项目惯例一致。 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   /* 吸附到容器顶部（暂时不考虑启用） */
   /* scroll-snap-align: start; */
 }
@@ -590,14 +603,6 @@ body {
   background: rgba(0,229,255,0.1);
   border-color: var(--accent-cyan);
   box-shadow: 0 0 12px rgba(0,229,255,0.15), inset 3px 0 0 var(--accent-cyan);
-}
-.skill-btn.none-skill {
-  border-style: dashed;
-  opacity: 0.85;
-}
-.skill-btn.none-skill.active {
-  border-style: solid;
-  opacity: 1;
 }
 
 /* Skill icon (48px square, fills card height) */
