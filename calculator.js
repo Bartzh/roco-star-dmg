@@ -229,7 +229,51 @@ let state = {
   // Range [-990, +990], step 10; default 0. Always shown on BOTH
   // attacker and defender panels.
   attackerSpeed: 0,
-  defenderSpeed: 0
+  defenderSpeed: 0,
+  // 挑战模式状态（UI 控件 + 用户偏好 + 答题运行时）
+  //   active      : 是否处于挑战设置阶段（chip 可见）
+  //   preset/count/pool/randomStats/randomSkill：用户偏好，退出答题时保留
+  //   running     : 是否处于答题阶段（精灵面板锁定）
+  //   phase       : 'idle' | 'picking'（已出题未提交）| 'answered'（已提交）
+  //   current     : 当前题号（0-based）
+  //   total       : 总题数（备份 = count，便于无依赖显示）
+  //   questions   : 全部题目快照（生成时确定下来），每元素含双方精灵/性格/IVs/buffs/speed/skillId/defHP
+  //   scores      : 每题 {layer, optimal, isKill, score}，提交时 push
+  //   totalScore  : 累计分
+  //   transitionGen  : 启动任何"挑战相关过渡动画"时 +1；onfinish 回调里检查 token
+  //                    是否还匹配，不匹配说明已被新动画接管、本次回调 no-op。
+  //                    修复快速连点 toggle / submit 时多组 onfinish 互相反扑。
+  //   answerShown    : 答题结果区（.challenge-answer-result）是否"应在显示中"。
+  //                    替代原来"body.classList.contains('challenge-answered')"判断——
+  //                    后者在 _showAnswerResult 的 fadeOut 还没结束时为 false，
+  //                    导致 _hideAnswerResult 早返回 → exitChallenge 提前清 body class
+  //                    → 220ms 后 _showAnswerResult 反向加回 → 答案信息残留。
+  //   answerAnimating: _showAnswerResult / _hideAnswerResult 正在播 220ms 过渡动画。
+  //                    submit/toggle 按钮 click handler 在此期间忽略点击，
+  //                    防止快速连点串起"submit → nextQuestion → 下一题 submit"链。
+  //   toggleAnimating: enterChallengeMode / exitChallengeMode 正在播 440ms 过渡动画。
+  //                    toggle 按钮 click handler 在此期间忽略点击（2026-07-18 加），
+  //                    防止连点触发"enter + exit 完整 880ms 动画、视觉上闪两次"。
+  //                    末尾 onfinish 内释放（gen 守卫，与 transitionGen 配套）。
+  challenge: {
+    active: false,
+    preset: 'easy',
+    count: 5,
+    pool: { attacker: 'common', defender: 'common' },
+    randomStats: { attacker: true, defender: true },
+    randomSkill: { attacker: true, defender: true },
+    running: false,
+    phase: 'idle',
+    current: 0,
+    total: 0,
+    questions: [],
+    scores: [],
+    totalScore: 0,
+    transitionGen: 0,
+    answerShown: false,
+    answerAnimating: false,
+    toggleAnimating: false,
+  },
 };
 
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
@@ -890,7 +934,11 @@ function setStarLayer(value) {
       emitShockwave();
     }
   }
-  calculateDamage();
+  // 挑战模式答题阶段（picking）不实时计算伤害：保持空圆环直到用户提交。
+  // 提交后（answered）或非挑战模式才计算。
+  if (state.challenge.phase !== 'picking') {
+    calculateDamage();
+  }
 }
 
 function updateSealGlow() {
@@ -1210,17 +1258,17 @@ if (document.readyState === 'loading') {
   startPickerToolbarAutoFit();
 }
 
-function renderSpiritArea(side) {
+function renderSpiritArea(side, opts) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   // 处于“选择中”或尚未选精灵 → 渲染选择器
   if (state.spiritPicking[side] || !spirit) {
-    renderSpiritPicker(side);
+    renderSpiritPicker(side, opts);
   } else {
-    renderSpiritCard(side);
+    renderSpiritCard(side, opts);
   }
 }
 
-function renderSpiritPicker(side) {
+function renderSpiritPicker(side, opts) {
   const selectArea = document.getElementById(`${side}-select-area`);
   const skillsSection = document.getElementById(`${side}-skills`);
   const statsSection = document.getElementById(`${side}-stats`);
@@ -1239,9 +1287,12 @@ function renderSpiritPicker(side) {
   const toolbarHTML = renderPickerToolbar(side, filter);
   const filtered = filterSpirits(side, filter);
   const optionsHTML = _renderPickerOptionsHTML(side, filtered);
+  // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
+  // 比 body class 路线可靠（body class 移除时浏览器会重新计算 style，可能反而触发动画）。
+  const animAttr = (opts && opts.skipAnimation) ? ' style="animation: none"' : '';
 
   selectArea.innerHTML = `
-    <div class="spirit-picker">
+    <div class="spirit-picker"${animAttr}>
       <div class="spirit-picker-header">
         <span class="picker-title">${titleText}</span>
         ${cancelBtn}
@@ -1333,7 +1384,7 @@ function resetPickerFilter(side) {
   refreshPickerGrid(side);
 }
 
-function renderSpiritCard(side) {
+function renderSpiritCard(side, opts) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   if (!spirit) return;
   const selectArea = document.getElementById(`${side}-select-area`);
@@ -1348,12 +1399,16 @@ function renderSpiritCard(side) {
   const illus = spirit.illustration_url
     ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
     : `<div class="placeholder" style="--el-color:${primaryColor}">${(spirit.name||'').slice(0,1)}</div>`;
+  // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
+  // 比 body class 路线可靠（见 renderSpiritPicker 注释）。
+  const skipAnim = !!(opts && opts.skipAnimation);
+  const animStyle = skipAnim ? '; animation: none' : '';
   selectArea.innerHTML = `
     <div class="spirit-card" role="button" tabindex="0"
          aria-label="更换${side === 'attacker' ? '攻击方' : '防御方'}精灵（当前：${spirit.name}）"
          onclick="enterSpiritPicker('${side}')"
          onkeydown="onSpiritCardKey(event, '${side}')"
-         style="--el-color:${primaryColor}">
+         style="--el-color:${primaryColor}${animStyle}">
       <div class="spirit-image">${illus}</div>
       <div class="name">${spirit.name}</div>
       <div class="type-tags">${tagsHTML}</div>
@@ -1837,9 +1892,6 @@ function renderPowerBoostChip() {
 // stores its own value). Reuses the .buff-chip visual style;
 // behaviour mirrors the buff chips (press-and-drag horizontal,
 // wheel, dblclick to reset). Range [-990, +990], step 10.
-//
-// The speed value is currently NOT used in damage calculation; it
-// is stored so that future features can read it.
 // ============================================================
 const SPEED_LABEL = '速度';
 const SPEED_MIN = -990;
@@ -2048,17 +2100,19 @@ function isFirstStrike(ctx) {
 }
 const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
-  sk_7190260(ctx, fromAttacker) {
+  多维击打(ctx, fromAttacker) {
     if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
     return {
       comboAdd: ctx.starLayer,
       notes: [`连击 +${ctx.starLayer}（星陨 ${ctx.starLayer} 层）`],
     };
   },
   // 观星：地系技能威力每层星陨 +20%
-  sk_200106(ctx, fromAttacker) {
+  观星(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (stripXi(ctx.attackSkill.element) !== '地') return null;
+    if (!ctx.starLayer) return null;
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
@@ -2066,8 +2120,9 @@ const SKILL_MODS = {
     };
   },
   // 坠星：全技能威力每层星陨 +20%
-  sk_280011(ctx, fromAttacker) {
+  坠星(ctx, fromAttacker) {
     if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
@@ -2075,16 +2130,26 @@ const SKILL_MODS = {
     };
   },
   // 天体吸积：每 1 层星陨印记，技能威力 +20
-  sk_7190440(ctx, fromAttacker) {
+  天体吸积(ctx, fromAttacker) {
     if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
     const add = 20 * ctx.starLayer;
     return {
       powerAdd: add,
       notes: [`威力 +${add}（星陨 ${ctx.starLayer} 层 ×20）`],
     };
   },
+  // 星痕：若对手有印记，本次技能威力 +40
+  星痕(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
+    return {
+      powerAdd: 40,
+      notes: ['威力 +40（有至少一层印记）'],
+    };
+  },
   // 狂欢开始：本精灵受到的克制伤害+25%
-  sk_200286(ctx, fromAttacker) {
+  狂欢开始(ctx, fromAttacker) {
     if (fromAttacker) return null;
     if (effectiveness(ctx.attackSkill.element, ctx.defender.types) <= 1) return null;
     return {
@@ -2098,7 +2163,7 @@ const SKILL_MODS = {
   //   (b) 攻击方有效速度严格大于防御方有效速度（平速在游戏内会拼速，在这里直接不算）
   //   (c) 防御方没有使用防御技能（应对成功必定先手）
   // 有效速度 = 性格/个体修正后的最终速度 + 速度 chip 调整。
-  sk_200124(ctx, fromAttacker) {
+  顺风(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2108,7 +2173,7 @@ const SKILL_MODS = {
     };
   },
   // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
-  sk_280023(ctx, fromAttacker) {
+  破空(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2118,7 +2183,7 @@ const SKILL_MODS = {
     };
   },
   // 扇风：若先于敌方攻击，本次技能威力 +50%
-  sk_7150060(ctx, fromAttacker) {
+  扇风(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2128,7 +2193,7 @@ const SKILL_MODS = {
     };
   },
   // 疾风刺：若先于敌方攻击，改为3连击
-  sk_7150090(ctx, fromAttacker) {
+  疾风刺(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const [firstStrike, reason] = isFirstStrike(ctx);
     if (!firstStrike) return null;
@@ -2138,7 +2203,7 @@ const SKILL_MODS = {
     };
   },
   // 展翅：自己携带的普通系技能变为翼系技能，若后于对手行动，自己受到的伤害+25%
-  sk_200127(ctx, fromAttacker) {
+  展翅(ctx, fromAttacker) {
     if (fromAttacker) {
       // 通过 elementOverride 在伤害计算时把 effective element 替换为翼系，
       if (stripXi(ctx.attackSkill.element) !== '普通') return null;
@@ -2157,7 +2222,7 @@ const SKILL_MODS = {
     }
   },
   // 铁蒺藜：应对状态：本次伤害翻倍
-  sk_7070240(ctx, fromAttacker) {
+  铁蒺藜(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2166,7 +2231,7 @@ const SKILL_MODS = {
     };
   },
   // 龙卷风：应对状态：本次技能威力变为1.5倍
-  sk_7150110(ctx, fromAttacker) {
+  龙卷风(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2175,7 +2240,7 @@ const SKILL_MODS = {
     };
   },
   // 追打：应对状态：本技能变为3连击
-  sk_7020470(ctx, fromAttacker) {
+  追打(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2184,7 +2249,7 @@ const SKILL_MODS = {
     };
   },
   // 炙热波动：应对状态：本次技能威力和赋予灼烧翻倍
-  sk_7040380(ctx, fromAttacker) {
+  炙热波动(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2193,7 +2258,7 @@ const SKILL_MODS = {
     };
   },
   // 虫击：应对状态：本次技能威力变为2倍，无视敌方系别抵抗
-  sk_7130150(ctx, fromAttacker) {
+  虫击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2203,7 +2268,7 @@ const SKILL_MODS = {
     };
   },
   // 突袭：应对状态：本次技能威力变为3倍
-  sk_7020450(ctx, fromAttacker) {
+  突袭(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2212,7 +2277,7 @@ const SKILL_MODS = {
     };
   },
   // 暗突袭：应对状态：本次技能威力翻倍
-  sk_7180120(ctx, fromAttacker) {
+  暗突袭(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2221,7 +2286,7 @@ const SKILL_MODS = {
     };
   },
   // 爆冲：应对状态：本次技能威力变为5倍
-  sk_7140220(ctx, fromAttacker) {
+  爆冲(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2230,7 +2295,7 @@ const SKILL_MODS = {
     };
   },
   // 技巧打击：应对状态：本次技能威力变为10倍
-  sk_7140120(ctx, fromAttacker) {
+  技巧打击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2239,7 +2304,7 @@ const SKILL_MODS = {
     };
   },
   // 无影脚：应对状态：本次技能威力变为2倍
-  sk_7140080(ctx, fromAttacker) {
+  无影脚(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2248,7 +2313,7 @@ const SKILL_MODS = {
     };
   },
   // 偷袭：应对状态：本次技能威力变为3倍
-  sk_7020490(ctx, fromAttacker) {
+  偷袭(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2257,7 +2322,7 @@ const SKILL_MODS = {
     };
   },
   // 散手：应对状态：本技能改为6连击
-  sk_7140070(ctx, fromAttacker) {
+  散手(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2266,7 +2331,7 @@ const SKILL_MODS = {
     };
   },
   // 连续爪击：应对状态：本次技能连击数翻倍
-  sk_7020460(ctx, fromAttacker) {
+  连续爪击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2275,7 +2340,7 @@ const SKILL_MODS = {
     };
   },
   // 滚雪球：应对状态：额外获得2层，本次技能威力翻倍
-  sk_7090270(ctx, fromAttacker) {
+  滚雪球(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2284,7 +2349,7 @@ const SKILL_MODS = {
     };
   },
   // 吹炎：应对状态：本次技能威力翻倍
-  sk_7100130(ctx, fromAttacker) {
+  吹炎(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2293,7 +2358,7 @@ const SKILL_MODS = {
     };
   },
   // 地陷：应对状态：本次技能威力翻倍，且物防额外+70%
-  sk_7080330(ctx, fromAttacker) {
+  地陷(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2302,7 +2367,7 @@ const SKILL_MODS = {
     };
   },
   // 闪燃：应对状态：本次技能威力变为4倍
-  sk_7040180(ctx, fromAttacker) {
+  闪燃(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
@@ -2311,7 +2376,7 @@ const SKILL_MODS = {
     };
   },
   // 灾厄：对自己造成物伤，应对状态：改为对敌方造成物伤，且本次技能威力+120
-  sk_7180140(ctx, fromAttacker) {
+  灾厄(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     if (ctx.defenseSkill.category !== '状态') {
       return {
@@ -2328,7 +2393,7 @@ const SKILL_MODS = {
     }
   },
   // 变形活画：敌方每有1层增益，本次技能威力+10%
-  sk_200243(ctx, fromAttacker) {
+  变形活画(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const speedLayers = Math.max(0, Math.floor(ctx.defenderSpeedBonus / 10));
     const defLayers   = Math.max(0, Math.floor(getBuff('defender', 'def')  / 10));
@@ -2340,8 +2405,26 @@ const SKILL_MODS = {
       notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）`],
     };
   },
+  // 急中生智：自己有减益时，本次技能威力 +40
+  急中生智(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    const speed = ctx.attackerSpeedBonus;
+    const atk   = getBuff('attacker', 'atk');
+    const matk  = getBuff('attacker', 'matk');
+    const powerBoost = state.attackerPowerBoost;
+    const combo = state.attackerCombo;
+    for (const b of [speed, atk, matk, powerBoost, combo]) {
+      if (b < 0) {
+        return {
+          powerAdd: 40,
+          notes: ['威力 +40（自身有减益）'],
+        };
+      }
+    }
+    return null;
+  },
   // 闪击：速度比敌方越高，本次技能威力越高
-  sk_7150250(ctx, fromAttacker) {
+  闪击(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const spdGap = ctx.attackerEffectiveSpeed - ctx.defenderEffectiveSpeed;
     if (spdGap <= 0) return null;
@@ -2358,7 +2441,7 @@ const SKILL_MODS = {
     };
   },
   // 鸣沙陷阱：物防比敌方越高，本次技能威力越高
-  sk_7080320(ctx, fromAttacker) {
+  鸣沙陷阱(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const attackerDef = Math.max(0, Math.round(getFinalStat(ctx.attacker, 'def', ctx.attackerNature, ctx.attackerIVs) * (1 + getBuff('attacker', 'def') / 100)));
     const defenderDef = Math.max(0, Math.round(getFinalStat(ctx.defender, 'def', ctx.defenderNature, ctx.defenderIVs) * (1 + getBuff('defender', 'def') / 100)));
@@ -2480,32 +2563,33 @@ function computeSkillDynamicModifiers(
 // ============================================================
 // DAMAGE CALCULATION
 // ============================================================
-function calculateDamage() {
-  if (!state.attacker || !state.defender || !state.attackSkill) {
-    renderWaiting();
-    return;
-  }
-  const atk = state.attacker;
-  const def = state.defender;
-  const skill = state.attackSkill;
-  const defSkill = state.defenseSkill || { reduction: 1, _pseudo: true };
-  const layer = state.starLayer;
-  const n = layer;
+// 伤害计算：拆为两个函数。
+//   computeFinalDamage(ctx) — 纯函数。读 ctx.*（不读全局 state），返回 data 对象。
+//   calculateDamage()      — 副作用层。读 state，构造 ctx 调 computeFinalDamage，
+//                           然后 renderResult + updateAtmosphere。
+// 拆出的好处：挑战模式二分查找/最优点计算可重复调 computeFinalDamage，
+// 不污染 DOM、不污染全局 state。
+function computeFinalDamage(ctx) {
+  const atk = ctx.attacker;
+  const def = ctx.defender;
+  const skill = ctx.attackSkill;
+  const defSkill = ctx.defenseSkill || { reduction: 1, _pseudo: true };
+  const n = ctx.starLayer;
 
   // 伤害类型决定：
   //   - damage_class === '自适应'（愿力冲击）：按精灵当前最终物攻/魔攻
   //     （含 buff）中较高者决定，物攻 ≥ 魔攻 → 物攻，否则魔攻。
   //   - 其他：保持原行为（'魔攻' → 魔攻，其余 → 物攻）。
-  const atkNature = getNature('attacker');
-  const defNature = getNature('defender');
-  const atkIVs    = getIVs('attacker');
-  const defIVs    = getIVs('defender');
+  const atkNature = ctx.attackerNature;
+  const defNature = ctx.defenderNature;
+  const atkIVs    = ctx.attackerIVs;
+  const defIVs    = ctx.defenderIVs;
   const atkBaseNoBuff  = getFinalStat(atk, 'atk',  atkNature, atkIVs);
   const matkBaseNoBuff = getFinalStat(atk, 'matk', atkNature, atkIVs);
   let isMagic;
   if (skill.damage_class === '自适应') {
-    const atkFull  = atkBaseNoBuff  * (1 + getBuff('attacker', 'atk')  / 100);
-    const matkFull = matkBaseNoBuff * (1 + getBuff('attacker', 'matk') / 100);
+    const atkFull  = atkBaseNoBuff  * (1 + (ctx.attackerBuff.atk  || 0) / 100);
+    const matkFull = matkBaseNoBuff * (1 + (ctx.attackerBuff.matk || 0) / 100);
     // 物攻 ≥ 魔攻 → 物攻；只有魔攻严格更高时才用魔攻。
     isMagic = matkFull > atkFull;
   } else {
@@ -2515,8 +2599,8 @@ function calculateDamage() {
   const defStatKey = isMagic ? 'mdef' : 'def';
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
   // nonsensical negative stats from extreme debuffs.
-  const atkBuffPct = getBuff('attacker', atkStatKey);
-  const defBuffPct = getBuff('defender', defStatKey);
+  const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
+  const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
   const atkStat = Math.max(0, Math.round((isMagic ? matkBaseNoBuff : atkBaseNoBuff) * (1 + atkBuffPct / 100)));
   const defStat = Math.max(0, Math.round(getFinalStat(def, defStatKey, defNature, defIVs) * (1 + defBuffPct / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
@@ -2525,9 +2609,9 @@ function calculateDamage() {
   // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
   const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
   // 威力 chip — flat addition to base power (always shown).
-  const powerBoost = getPowerBoost();
+  const powerBoost = ctx.attackerPowerBoost || 0;
   // 连击数 chip — flat addition to base combo count (always shown).
-  const attackerCombo = getComboBoost();
+  const attackerCombo = ctx.attackerCombo || 0;
   // Effective element for STAB / effectiveness / 幻 checks. Dynamic modifiers
   // (e.g. 展翅) can override the skill's original element (普通 → 翼) without
   // mutating the skill data.
@@ -2543,7 +2627,7 @@ function calculateDamage() {
   // by the chip; they still pick up dyn.comboAdd from skill modifiers
   // (e.g. 多维击打's starLayer-based extra hits) but never the chip.
   const hasCombo = skill.combo != null;
-  const chipCombo = hasCombo ? getComboBoost() : 0;
+  const chipCombo = hasCombo ? attackerCombo : 0;
   const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + chipCombo) * dyn.comboMult);
   const power = Math.max(0, ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
@@ -2569,7 +2653,7 @@ function calculateDamage() {
   const isKill = finalDamage >= defHP;
   const overflow = isKill ? finalDamage - defHP : 0;
 
-  renderResult({
+  return {
     finalDamage, skillDmg, starDmg, starPower,
     skillEff, skillEffRaw, starEff, stab, combo,
     hpPercent, remainingHP, remainingPercent, isKill, overflow,
@@ -2578,8 +2662,35 @@ function calculateDamage() {
     atkStat, defStat, isMagic, dyn,
     atkBuffPct, defBuffPct,
     powerBoost, attackerCombo, hasCombo
+  };
+}
+
+function calculateDamage() {
+  if (!state.attacker || !state.defender || !state.attackSkill) {
+    renderWaiting();
+    return;
+  }
+  // 构造 ctx 并调纯计算函数。挑战模式下，state 可能反映"上一题提交时的快照"，
+  // 但 state.starLayer 仍随用户拖滑块实时变化，因此正常计算路径无需特殊处理。
+  const data = computeFinalDamage({
+    attacker: state.attacker,
+    defender: state.defender,
+    attackSkill: state.attackSkill,
+    defenseSkill: state.defenseSkill,
+    attackerNature: state.attackerNature,
+    defenderNature: state.defenderNature,
+    attackerIVs: state.attackerIVs,
+    defenderIVs: state.defenderIVs,
+    attackerBuff: state.attackerBuff,
+    defenderBuff: state.defenderBuff,
+    attackerSpeed: state.attackerSpeed,
+    defenderSpeed: state.defenderSpeed,
+    attackerPowerBoost: state.attackerPowerBoost,
+    attackerCombo: state.attackerCombo,
+    starLayer: state.starLayer,
   });
-  updateAtmosphere(hpPercent, isKill);
+  renderResult(data);
+  updateAtmosphere(data.hpPercent, data.isKill);
 }
 
 // ============================================================
@@ -2831,6 +2942,44 @@ function renderBreakdownList(breakdownList, data) {
 }
 
 function renderWaiting() {
+  // 挑战模式答题阶段（c.running && c.phase === 'picking'）：双方精灵已就位、
+  // 攻击技能也已确定，伤害要等用户点"提交答案"才计算。
+  //   - 复用空圆环 + "—" 占位（用户调星陨层数时 ring 仍空、不闪烁）
+  //   - 但提示语必须换成"提交答案后计算结果"，否则会沿用普通模式的
+  //     "选择双方精灵开始计算"，与"双方已就位"的当前状态矛盾，误导用户。
+  //   - 这条 check 放在最前面：进 if 后直接 return（不落到下面的 fallback 链），
+  //     避免被 "state.attacker && state.defender && state.attackSkill 都在"
+  //     的逻辑又覆盖回"选择双方精灵开始计算"。
+  if (state.challenge.running && state.challenge.phase === 'picking') {
+    // Reset ring
+    const ringFill = document.getElementById('result-ring-fill');
+    if (ringFill) {
+      ringFill.style.strokeDashoffset = String(RESULT_RING_CIRC);
+      ringFill.style.stroke = 'rgba(255,255,255,0.15)';
+      ringFill.style.filter = 'none';
+    }
+    // Reset center text
+    const pctEl = document.getElementById('result-pct');
+    if (pctEl) {
+      pctEl.textContent = '—';
+      pctEl.style.textShadow = 'none';
+      pctEl.classList.remove('number-pop');
+    }
+    const dmgEl = document.getElementById('result-dmg');
+    if (dmgEl) dmgEl.textContent = '—';
+    // Info 文案：覆盖默认"选择双方精灵开始计算"
+    const infoEl = document.getElementById('result-info');
+    if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">提交答案后计算结果</div>`;
+    // Hide breakdown
+    const breakdownSection = document.getElementById('breakdown-section');
+    if (breakdownSection) breakdownSection.style.display = 'none';
+    const breakdownContent = document.getElementById('breakdown-content');
+    if (breakdownContent) breakdownContent.classList.remove('open');
+    updateAtmosphere(0, false);
+    return;
+  }
+
+  // 普通模式（不在挑战答题中）的提示语
   let msg = '选择双方精灵开始计算';
   if (state.attacker && !state.defender) msg = '选择防御方精灵';
   if (!state.attacker && state.defender) msg = '选择攻击方精灵';
@@ -2937,6 +3086,16 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>挑战模式 <span class="modal-date">· 2026-07-21</span></h3>
+      <ul>
+        <li>挑战模式上线：这是一个考验你对星陨斩杀线的把握，辅助记忆斩杀线的小游戏。</li>
+        <li>基本流程：挑战设置 → 开始挑战 → 自动出题 → 拖动星陨层数 → 提交答案 → 评分 → 下一道题 / 结算。</li>
+        <li>双方精灵池支持「全部 / 常见 / 自选」；属性配置与技能选择支持「固定当前 / 随机每题」；防御技能按相同减伤率兜底匹配。</li>
+        <li>答题阶段精灵面板自动锁定（灰显、不可点），仅星陨层数可调；随时可「退出挑战」回到计算器状态。</li>
+        <li>适配了「星痕」和「急中生智」两个技能。</li>
+        <li>以及其他一些细节优化和bug修复。</li>
+      </ul>
+      <hr>
       <h3>性格个体自动保存 <span class="modal-date">· 2026-07-20</span></h3>
       <ul>
         <li>现在在每次修改性格和个体后都会自动保存（到localStorage），下次选择精灵时会自动加载。</li>
@@ -2984,6 +3143,12 @@ const MODAL_CONTENT = {
   guide: {
     title: '使用说明',
     html: `
+      <h3>大致介绍</h3>
+      <ul>
+        <li>这是一个专为<strong>星陨</strong>设计的《洛克王国：世界》PVP 伤害计算器工具，有基本的伤害计算功能，便捷的星陨层数调整，以及一些精灵和技能的特别适配，此外还有挑战模式，可以测试自己对星陨斩杀线熟悉程度。</li>
+        <li>该工具的首要设计目标是尽可能简洁好看，保持克制避免过于复杂，所以不会考虑支持所有游戏特性（我也懒得搞哈哈）。</li>
+      </ul>
+
       <h3>基本流程</h3>
       <ol>
         <li>选择<strong>攻击方</strong>与<strong>防御方</strong>精灵（可搜索 / 筛选系别）。</li>
@@ -2998,8 +3163,19 @@ const MODAL_CONTENT = {
         <li>精灵特性，包括：仪式巨像家族，岚鸟家族，凡鹰家族，机幕方舟家族，画间沉铁兽。</li>
         <li>与星陨层数联动的技能，包括：多维击打、天体吸积。</li>
         <li>可以通过防御方的「聚能」来触发特殊的「应对状态」效果的攻击技能，包括：铁蒺藜、龙卷风、追打、炙热波动、虫击、突袭、暗突袭、爆冲、技巧打击、无影脚、偷袭、散手、连续爪击、滚雪球、吹炎、地陷、闪燃、灾厄，以及十八系愿力冲击。</li>
-        <li>此外还有扇风、疾风刺、闪击、鸣沙陷阱。</li>
+        <li>此外还有扇风、疾风刺、闪击、鸣沙陷阱、星痕、急中生智。</li>
       </ul>
+
+      <h3>挑战模式</h3>
+      <p>这是一个考验你对星陨斩杀线的把握，辅助记忆斩杀线的小游戏。</p>
+      <ol>
+        <li>点击顶部的「挑战模式」按钮，会进入挑战模式设置阶段，你可以设置挑战模式的参数，包括精灵池，属性配置，技能选择以及题数。</li>
+        <li>设置好后，点击「开始挑战」按钮进入答题阶段，系统会根据你的设置随机出题，此时两侧精灵面板的交互会被全部锁定，伤害结果停止计算，只剩下星陨层数可以调整，这就是你的「作答区」。</li>
+        <li>根据系统给出的双方精灵状态，判断此时攻击方需要多少层星陨印记可刚好将防御方斩杀（伤害占比超过100%），调整星陨层数至你认为的答案后点击「提交答案」按钮。</li>
+        <li>此时伤害结果开始计算，系统会根据正确答案与你给出的答案之间的差来为你打分。</li>
+        <li>点击「下一道题」，将从第二步开始重复步骤，直到所有题目都作答完毕。</li>
+        <li>在任何阶段下，你都可以点击「退出挑战」按钮来将页面退回至计算器状态。</li>
+      </ol>
 
       <h3>数据来源</h3>
       <ul>
@@ -3073,6 +3249,1581 @@ function initInfoModal() {
   });
 }
 
+// ============================================================
+// CHALLENGE MODE (UI 控件层)
+// ------------------------------------------------------------
+// 本文件此次只承载"控件 + 过渡"：进入/退出挑战模式、预设/题数 chip、
+// 侧栏 label ↔ chip 切换动画。业务逻辑（出题、提交、评分）后续 PR。
+//
+// 关键不变量：
+//   1. 精灵池（攻击方/防御方）是**单选** chip 组：3 个 chip（全部/常见/自选）
+//      同时只有一个 .active，**不能空选**。点击当前选中项保持选中不变。
+//   2. 「随机」chip 是**开关**：在 .active 和无 .active 之间切换。
+//   3. 所有 chip 都复用 .buff-chip 的视觉（.label-chip），并带按压特效
+//      （pointerdown 期间加 .pressing 类）。
+//   4. 进入挑战模式：body 加 .challenge-mode；隐藏星陨/伤害结果，
+//      显示 .challenge-setup；侧栏 label-text 淡出，label-chip-group 淡入。
+//   5. 退出：反向。display 切换串在 Web Animations API 动画的 onfinish 时机。
+//   6. seal-container 宽度固定 280px，避免进入/退出时 .battle-area 横向抖动。
+// ============================================================
+
+const CHALLENGE_LABEL_TRANSITION_MS = 220;   // label ↔ chip 淡入淡出时长
+
+// 缓动曲线（Material Design 命名）
+// EASING_STANDARD：cubic-bezier(0.4, 0, 0.2, 1) — Material "standard" 缓动
+//   加速进入、减速退出，曲线对称、视觉中性。
+//   用于：
+//     - 所有动画
+//
+// EASING_DECELERATE：cubic-bezier(0.16, 1, 0.3, 1) — Material "deceleration" 缓动
+//   极速进入（前 25% 进度就跑完 ~70%），最后慢慢"落定"，模拟物理减速到位。
+//   让"新内容进场"有一种"轻盈落定"的感觉。
+//   用于：
+//     - 暂时不使用
+const EASING_STANDARD = 'cubic-bezier(0.4, 0, 0.2, 1)';
+const EASING_DECELERATE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+
+// 工具：用 Web Animations API 播放「淡出 → 隐藏 → 淡出对方/淡入自己」序列。
+//   fadeOut: true 时把元素淡出后 display:none；fadeIn: true 时把元素从 display:none
+//   切到 inline-flex 后淡入。两个参数可同时为 false（仅同步样式）。
+function _swapLabelVisibility(textEl, chipEl, opts) {
+  const { showChip } = opts;
+
+  // 进入或退出前，**先取消**这两个元素上残留的 Web Animations（避免旧的
+  // fill:'forwards' 在新动画结束后"复活"，把元素重新拉到 opacity:0）。
+  // 这是双向切换必须的清理，否则第二次进入/退出后 chip 或文本会"卡死"。
+  _cancelAnimations(textEl);
+  _cancelAnimations(chipEl);
+
+  if (showChip) {
+    // 文本淡出 → 隐藏 → chip 取消 hidden 并淡入
+    if (textEl && textEl.style.display !== 'none') {
+      const a = textEl.animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-4px)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+      a.onfinish = () => {
+        textEl.style.display = 'none';
+        if (chipEl) {
+          chipEl.hidden = false;
+          chipEl.animate(
+            [
+              { opacity: 0, transform: 'translateY(4px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+          );
+        }
+      };
+    } else if (chipEl) {
+      // 文本已经隐藏（再次进入时），直接让 chip 淡入
+      chipEl.hidden = false;
+      chipEl.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+    }
+  } else {
+    // chip 淡出 → 隐藏 → 文本取消 hidden 并淡入
+    if (chipEl && !chipEl.hidden) {
+      const a = chipEl.animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-4px)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+      a.onfinish = () => {
+        chipEl.hidden = true;
+        if (textEl) {
+          textEl.style.display = '';
+          textEl.animate(
+            [
+              { opacity: 0, transform: 'translateY(4px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+          );
+        }
+      };
+    } else if (textEl) {
+      // chip 已经隐藏，文本直接淡入
+      textEl.style.display = '';
+      textEl.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+    }
+  }
+}
+
+// 取消元素上所有 Web Animations（包括 fill:'forwards' 残留的"最终态"）。
+// 双向切换前调用，避免旧动画在"后"相位把元素拉回 opacity:0 的"卡死"态。
+function _cancelAnimations(el) {
+  if (!el || typeof el.getAnimations !== 'function') return;
+  for (const a of el.getAnimations()) {
+    try { a.cancel(); } catch (_) {}
+  }
+}
+
+// 统一取消挑战模式相关元素的所有 Web Animations。
+// 在 enter / exit / show / hide 启动新动画前调用，避免新旧 .animate() 互相
+// 反向覆盖同一元素（Element.animate() 不会自动取消旧 animation，必须显式 cancel）。
+//   - 中心区域：.seal-top / .seal-middle / .result-bottom / #challenge-setup /
+//     #challenge-answer-result
+//   - 侧栏：所有 .label-text ↔ .label-chip-group 对
+function _cancelChallengeAnimations() {
+  document.querySelectorAll(
+    '.seal-top, .seal-middle, .result-bottom, ' +
+    '#challenge-setup, #challenge-answer-result'
+  ).forEach(el => _cancelAnimations(el));
+  for (const pair of _collectLabelSwapPairs()) {
+    _cancelAnimations(pair.textEl);
+    _cancelAnimations(pair.chipEl);
+  }
+}
+
+// 收集挑战模式下需要切换的 (text, chip) 对：
+//   - 攻击方 / 防御方 的 panel-label
+//   - 属性配置 / 攻击技能 / 防御技能 的 section-title
+function _collectLabelSwapPairs() {
+  const groups = document.querySelectorAll('.label-chip-group');
+  return Array.from(groups).map(g => ({
+    textEl: g.parentElement.querySelector('.label-text'),
+    chipEl: g,
+  })).filter(p => p.textEl && p.chipEl);
+}
+
+// 进入挑战模式：把 chip 组淡入到 label 位置；显示 .challenge-setup；
+// 隐藏星陨/伤害结果。按钮文案切换为"退出挑战"。
+//
+// 关键时序（必须与侧栏 label 切换 440ms 对齐）：
+//   t=0    开始：星陨/伤害结果淡出 (220ms) + 侧栏 label-text 淡出 (220ms) [并行]
+//   t=220  完成：星陨/伤害结果 → body.challenge-mode (display:none) + 挑战设置淡入 (220ms) + 侧栏 chip 淡入 (220ms) [并行]
+//   t=440  全部完成
+//   旧实现：body.challenge-mode 立即加上 → 星陨/伤害结果瞬间消失 → 挑战设置 220ms 淡入。
+//   这导致中心比两侧 chip 早 220ms 完成（侧栏是 text 淡出 220 + chip 淡入 220 = 440ms）。
+//
+// 快速连点防御（2026-07-18）：
+//   1) 进入前先 _cancelChallengeAnimations() 取消所有 sections / setup / label
+//      pairs 上正在跑的 animation——避免与"上次 exit 留下的 fade"反向覆盖。
+//   2) 启动时 transitionGen++ 并快照 myGen；Promise.all 回调里检查
+//      transitionGen === myGen，不等则 no-op（已被新的 enter/exit 接管）。
+//      这覆盖了"用户在 220ms 内点退出"导致的旧回调反扑。
+function enterChallengeMode() {
+  if (state.challenge.active) return;
+  // 进入前先清理所有相关元素上正在跑的 animation（修复连点 toggle 时
+  // 上一次 enter 留下的 .animate() 反向动画的 bug）。
+  _cancelChallengeAnimations();
+  const myGen = ++state.challenge.transitionGen;
+  state.challenge.active = true;
+  // 锁住 toggle click handler（2026-07-18）：440ms 完整动画期间忽略点击，
+  // 防止"enter + exit 各 440ms、视觉上闪两次"。末尾 setup 淡入 onfinish
+  // 释放（带 gen 守卫，cancel 时不释放，被新动画接管时由新动画释放）。
+  state.challenge.toggleAnimating = true;
+
+  // 切换按钮文案 + 视觉
+  const btn = document.getElementById('challenge-toggle-btn');
+  const text = btn && btn.querySelector('.challenge-toggle-text');
+  const icon = btn && btn.querySelector('.challenge-toggle-icon');
+  if (btn) {
+    btn.classList.add('is-active');
+    btn.setAttribute('aria-pressed', 'true');
+  }
+  if (text) text.textContent = '退出挑战';
+  if (icon) icon.textContent = '✕';
+
+  // 1) 星陨/伤害结果淡出 → 2) body.challenge-mode + challenge-setup 淡入
+  // 与退出对称：先让旧内容淡出，再让新内容淡入，使总时长对齐 chip 的 440ms。
+  const sections = document.querySelectorAll('.seal-top, .seal-middle, .result-bottom');
+  const sectionAnims = Array.from(sections).map(s =>
+    s.animate(
+      [
+        { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-4px)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+    )
+  );
+  Promise.all(sectionAnims.map(a => a.finished)).then(() => {
+    // gen 守卫：回调触发时若 transitionGen 已变化（用户在淡出期间点了退出），
+    // 说明已被 exit 接管，本次回调 no-op，避免 body 状态被反向写入。
+    if (state.challenge.transitionGen !== myGen) return;
+    sections.forEach(s => {
+      s.style.opacity = '';
+      s.style.transform = '';
+    });
+    // 此时才让 body.challenge-mode 生效（星陨/伤害结果回归 display:none）。
+    document.body.classList.add('challenge-mode');
+
+    // 显示挑战设置区。**必须先取消 setup 上残留的 Web Animations**——上次 exit
+    // 的 Animation 留在 getAnimations() 里、其 fill:'forwards' 会把 setup 钉在
+    // opacity:0；不取消的话，setup.hidden = false 后会被 fill 拉回 0（出现一下就消失）。
+    const setup = document.getElementById('challenge-setup');
+    if (setup) {
+      _cancelAnimations(setup);
+      setup.style.opacity = '';
+      setup.style.transform = '';
+      setup.hidden = false;
+      const setupAnim = setup.animate(
+        [
+          { opacity: 0, transform: 'translateY(6px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+      // 完整 440ms 动画结束（sections 淡出 220 + setup 淡入 220）后释放
+      // toggle 锁；gen 守卫确保只在"本次 enter 没被抢断"时释放——
+      // 若已被 exit 接管（transitionGen 变了），由 exit 自己的 onfinish 释放。
+      setupAnim.onfinish = () => {
+        if (state.challenge.transitionGen !== myGen) { setupAnim.cancel(); return; }
+        setupAnim.cancel();
+        state.challenge.toggleAnimating = false;
+      };
+    }
+  });
+
+  // 逐对 label 做淡出 → 淡入 chip 组的过渡（与星陨/伤害结果淡出并行开始；总 440ms）
+  for (const pair of _collectLabelSwapPairs()) {
+    _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: true });
+  }
+}
+
+// 退出挑战模式：反向过渡；隐藏 .challenge-setup；按钮恢复"挑战模式"。
+// 关键顺序：1) setup 淡出 → 2) hidden → 3) body.challenge-mode 移除（星陨/伤害结果
+// 重新出现）→ 4) 星陨/伤害结果淡入。**不能**先移除 body.challenge-mode 再淡出 setup，
+// 否则两者会同时存在导致布局挤兑（星陨/伤害结果被 setup 顶到下面挤在一起）。
+//
+// 快速连点防御（2026-07-18）：
+//   1) 进入前 _cancelChallengeAnimations() 取消 sections / setup / label pairs 上
+//      正在跑的 animation——避免与"上次 enter 留下的 fade"反向覆盖。
+//   2) transitionGen++ 并快照 myGen；setup.animate 与 sections.animate 的 onfinish
+//      内检查 transitionGen === myGen，不等则 no-op。
+function exitChallengeMode() {
+  if (!state.challenge.active) return;
+  // 进入前先清理所有相关元素上正在跑的 animation（修复连点 toggle 时
+  // 上一次 enter 留下的 .animate() 反向动画的 bug）。
+  _cancelChallengeAnimations();
+  const myGen = ++state.challenge.transitionGen;
+  state.challenge.active = false;
+  // 锁住 toggle click handler（2026-07-18）：440ms 完整动画期间忽略点击，
+  // 防止"enter + exit 各 440ms、视觉上闪两次"。末尾 sections 淡入 onfinish
+  // 释放（带 gen 守卫，被新动画接管时由新动画释放）。
+  state.challenge.toggleAnimating = true;
+
+  const btn = document.getElementById('challenge-toggle-btn');
+  const text = btn && btn.querySelector('.challenge-toggle-text');
+  const icon = btn && btn.querySelector('.challenge-toggle-icon');
+  if (btn) {
+    btn.classList.remove('is-active');
+    btn.setAttribute('aria-pressed', 'false');
+  }
+  if (text) text.textContent = '挑战模式';
+  if (icon) icon.textContent = '⚔';
+
+  // 逐对 label 做反向过渡（与 setup 淡出并行）
+  for (const pair of _collectLabelSwapPairs()) {
+    _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: false });
+  }
+
+  // 挑战设置淡出 → 隐藏 → 移除 body.challenge-mode → 星陨/伤害结果淡入
+  const setup = document.getElementById('challenge-setup');
+  if (setup) {
+    _cancelAnimations(setup);
+    const a = setup.animate(
+      [
+        { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-6px)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+    );
+    a.onfinish = () => {
+      // gen 守卫：若已被新的 enter 接管（用户在淡出期间点了"挑战模式"），
+      // 不再继续改 body class 与启动 sections 淡入——避免两者打架。
+      if (state.challenge.transitionGen !== myGen) { a.cancel(); return; }
+      setup.hidden = true;
+      setup.style.opacity = '';
+      setup.style.transform = '';
+      a.cancel();  // 主动取消，避免 fill 残留到下次 enter
+      // 此时才让 body.challenge-mode 移除（星陨/伤害结果回归），并用淡入过渡消解"突然出现"。
+      document.body.classList.remove('challenge-mode');
+      const sections = document.querySelectorAll('.seal-top, .seal-middle, .result-bottom');
+      sections.forEach(s => {
+        const anim = s.animate(
+          [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+        );
+        anim.onfinish = () => {
+          // 同样的 gen 守卫
+          if (state.challenge.transitionGen !== myGen) { anim.cancel(); return; }
+          s.style.opacity = '';
+          s.style.transform = '';
+          anim.cancel();
+          // 完整 440ms 动画结束（setup 淡出 220 + sections 淡入 220）后释放
+          // toggle 锁；只在"本次 exit 没被抢断"时释放。
+          state.challenge.toggleAnimating = false;
+        };
+      });
+    };
+  }
+}
+
+// ============================================================
+// CHALLENGE MODE (业务逻辑层：题目池 / 答题流程 / 评分)
+// ------------------------------------------------------------
+// 题目池生成（解耦的 3 个工厂 + 1 个 orchestrator）。每个工厂返回一个
+// 生成器 () => 本题具体值，便于后续调整每个维度的"随机策略"而不动其他维度。
+// 业务逻辑（startChallenge / applyQuestion / submitAnswer / nextQuestion /
+// exitChallenge / findMinKillLayer）也放在本段。
+// ============================================================
+
+// 工具：从数组里等概率随机一个元素。防御技能"无"权重更大的随机：把
+// __none__ 在候选数组里重复多份实现加权采样。
+function _pickRandom(arr) {
+  if (!arr || arr.length === 0) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// 取本道题新精灵的挑战模式随机池（可能为 null）。
+//   side    : 'attacker' | 'defender'
+//   spriteId: 精灵 id
+// 池数据来自 OTHERS.attacker_random_pools / OTHERS.defender_random_pools，
+// 由 make_final_jsons.py 产出。每个池含 default_weight 与 combos：
+//   - 总权重 = sum(combos.weight) + default_weight
+//   - 抽到 default_weight 区间 → 走"普通随机"（未命中预设组合）
+//   - 抽到 combo → 返回 combo.combo
+function _getRandomPool(side, spriteId) {
+  if (!spriteId) return null;
+  const pools = (side === 'attacker')
+    ? OTHERS.attacker_random_pools
+    : OTHERS.defender_random_pools;
+  return pools?.[spriteId] || null;
+}
+
+// 按权重从池里抽一个 combo；落在 default_weight 区间或池为空时返回 null。
+// 返回 null 表示"未命中预设组合"，由调用方走普通随机兜底。
+function _pickFromPool(pool) {
+  if (!pool) return null;
+  const combos = pool.combos || [];
+  const defaultW = pool.default_weight || 0;
+  const totalW = combos.reduce((s, c) => s + c.weight, 0) + defaultW;
+  if (totalW <= 0) return null;
+  let r = Math.random() * totalW;
+  for (const c of combos) {
+    r -= c.weight;
+    if (r < 0) return c.combo;
+  }
+  return null;
+}
+
+// 挑战模式技能随机兜底的权重表（具体数值可调）。
+//  - 攻击方：愿力冲击（id 以 __yuanli_ 开头，共 18 个变体）权重低；
+//    精灵自身攻击技能权重高。
+//  - 防御方：__none__（无）> __state__（聚能）> 精灵自身防御技能。
+// 概率 = weight / sum(weights)，精灵自身技能数量越多，其总占比越高。
+const CHALLENGE_SKILL_WEIGHTS = {
+  attacker: { yuanli: 4, other: 5 },
+  defender: { none:   5, state: 4, other: 2 },
+};
+
+// 按 CHALLENGE_SKILL_WEIGHTS 从 opts 抽一个技能对象（调用方取 .id）。
+//   side = 'attacker' | 'defender'
+//   全部权重 ≤ 0 时返回 null（调用方需有兜底）
+function _pickWeightedSkill(opts, side) {
+  if (!opts || opts.length === 0) return null;
+  const W = CHALLENGE_SKILL_WEIGHTS[side];
+  const weighted = opts.map(s => {
+    let w;
+    if (side === 'attacker') {
+      w = s.id.startsWith('__yuanli_') ? W.yuanli : W.other;
+    } else {
+      if (s.id === '__none__')       w = W.none;
+      else if (s.id === '__state__') w = W.state;
+      else                           w = W.other;
+    }
+    return { s, w };
+  });
+  const totalW = weighted.reduce((sum, x) => sum + x.w, 0);
+  if (totalW <= 0) return null;
+  let r = Math.random() * totalW;
+  for (const x of weighted) {
+    r -= x.w;
+    if (r < 0) return x.s;
+  }
+  return weighted[weighted.length - 1].s; // 浮点累加误差兜底
+}
+
+// ------------------------------------------------------------
+// 题目池生成：3 个独立工厂 + 1 个 orchestrator
+// ------------------------------------------------------------
+
+// 精灵池工厂：返回 () => 精灵 id
+//   pool[side] = 'all'    : 从所有 SPRITES 中等概率采样
+//   pool[side] = 'common' : 从 OTHERS.common_attackers/defenders 中等概率采样
+//   pool[side] = 'custom' : 固定返回 state[side].id（自选必须已选好精灵）
+function buildSpiritRng(side) {
+  const mode = state.challenge.pool[side];
+  if (mode === 'all') {
+    const allIds = Object.keys(SPRITES);
+    return () => _pickRandom(allIds);
+  }
+  if (mode === 'common') {
+    const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
+                                       : (OTHERS.common_defenders || []);
+    const ids = list.slice();
+    return () => _pickRandom(ids);
+  }
+  // 'custom' — 固定当前用户选的精灵
+  const fixedId = (side === 'attacker') ? state.attacker?.id : state.defender?.id;
+  if (!fixedId) {
+    // 自选池但精灵未选：兜底用常见池（避免抛错）
+    const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
+                                       : (OTHERS.common_defenders || []);
+    return () => _pickRandom(list);
+  }
+  return () => fixedId;
+}
+
+// 属性配置工厂：返回 (spirit) => { nature, ivs, buff, speed, power, combo }
+//   randomStats[side] = false: 深拷贝当前 state（不污染用户原值，spirit 参数忽略）
+//   randomStats[side] = true : 先按 spirit 的随机池抽 nature+ivs / buff-spd /
+//                              power / combo（落入 default_weight 区间则走普通随机）；
+//                              威力/连击仅攻击方，防御方恒为 0
+//   关键：必须传入"本道题新生成的精灵"——与 buildSkillRng 一致，避免误用
+//   state.[side]（上一个题目 / 用户在普通计算器里选的精灵）的旧 pool。
+function buildStatsRng(side) {
+  if (!state.challenge.randomStats[side]) {
+    // 固定：从当前 state 深拷贝
+    return (_spirit) => ({
+      nature: side === 'attacker'
+        ? { ...state.attackerNature }
+        : { ...state.defenderNature },
+      ivs: side === 'attacker'
+        ? state.attackerIVs.slice()
+        : state.defenderIVs.slice(),
+      buff: side === 'attacker'
+        ? { ...state.attackerBuff }
+        : { ...state.defenderBuff },
+      speed: side === 'attacker' ? state.attackerSpeed : state.defenderSpeed,
+      // 威力 / 连击：仅攻击方有意义；防御方恒 0（其状态字段也不存在）
+      power: side === 'attacker' ? state.attackerPowerBoost : 0,
+      combo: side === 'attacker' ? state.attackerCombo : 0,
+    });
+  }
+  // 随机：先看 spirit 的随机池，再走普通兜底
+  return (spirit) => {
+    const pool = _getRandomPool(side, spirit?.id);
+    // 1. nature + ivs（来自 pool.stats；未命中走普通随机）
+    const statsPicked = _pickFromPool(pool?.stats);
+    let nature, ivs;
+    if (statsPicked) {
+      nature = { up: statsPicked.nature.up, down: statsPicked.nature.down };
+      ivs = statsPicked.ivs.slice();
+    } else {
+      // 兜底：性格从 6 个 statKey 里抽 2 个不同（up != down）
+      const keys = STAT_KEYS.slice();
+      const upIdx = Math.floor(Math.random() * keys.length);
+      let downIdx = Math.floor(Math.random() * (keys.length - 1));
+      if (downIdx >= upIdx) downIdx += 1;
+      nature = { up: keys[upIdx], down: keys[downIdx] };
+      // 兜底：IVs 从 6 个 statKey 里抽 3 个不同
+      const ivKeys = keys.slice();
+      ivs = [];
+      for (let i = 0; i < MAX_IV; i++) {
+        const idx = Math.floor(Math.random() * ivKeys.length);
+        ivs.push(ivKeys.splice(idx, 1)[0]);
+      }
+    }
+    // 2. buff / spd / power / combo（来自 pool.buffs；未命中则全 0）
+    //    pool.buffs.combo 是 list[dict]，每个 dict 的 key 分流：
+    //      - atk / matk / def / mdef → 写入"常量 buff"对象（由 side 决定哪些 key 有效）
+    //      - spd / power / combo      → 独立字段；威力/连击仅攻击方
+    const buffPicked = _pickFromPool(pool?.buffs);
+    const buff = side === 'attacker'
+      ? { atk: 0, matk: 0 }
+      : { def: 0, mdef: 0 };
+    let spd = 0, power = 0, combo = 0;
+    if (buffPicked) {
+      for (const b of buffPicked) {
+        // 独立字段
+        if (b.spd   != null) spd = b.spd;
+        if (side === 'attacker') {
+          if (b.power != null) power = b.power;
+          if (b.combo != null) combo = b.combo;
+        }
+        // 常量 buff：从 b 复制一份去掉 spd/power/combo 的版本写入
+        const { spd: _s, power: _p, combo: _c, ...rest } = b;
+        Object.assign(buff, rest);
+      }
+    }
+    return { nature, ivs, buff, speed: spd, power, combo };
+  };
+}
+
+// 技能选择工厂：返回 (spirit) => 技能 id
+//   关键：必须传入"本道题新生成的精灵"作为参数（而不是闭包 state.[side]），
+//   因为题目池模式下（新精灵 != state.[side]）如果用 state，pool/opts
+//   兜底会从旧精灵的数据里挑，导致选出来的 id 在新精灵里查不到，
+//   applyQuestion 触发 opts[0] 兜底——看起来"必然选第一个技能"。
+// 兜底路径（"固定"分支用户技能找不到时 / "随机"分支）共享：
+//   spirit 池 → 加权随机（CHALLENGE_SKILL_WEIGHTS）
+// 攻击方：
+//   randomSkill=false (固定)：优先 state.attackSkill.id；该 id 不在新精灵可用列表
+//                            中时走兜底
+//   randomSkill=true  (随机)：直接走兜底
+// 防御方：
+//   randomSkill=false (固定)：优先 state.defenseSkill.id；找不到时按 reduction
+//                            四舍五入容差匹配；都失败走兜底
+//   randomSkill=true  (随机)：直接走兜底
+function buildSkillRng(side) {
+  const isRandom = state.challenge.randomSkill[side];
+  // 4 个分支共享的兜底：先看 spirit 池；未命中/不合法走加权随机
+  const fallback = (spirit, opts, noneId) => {
+    const pool = _getRandomPool(side, spirit?.id);
+    const picked = _pickFromPool(pool?.skills);
+    if (picked && opts.some(s => s.id === picked)) return picked;
+    const weighted = _pickWeightedSkill(opts, side);
+    return weighted ? weighted.id : noneId;
+  };
+
+  if (side === 'attacker') {
+    if (!isRandom) {
+      // 固定：先尝试用户的技能；不匹配走兜底
+      const userId = state.attackSkill?.id;
+      return (attacker) => {
+        const opts = getAttackSkillOptions(attacker);
+        if (userId && opts.some(s => s.id === userId)) return userId;
+        return fallback(attacker, opts, YUANLI_SKILLS[0].id);
+      };
+    }
+    // 随机：直接走兜底
+    return (attacker) => {
+      const opts = getAttackSkillOptions(attacker);
+      return fallback(attacker, opts, YUANLI_SKILLS[0].id);
+    };
+  }
+  // 防御方
+  if (!isRandom) {
+    const userId = state.defenseSkill?.id;
+    const userReduction = state.defenseSkill?.reduction;
+    return (defender) => {
+      const opts = getDefenseSkillOptions(defender);
+      // 1. 优先：完全相同 id
+      if (userId) {
+        const hit = opts.find(s => s.id === userId);
+        if (hit) return hit.id;
+      }
+      // 2. reduction 四舍五入容差匹配（容差=整数百分比相等）
+      if (userReduction != null) {
+        const userPct = Math.round(userReduction * 100);
+        const hit = opts.find(s => s.reduction != null
+          && Math.round(s.reduction * 100) === userPct);
+        if (hit) return hit.id;
+      }
+      // 3. 兜底：与"随机"分支共享
+      return fallback(defender, opts, '__none__');
+    };
+  }
+  // 随机：直接走兜底
+  return (defender) => {
+    const opts = getDefenseSkillOptions(defender);
+    return fallback(defender, opts, '__none__');
+  };
+}
+
+// Orchestrator：取 6 个工厂各调用一次，组装成一道题快照。
+// 快照中防御方最终 HP 也存起来，避免后续评分时再算一次。
+function buildQuestionSnapshot(_index) {
+  const atkId    = buildSpiritRng('attacker')();
+  const defId    = buildSpiritRng('defender')();
+  // 关键：先构造本题新精灵对象，再让属性/技能工厂用新精灵的 pool 与技能表
+  // 去选/兜底，避免 buildStatsRng / buildSkillRng 误用 state.[side]（上一个题目
+  // / 用户在普通计算器里选的精灵）的旧 pool 或技能表——那会导致选出来的 id
+  // 在新精灵里查不到，触发 applyQuestion 的 opts[0] 兜底，看起来像"必然选
+  // 第一个技能"。
+  const attacker = { id: atkId, ...(SPRITES[atkId] || {}) };
+  const defender = { id: defId, ...(SPRITES[defId] || {}) };
+  const atkStats = buildStatsRng('attacker')(attacker);
+  const defStats = buildStatsRng('defender')(defender);
+  const atkSkId  = buildSkillRng('attacker')(attacker);
+  const defSkId  = buildSkillRng('defender')(defender);
+  const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
+  return {
+    attacker,
+    defender,
+    attackerNature: atkStats.nature,
+    defenderNature: defStats.nature,
+    attackerIVs: atkStats.ivs,
+    defenderIVs: defStats.ivs,
+    attackerBuff: atkStats.buff,
+    defenderBuff: defStats.buff,
+    attackerSpeed: atkStats.speed,
+    defenderSpeed: defStats.speed,
+    // 威力 / 连击作为题目配置的一部分（仅攻击方；防御方无对应 state 字段）
+    attackerPowerBoost: atkStats.power,
+    attackerCombo: atkStats.combo,
+    attackSkillId: atkSkId,
+    defenseSkillId: defSkId,
+    defHP,
+  };
+}
+
+// 二分查找：在 [0, 99] 范围内找能击杀的最少星陨层数。
+// 单调性：finalDamage 关于 starLayer 单调非递减（已确认）。
+// 99 层仍不能击杀 → 返回 99 作为"不可击杀"哨兵值。
+// 哨兵选 99（不是 100）的原因：配合绝对值公式 |s - 99|，
+//   submit 99 → |99-99|*10 = 0 → 100 分（用户的"不可击杀时提交99得100"语义）。
+//   submit 0 → |0-99|*10 = 990 → 0 分（梯度）。
+// 若用 100 作哨兵，s=99 时 |99-100|*10 = 10 → 90 分，与用户预期不符。
+function findMinKillLayer(snap, q) {
+  // 99 层也不能击杀
+  const dmg99 = computeFinalDamage({ ...snap, starLayer: 99 }).finalDamage;
+  if (dmg99 < q.defHP) return 99;
+  // 0 层即可击杀
+  const dmg0 = computeFinalDamage({ ...snap, starLayer: 0 }).finalDamage;
+  if (dmg0 >= q.defHP) return 0;
+  // 二分 [1, 99]
+  let lo = 1, hi = 99;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const dmg = computeFinalDamage({ ...snap, starLayer: mid }).finalDamage;
+    if (dmg >= q.defHP) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
+// ------------------------------------------------------------
+// 答题流程辅助函数
+// ------------------------------------------------------------
+
+// 锁定 / 解锁精灵面板：仅影响 .spirit-panel 及其后代；星陨层数控件不受影响。
+function lockSpiritPanels() {
+  for (const id of ['attacker-panel', 'defender-panel']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('challenge-locked');
+  }
+}
+function unlockSpiritPanels() {
+  for (const id of ['attacker-panel', 'defender-panel']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('challenge-locked');
+  }
+}
+
+// 锁定 / 解锁星陨层数控件（#seal-wrapper 拖拽 + #seal-slider 滑块）。
+// 锁定后：拖拽失效、滚轮失效、滑块 disabled。
+function lockStarControls() {
+  const wrapper = document.getElementById('seal-wrapper');
+  const slider = document.getElementById('seal-slider');
+  if (wrapper) wrapper.classList.add('challenge-locked');
+  if (slider) slider.disabled = true;
+}
+function unlockStarControls() {
+  const wrapper = document.getElementById('seal-wrapper');
+  const slider = document.getElementById('seal-slider');
+  if (wrapper) wrapper.classList.remove('challenge-locked');
+  if (slider) slider.disabled = false;
+}
+
+// ------------------------------------------------------------
+// 答题结果切换：把 .seal-middle（滑条）替换为 .challenge-answer-result。
+// 与 enterChallengeMode / exitChallengeMode 共用同一套 Web Animations API
+// 风格（220ms opacity + translateY 4-6px）。
+//   - _showAnswerResult(opts): 答完一题后调用，淡出滑条 → 显示结果
+//   - _hideAnswerResult(opts): 切到下一题 / 退出挑战时调用，淡出结果 → 淡入滑条
+// 两个函数都接受 { animated } 选项；exitChallenge 会传 animated:false 走
+// 原地退出（不播动画），与 toggle 按钮的"原地退出"语义一致。
+// ------------------------------------------------------------
+function _showAnswerResult({ score, optimal }) {
+  const middle = document.getElementById('seal-middle');
+  const result = document.getElementById('challenge-answer-result');
+  const scoreEl = document.getElementById('challenge-answer-score');
+  const optimalEl = document.getElementById('challenge-answer-optimal');
+  if (!middle || !result || !scoreEl || !optimalEl) return;
+
+  // 快速连点防御（2026-07-18）：
+  //   - 进入前先取消 answerAnimating 期间可能存在的 _hideAnswerResult fade
+  //   - 启动 transitionGen++ 并快照 myGen；fadeOut.onfinish 内检查 token，
+  //     不等则 no-op——防止 _hideAnswerResult 抢在 fadeOut 完成前退出后，
+  //     本回调反向把 body 重新加上 challenge-answered。
+  //   - answerShown/answerAnimating 立即置 true，让 race 窗口内的
+  //     _hideAnswerResult 能正确识别"结果已显示"（不再误判"还没加 body class"
+  //     而早返回）。
+  _cancelAnimations(middle);
+  _cancelAnimations(result);
+  const myGen = ++state.challenge.transitionGen;
+  state.challenge.answerShown = true;
+  state.challenge.answerAnimating = true;
+
+  // 1. 填充内容 + 分数等级（高分绿/中分黄/低分红）
+  scoreEl.textContent = score;
+  optimalEl.textContent = optimal;
+  let grade = 'low';
+  if (score >= 80) grade = 'high';
+  else if (score >= 50) grade = 'mid';
+  scoreEl.dataset.grade = grade;
+
+  // 2. 淡出滑条 → body.challenge-answered 触发 CSS 隐藏 + 显示结果 → 淡入
+  // 关键：先做完淡出再加 body class，否则 body class 的 display:none 会让
+  // 淡出动画"瞬间消失"，看起来像没动画。
+  const fadeOut = middle.animate(
+    [
+      { opacity: 1, transform: 'translateY(0)' },
+      { opacity: 0, transform: 'translateY(-4px)' },
+    ],
+    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+  );
+  fadeOut.onfinish = () => {
+    // gen 守卫：若 _hideAnswerResult / _showAnswerResult 已被新调用接管
+    // （transitionGen 已变），不再继续——避免 body 状态被反向写入导致
+    // 答案信息残留与滑条共存。
+    if (state.challenge.transitionGen !== myGen) return;
+    // 淡出完成才切 display：CSS 让 .seal-middle 隐藏、.challenge-answer-result 显示
+    document.body.classList.add('challenge-answered');
+    result.hidden = false;
+    _cancelAnimations(result);
+    result.animate(
+      [
+        { opacity: 0, transform: 'translateY(4px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+    );
+    // 整个 show 流程（淡出滑条 + 切 display + 淡入结果）完成；
+    // 答题结果区稳定显示，answerAnimating 复位。
+    state.challenge.answerAnimating = false;
+  };
+}
+
+// 答题结果 → 滑条 切换。
+// 快速连点防御（2026-07-18）：
+//   - 早返回判断改用 state.challenge.answerShown（与 c.phase 同步设置），
+//     替代 "body.classList.contains('challenge-answered')"——后者在
+//     _showAnswerResult 的 fadeOut 还没结束时为 false，会让 race 窗口内的
+//     _hideAnswerResult 误判"已隐藏"而早返回，导致 body class 被提前移除。
+//   - transitionGen++ 快照 myGen；fadeOut/fadeIn 的 onfinish 内 gen 守卫，
+//     防止 _showAnswerResult 抢在 fadeOut 完成后反向写入 body 状态。
+//   - answerShown/answerAnimating 立即维护为 hide 流程的最新状态。
+function _hideAnswerResult({ animated = true } = {}) {
+  const middle = document.getElementById('seal-middle');
+  const result = document.getElementById('challenge-answer-result');
+  if (!middle || !result) return Promise.resolve();
+  // 已经在"滑条态"就直接返回（防重复调用）。**用 answerShown 而非 body class**：
+  // _showAnswerResult 的 fadeOut 未结束时 body 还没有 challenge-answered，
+  // 但 answerShown 已在调用入口置 true（与 c.phase 同步），能正确识别
+  // "结果区在显示中"这一语义。
+  if (!state.challenge.answerShown) return Promise.resolve();
+
+  // 原地退出：不播动画，立即换回滑条（用于 exitChallenge 等"立即收尾"场景）
+  if (!animated) {
+    const myGen = ++state.challenge.transitionGen;
+    state.challenge.answerShown = false;
+    state.challenge.answerAnimating = false;
+    document.body.classList.remove('challenge-answered');
+    result.hidden = true;
+    return Promise.resolve();
+  }
+
+  // 淡出答题结果 → 切回滑条 → 淡入滑条
+  // 进入前先清理 answerAnimating 期间可能存在的 _showAnswerResult fadeOut
+  // （虽然 _showAnswerResult 自己有 gen 守卫不再反扑，但保险起见清掉）
+  _cancelAnimations(result);
+  _cancelAnimations(middle);
+  const myGen = ++state.challenge.transitionGen;
+  state.challenge.answerAnimating = true;
+  // 立即清 answerShown——这样若 race 窗口内 _showAnswerResult 被再次调用
+  // （理论上不会，但防御），它会自己重新置 true + 启动新动画。
+  state.challenge.answerShown = false;
+
+  return new Promise(resolve => {
+    const fadeOut = result.animate(
+      [
+        { opacity: 1, transform: 'translateY(0)' },
+        { opacity: 0, transform: 'translateY(-4px)' },
+      ],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+    );
+    fadeOut.onfinish = () => {
+      // gen 守卫：若 _showAnswerResult / _hideAnswerResult 已被新调用接管
+      // （用户在淡出期间又点了 submit），不再继续——避免 body 状态被
+      // 错误地覆盖为 hide 终态（导致 result 残留或被强行隐藏）。
+      if (state.challenge.transitionGen !== myGen) { fadeOut.cancel(); return; }
+      // 切回滑条：移除 body class + 隐藏结果节点
+      document.body.classList.remove('challenge-answered');
+      result.hidden = true;
+      // 淡入滑条
+      const fadeIn = middle.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'translateY(0)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+      // 等淡入完成再 resolve：调用方此时移除 body.challenge-running / .challenge-mode 才安全
+      fadeIn.onfinish = () => {
+        // gen 守卫：同样防止后续新动画接管后这个 callback 反向 reset state
+        if (state.challenge.transitionGen !== myGen) { fadeIn.cancel(); return; }
+        state.challenge.answerAnimating = false;
+        resolve();
+      };
+    };
+  });
+}
+
+// 渲染进度信息（"第 N / M 题 · 累计 X 分"）
+function renderChallengeProgress() {
+  const el = document.getElementById('challenge-progress-info');
+  if (!el) return;
+  const c = state.challenge;
+  el.textContent = `第 ${c.current + 1} / ${c.total} 题 · 累计 ${c.totalScore} 分`;
+}
+
+// 渲染提交/下一道题/查看结果按钮文案 + 启用状态。
+function renderSubmitButton() {
+  const btn = document.getElementById('challenge-submit-btn');
+  if (!btn) return;
+  const c = state.challenge;
+  const isLast = c.current >= c.total - 1;
+  btn.classList.remove('is-next');
+  if (c.phase === 'picking') {
+    btn.textContent = '提交答案';
+    btn.disabled = false;
+  } else if (c.phase === 'answered') {
+    btn.textContent = isLast ? '查看结果' : '下一道题';
+    btn.disabled = false;
+    btn.classList.add('is-next');
+  } else {
+    // 'idle' / 'done'
+    btn.textContent = '提交答案';
+    btn.disabled = true;
+  }
+}
+
+// 全部完成后的结算视图：进度条显示总分；提交按钮消失；星陨控件保持锁定。
+// 原本会在 result-info 区域写每题明细，但发现那个区域在伤害圆环正下方，
+// 文字过长会顶歪伤害明细的"伤害计算明细"按钮，且视觉上很拥挤，故暂时移除。
+// 之后再考虑用更合适的方案展示每题得分（例如弹窗 / 折叠面板 / 单独页面）。
+function renderChallengeResult() {
+  const c = state.challenge;
+  const info = document.getElementById('challenge-progress-info');
+  if (info) info.textContent = `挑战完成 · 总分 ${c.totalScore} / ${c.total * 100}`;
+  // 提交按钮淡出（220ms），不直接 display:none 避免突兀。
+  const btn = document.getElementById('challenge-submit-btn');
+  if (btn) {
+    btn.classList.remove('is-shown');
+    btn.setAttribute('aria-hidden', 'true');
+  }
+  lockStarControls();
+  c.phase = 'done';
+}
+
+// ------------------------------------------------------------
+// 核心流程
+// ------------------------------------------------------------
+
+// 答题阶段：自动把技能列表滚动到当前选中的技能（.skill-btn.active）。
+// 精灵面板已锁定交互（pointer-events: none），用户无法自己滚列表，
+// 必须由 JS 在 renderSkills 后代为滚到中心位置，避免选中技能被遮挡。
+function _scrollSkillListToSelected(side) {
+  const list = document.getElementById(side + '-skill-list');
+  if (!list) return;
+  const selected = list.querySelector('.skill-btn.active');
+  if (!selected || typeof selected.scrollIntoView !== 'function') return;
+  // 用 scrollIntoView({ block: 'start' }) 把目标技能滚动到顶部；
+  selected.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' });
+}
+
+// 应用一道题：替换 state 全字段并重渲染。
+// 关键：绕过 selectSpirit / selectAttackSkill / selectDefenseSkill（它们会
+// 清空 nature/IVs/buff/speed/power/combo，并触发 calculateDamage 副作用）。
+function applyQuestion(index) {
+  const q = state.challenge.questions[index];
+  if (!q) return;
+  // 1. 替换 state 全部相关字段（深拷贝避免污染快照）
+  state.attacker = { ...q.attacker };
+  state.defender = { ...q.defender };
+  state.attackerNature = { ...q.attackerNature };
+  state.defenderNature = { ...q.defenderNature };
+  state.attackerIVs = q.attackerIVs.slice();
+  state.defenderIVs = q.defenderIVs.slice();
+  state.attackerBuff = { ...q.attackerBuff };
+  state.defenderBuff = { ...q.defenderBuff };
+  state.attackerSpeed = q.attackerSpeed;
+  state.defenderSpeed = q.defenderSpeed;
+  // 威力 / 连击：题目配置的一部分（与双攻/双防/速度同级），不再每题重置
+  state.attackerPowerBoost = q.attackerPowerBoost;
+  state.attackerCombo = q.attackerCombo;
+  state.spiritPicking.attacker = false;
+  state.spiritPicking.defender = false;
+  // 2. 攻击技能：在新精灵的可用列表中找对应 id
+  const atkOpts = getAttackSkillOptions(state.attacker);
+  const atkIdx = atkOpts.findIndex(s => s.id === q.attackSkillId);
+  if (atkIdx >= 0) {
+    state.attackSkillIdx = atkIdx;
+    state.attackSkill = atkOpts[atkIdx];
+  } else {
+    // 题目的 id 在新精灵里不可用 → 用 opts[0] 兜底
+    state.attackSkillIdx = 0;
+    state.attackSkill = atkOpts[0] || null;
+  }
+  // 3. 防御技能
+  const defOpts = getDefenseSkillOptions(state.defender);
+  const defIdx = defOpts.findIndex(s => s.id === q.defenseSkillId);
+  if (defIdx >= 0) {
+    state.defenseSkillIdx = defIdx;
+    state.defenseSkill = defOpts[defIdx];
+  } else {
+    state.defenseSkillIdx = 0;
+    state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', reduction: 1, _pseudo: true };
+  }
+  // 4. 重置星陨层数 + 题目元数据
+  state.starLayer = 0;
+  state.challenge.current = index;
+  state.challenge.phase = 'picking';
+  // 5. 同步 UI
+  renderSpiritArea('attacker');
+  renderSpiritArea('defender');
+  renderSkills('attacker');
+  renderSkills('defender');
+  // 5b. 滚动技能列表到选中的技能（面板已锁定交互，必须 JS 代滚）
+  _scrollSkillListToSelected('attacker');
+  _scrollSkillListToSelected('defender');
+  renderStatsConfig('attacker');
+  renderStatsConfig('defender');
+  renderBuffChips('attacker');
+  renderBuffChips('defender');
+  renderPowerBoostChip();
+  setStarLayer(0);
+  // 6. 答题阶段不计算伤害：保持空圆环 + 等待提交
+  renderWaiting();
+  // 7. 进度条 + 提交按钮
+  renderChallengeProgress();
+  renderSubmitButton();
+  // 8. 解锁星陨层数（每题开始都让用户能拖）
+  unlockStarControls();
+  // 9. 切到答题态：先移除 challenge-mode 让 seal/结果回归显示（避免其 CSS
+  //    display:none 把星陨/伤害结果钉死），再加 challenge-running。
+  //    设置阶段（enterChallengeMode）时 body 有 challenge-mode，applyQuestion
+  //    需要同时清理掉，否则星陨盘 + 伤害圆环不会显示。
+  //
+  //    **第一题**（setup → running 首次切换）：seal 区域需要走"setup 淡出 →
+  //    swap body class → seal 淡入"的 440ms 过渡，与 exitChallengeMode 对称。
+  //    之前是同步切换：.seal-* 元素从 display:none 直接变 display:flex，
+  //    看起来"突然出现"。其他 UI（spirit 卡 spiritAreaIn、label-chip→label）
+  //    已经在并行播，seal 区域补上同样的 Web Animations 即可。
+  //    **后续题**：body 类与 setup.hidden 都在第一题设置过，这里就是 no-op，
+  //    不用再走动画。
+  //
+  // 快速连点防御（2026-07-18）：
+  //   - 第一题启动前 _cancelChallengeAnimations() + transitionGen++；setup
+  //     淡出与 sections 淡入的 onfinish 内 gen 守卫——防止用户在 220ms 内点
+  //     退出（exitChallenge 会 cancel 这些 animation + bump gen），即便
+  //     onfinish 仍然 fire，gen 失配也会 no-op。
+  //
+  //   **不在这里清 answerShown/answerAnimating**：nextQuestion 路径下
+  //     _hideAnswerResult 入口立即把 answerAnimating 设为 true（防 submit
+  //     click 在 440ms 内重入），紧接着 applyQuestion(next) 同步执行——
+  //     如果这里再设 false，next 之后那 440ms 的锁立即被吃掉，user 可以
+  //     连点 submit/退出挑战再次触发链式动画。改为：_hideAnswerResult
+  //     自己的 fadeIn.onfinish 负责设 false。
+  if (index === 0) {
+    const setup = document.getElementById('challenge-setup');
+    if (setup) {
+      _cancelAnimations(setup);
+      const myGen = ++state.challenge.transitionGen;
+      const fadeOut = setup.animate(
+        [
+          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0, transform: 'translateY(-6px)' },
+        ],
+        { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+      );
+      fadeOut.onfinish = () => {
+        // gen 守卫：若已被新的 enter/exit 接管（用户在 220ms 内点退出），
+        // 不再继续——避免 body 状态被反向写入。
+        if (state.challenge.transitionGen !== myGen) { fadeOut.cancel(); return; }
+        // 此时才让 body 切到 running 态：先隐藏 setup + swap class，
+        // 再淡入 seal-*，避免两者在 .seal-container（flex column）里同时存在造成挤兑。
+        setup.hidden = true;
+        setup.style.opacity = '';
+        setup.style.transform = '';
+        fadeOut.cancel();  // 主动取消，避免 fill 残留到下次 enter
+        document.body.classList.remove('challenge-mode');
+        document.body.classList.add('challenge-running');
+        const sections = document.querySelectorAll('.seal-top, .seal-middle, .result-bottom');
+        sections.forEach(s => {
+          const anim = s.animate(
+            [
+              { opacity: 0, transform: 'translateY(4px)' },
+              { opacity: 1, transform: 'translateY(0)' },
+            ],
+            { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+          );
+          anim.onfinish = () => {
+            // 同样的 gen 守卫
+            if (state.challenge.transitionGen !== myGen) { anim.cancel(); return; }
+            s.style.opacity = '';
+            s.style.transform = '';
+          };
+        });
+      };
+    } else {
+      // 兜底：找不到 setup 时直接切（不应该发生）
+      document.body.classList.remove('challenge-mode');
+      document.body.classList.add('challenge-running');
+    }
+  } else {
+    // 后续题：body 类已经在第一次 applyQuestion 设置好（remove/add 都是 no-op），
+    // setup 也已经 hidden，不再动它。
+    document.body.classList.remove('challenge-mode');
+    document.body.classList.add('challenge-running');
+    const setup = document.getElementById('challenge-setup');
+    if (setup) setup.hidden = true;
+  }
+  // 进度信息 + 提交按钮：CSS 控透明度（220ms 淡入），aria-hidden 与可见性同步
+  // — 之前用 `hidden = true/false` 是二值切换，没有过渡，体验突兀。
+  const info = document.getElementById('challenge-progress-info');
+  if (info) {
+    info.classList.add('is-shown');
+    info.setAttribute('aria-hidden', 'false');
+  }
+  const submitBtn = document.getElementById('challenge-submit-btn');
+  if (submitBtn) {
+    submitBtn.classList.add('is-shown');
+    submitBtn.setAttribute('aria-hidden', 'false');
+  }
+  // 10. 答题阶段：把侧栏 label-chip（精灵池单选/随机 chip）淡出，让 label-text
+  //     淡入回归——与「从挑战设置退出挑战」时的视觉一致（见 exitChallengeMode）。
+  //     不然进入答题态后还会看到「全部/常见/自选」「随机」等 chip，干扰注意力。
+  //     **只在第一题播**：后续题目（nextQuestion）的 label 已经在第一题被换回 text，
+  //     再播一次 _swapLabelVisibility 就是无意义的"文字淡入"——文字其实一直在那，
+  //     看起来很奇怪。
+  if (index === 0) {
+    for (const pair of _collectLabelSwapPairs()) {
+      _swapLabelVisibility(pair.textEl, pair.chipEl, { showChip: false });
+    }
+  }
+}
+
+// 提交答案：二分查找最优层数 → 评分 → 锁定星陨控件（保持用户提交的层数）。
+function submitAnswer() {
+  const c = state.challenge;
+  if (c.phase !== 'picking') return;  // 防双击
+  // 快速连点防御（2026-07-18）：如果 _showAnswerResult / _hideAnswerResult 还在
+  // 播 220ms 过渡动画，忽略本次点击。否则会与上一次提交未完成的"结果区切换"
+  // 动画叠加，触发 answer 信息残留 + body class 反向写入。
+  if (c.answerAnimating) return;
+  const q = c.questions[c.current];
+  if (!q) return;
+  const submitted = state.starLayer;
+  // 临时 ctx 用于二分查找最优层数（不污染 state）
+  const baseSnap = {
+    attacker: q.attacker,
+    defender: q.defender,
+    attackSkill: state.attackSkill,   // 此时 state 已被 applyQuestion 同步
+    defenseSkill: state.defenseSkill,
+    attackerNature: q.attackerNature,
+    defenderNature: q.defenderNature,
+    attackerIVs: q.attackerIVs,
+    defenderIVs: q.defenderIVs,
+    attackerBuff: q.attackerBuff,
+    defenderBuff: q.defenderBuff,
+    attackerSpeed: q.attackerSpeed,
+    defenderSpeed: q.defenderSpeed,
+    attackerPowerBoost: state.attackerPowerBoost,
+    attackerCombo: state.attackerCombo,
+    starLayer: 0,
+  };
+  const optimal = findMinKillLayer(baseSnap, q);
+  // 评分：score = 100 - |s - o| × 10，截断到 [0, 100]
+  //   用 |s - o|（绝对差）而不是 (s - o)，让公式在击杀/未击杀两种情况下
+  //   都给出合理梯度，与用户的"0层就死 submit 0 得 100、99层都不死
+  //   submit 99 得 100、未击杀按偏离程度扣分"语义一致。
+  //   - 击杀场景（o ∈ [0, 99]）：submit 偏离 o 越远，扣分越多（双向）
+  //   - 不可击杀（哨兵 99）：submit 99 → 100；submit 0 → 0
+  // 计算 userDamage 仅用于 isKill 字段（信息性展示），不影响分数。
+  const userDamage = computeFinalDamage({ ...baseSnap, starLayer: submitted }).finalDamage;
+  const userKills = userDamage >= q.defHP;
+  const diff = Math.abs(submitted - optimal);
+  const score = Math.max(0, Math.min(100, 100 - diff * 10));
+  c.scores.push({
+    layer: submitted,
+    optimal,
+    isKill: userKills,        // 信息性字段：用户提交层数是否实际击杀（不影响分数）
+    score,
+  });
+  c.totalScore += score;
+  c.phase = 'answered';
+  // 锁定星陨层数（提交后不允许再调）；滑块保持用户提交的层数（不动），
+  // 下方 calculateDamage 会用此层数算出真实伤害并显示。
+  lockStarControls();
+  // 把 .seal-middle（滑条）替换为 .challenge-answer-result，显示"得分"与"最优层数"。
+  // 内部用 Web Animations API 淡出滑条 + 淡入结果（220ms + translateY），
+  // 不直接 display:none 切换以避免突兀。
+  _showAnswerResult({ score, optimal });
+  // 刷新按钮 + 进度
+  renderChallengeProgress();
+  renderSubmitButton();
+  // 提交后才计算伤害（让圆环显示最终结果）。
+  // 此时 phase === 'answered'，setStarLayer 的 phase guard 不会阻止 calculateDamage。
+  calculateDamage();
+}
+
+// 进入下一道题 / 最后一题显示结算
+function nextQuestion() {
+  const c = state.challenge;
+  // 快速连点防御（2026-07-18）：如果 _showAnswerResult / _hideAnswerResult 还在
+  // 播 220ms 过渡动画，忽略本次点击。否则会与未完成的"结果区切换"动画叠加，
+  // 导致 applyQuestion 与 hide 的 body class 状态互相覆盖。
+  if (c.answerAnimating) return;
+  const next = c.current + 1;
+  if (next >= c.total) {
+    renderChallengeResult();
+    return;
+  }
+  // 把答题结果切回滑条（在切题之前完成淡出 → 淡入，避免"切题后滑条突然出现"）。
+  // 内部走 Web Animations API：淡出结果 → 切 display → 淡入滑条（220ms + translateY）。
+  _hideAnswerResult();
+  // 重置滑块控件
+  unlockStarControls();
+  setStarLayer(0);
+  applyQuestion(next);
+}
+
+// 退出挑战：解除所有锁定、回到正常计算器状态。
+// 不备份 state —— applyQuestion 期间会改写 state 字段，退出后 state 残留
+// 的是最后提交的题目快照；用户重新调整即可，不专门设计"恢复原状态"。
+//
+// 快速连点防御（2026-07-18）：
+//   1) 入口处 running 守卫：第二次点击的 exitChallenge 调用直接 no-op，
+//      避免第一次未跑完就第二次进。
+//   2) 先 transitionGen++ + _cancelChallengeAnimations()，确保 _showAnswerResult
+//      / applyQuestion(0) 留下的 220ms onfinish 回调的 gen 失配、no-op，
+//      不会再反向加回 body class。
+//   3) 显式重置 answerAnimating。
+//
+//   **不要**在这里把 c.answerShown = false：_hideAnswerResult 入口用
+//   `if (!answerShown) return Promise.resolve();` 早返回；这里清掉后
+//   _hideAnswerResult 不会走完整流程，.challenge-answer-result 不会被
+//   hidden=true、body 也不会 remove('challenge-answered')——最终 result
+//   与 .seal-middle 同时显示（"答案信息留在这里 + 滑条瞬间出现"）。
+//   answerShown 由 _showAnswerResult 入口设为 true，让 _hideAnswerResult
+//   检测到它存在、走完整淡出 → 切 display → 淡入流程。
+function exitChallenge() {
+  const c = state.challenge;
+  if (!c.running) return;  // 快速连点防御：第二次点击 no-op
+  // 取消所有挑战相关元素上正在跑的 animation（含 _showAnswerResult 的
+  // fadeOut.onfinish / applyQuestion(0) 的 setup 淡出 onfinish 等），
+  // 并 bump transitionGen 让残留的 onfinish 回调 gen 失配、no-op。
+  c.transitionGen++;
+  _cancelChallengeAnimations();
+  // 不清 c.answerShown：让 _hideAnswerResult 检测到"结果区在显示中"、
+  // 走完整淡出 → 切 display → 淡入滑条流程（修复 2026-07-18 答案残留 bug）。
+  c.answerAnimating = false;
+
+  // 1. 解锁所有面板
+  unlockSpiritPanels();
+  unlockStarControls();
+  // 1b. 如果当前在"已提交"态，答题结果区域正显示得分/最优层数；
+  //     退出挑战时把它换回星陨滑条。走与 nextQuestion 同样的 220ms 淡出 →
+  //     淡入过渡（与每道题之间的切换保持一致）。其余退出逻辑（重置状态、
+  //     重渲染精灵面板等）与动画并行执行，中心区域的 swap 是用户视线焦点，
+  //     周围 UI 的瞬时变化不会干扰体验。
+  //
+  //     **关键**：必须等 swap 全部完成（淡出 220 + 淡入 220 ≈ 440ms）后再
+  //     移除 body.challenge-running / body.challenge-mode。否则 CSS 规则
+  //       body.challenge-running.challenge-answered .seal-middle { display:none }
+  //     在淡出过程中就失效——.seal-middle 立即显形（opacity:1、translateY:0），
+  //     与正在淡出的 .challenge-answer-result 同时出现在 .seal-container
+  //     （flex column）里上下排，呈现"上下挤在一起"的瞬态。
+  //     _hideAnswerResult 现在返回 Promise：非 answered 态早返回时立即 resolve，
+  //     下面 .then() 相当于同步执行（行为不变）。
+  _hideAnswerResult().then(() => {
+    // 4. body 退出 running（同时清理可能残留的 challenge-mode）
+    //    放在 .then 末尾：等淡入滑条也播完再移除，让 CSS 规则覆盖期
+    //    与 .seal-middle 的 220ms 淡入动画完整对齐。
+    document.body.classList.remove('challenge-running');
+    document.body.classList.remove('challenge-mode');
+  });
+  // 2. 进度信息 + 提交按钮淡出（220ms），aria-hidden 同步更新
+  const info = document.getElementById('challenge-progress-info');
+  if (info) {
+    info.classList.remove('is-shown');
+    info.setAttribute('aria-hidden', 'true');
+  }
+  const btn = document.getElementById('challenge-submit-btn');
+  if (btn) {
+    btn.classList.remove('is-shown');
+    btn.setAttribute('aria-hidden', 'true');
+    // 延迟移除 is-next / 设置 disabled = true：
+    //   exitChallenge 在同一帧内如果同步把这两个也改了，浏览器会把这
+    //   三次状态变更合批为一次过渡（.is-shown → 默认），于是：
+    //     1) color 从 yellow (.is-next) → cyan 走 0.22s 过渡，和
+    //        opacity 渐出同步发生 → 看起来像"淡出最后变蓝";
+    //     2) :disabled 的 opacity: 0.45 覆盖掉默认 0，opacity 实际
+    //        终点是 0.45（不是 0），到 0.22s visibility:hidden 突然
+    //        生效 → 看起来像"卡了一下"。
+    //   解决办法：淡出过程中保持按钮原状态（.is-shown.is-next / enabled），
+    //   等 220ms 过渡结束 + 40ms buffer 再清理。这时按钮已经 visibility:hidden，
+    //   color 变蓝与 disabled 置位都不可见。
+    setTimeout(() => {
+      if (!btn.isConnected) return;   // 防御：节点被移除就不动它
+      btn.classList.remove('is-next');
+      btn.disabled = true;
+    }, 260);
+  }
+  // 3. 还原切换按钮的"挑战模式"状态（不要重新跑 exitChallengeMode 那一套
+  //    440ms 过渡动画 — 用户原话"原地退出"）
+  const toggleBtn = document.getElementById('challenge-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.classList.remove('is-active');
+    toggleBtn.setAttribute('aria-pressed', 'false');
+    const text = toggleBtn.querySelector('.challenge-toggle-text');
+    const icon = toggleBtn.querySelector('.challenge-toggle-icon');
+    if (text) text.textContent = '挑战模式';
+    if (icon) icon.textContent = '⚔';
+  }
+  // 4. body 退出 running（同时清理可能残留的 challenge-mode）—— 已移至
+  //    上面 _hideAnswerResult().then() 里延后到 swap 动画完成后再移除。
+  // 5. 重置 running 状态字段
+  c.running = false;
+  c.active = false;   // 同步把 setup 状态也清掉，让 toggle 按钮 3 路分支落到 "enter"
+  c.phase = 'idle';
+  c.current = 0;
+  c.total = 0;
+  c.questions = [];
+  c.scores = [];
+  c.totalScore = 0;
+  // 6. 重渲染（state 已被 applyQuestion 改写——重新渲染以反映当前 state）
+  // 退出时给 spirit 卡片走 skipAnimation：原地退出不应该播一个 250ms 的 spiritAreaIn。
+  // 走 inline style（见 renderSpiritCard/renderSpiritPicker），element 创建时即抑制动画。
+  renderSpiritArea('attacker', { skipAnimation: true });
+  renderSpiritArea('defender', { skipAnimation: true });
+  renderSkills('attacker');
+  renderSkills('defender');
+  renderStatsConfig('attacker');
+  renderStatsConfig('defender');
+  renderBuffChips('attacker');
+  renderBuffChips('defender');
+  renderPowerBoostChip();
+  setStarLayer(state.starLayer);
+  // 7. 重新计算伤害（恢复实时显示）
+  calculateDamage();
+  const breakdownSection = document.getElementById('breakdown-section');
+  if (breakdownSection) breakdownSection.style.display = 'none';
+}
+
+// 开始挑战：生成题目池 + 启动第一题
+function startChallenge() {
+  const c = state.challenge;
+  // 1. 校验自选池精灵已选
+  for (const side of ['attacker', 'defender']) {
+    if (c.pool[side] === 'custom') {
+      const has = side === 'attacker' ? !!state.attacker : !!state.defender;
+      if (!has) {
+        // 简单提示：复用现有信息弹窗
+        const modal = document.getElementById('info-modal');
+        const title = document.getElementById('modal-title');
+        const body = document.getElementById('modal-body');
+        if (modal && title && body) {
+          title.textContent = '无法开始挑战';
+          const whichSide = side === 'attacker' ? '攻击方' : '防御方';
+          body.innerHTML = `<div style="line-height:1.7">「自选」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 常见」池。</div>`;
+          modal.classList.add('is-open');
+          modal.setAttribute('aria-hidden', 'false');
+        }
+        return;
+      }
+    }
+  }
+  // 2. 生成题目
+  c.questions = [];
+  for (let i = 0; i < c.count; i++) {
+    c.questions.push(buildQuestionSnapshot(i));
+  }
+  c.total = c.count;
+  c.current = 0;
+  c.scores = [];
+  c.totalScore = 0;
+  c.running = true;
+  c.phase = 'idle';
+  // 3. 锁定精灵面板
+  lockSpiritPanels();
+  // 4. 应用第一题（applyQuestion 内部会切到 challenge-running / 显示 progress）
+  applyQuestion(0);
+}
+
+// 给 .label-chip 挂按压特效（pointerdown/pointerup/cancel）。
+// 用 capturing=false 即可，chip 内部不再消费 pointerdown。
+function _attachLabelChipPressEffect(chip) {
+  if (chip.__pressBound) return;
+  chip.__pressBound = true;
+  const onDown = () => chip.classList.add('pressing');
+  const release = () => chip.classList.remove('pressing');
+  chip.addEventListener('pointerdown', onDown);
+  chip.addEventListener('pointerup', release);
+  chip.addEventListener('pointercancel', release);
+  chip.addEventListener('pointerleave', release);
+  // 键盘 Enter/Space 也复用该特效（按下时短暂加类）
+  chip.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') onDown();
+  });
+  chip.addEventListener('keyup', release);
+  chip.addEventListener('blur', release);
+}
+
+// 单选 chip 组：点击触发时把同组内 .active 切到目标 chip；点击当前 active
+// 不做任何事（不能空选）。返回值表示是否真的切换了。
+function _setSingleChoice(group, value) {
+  const chips = group.querySelectorAll('.label-chip');
+  let changed = false;
+  chips.forEach(c => {
+    const isTarget = c.dataset.value === value || c.dataset.pool === value;
+    if (isTarget && !c.classList.contains('active')) {
+      c.classList.add('active');
+      c.setAttribute('aria-pressed', 'true');
+      changed = true;
+    } else if (isTarget) {
+      // 已经是 active，也保持并同步 aria
+      c.setAttribute('aria-pressed', 'true');
+    } else if (c.classList.contains('active')) {
+      c.classList.remove('active');
+      c.setAttribute('aria-pressed', 'false');
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+// 开关 chip：toggle .active。返回新状态（true=激活）。
+function _toggleChip(chip) {
+  const newActive = !chip.classList.contains('active');
+  chip.classList.toggle('active', newActive);
+  chip.setAttribute('aria-pressed', newActive ? 'true' : 'false');
+  return newActive;
+}
+
+// 挑战模式预设配置表。
+//   easy    : 双方精灵常见 / 双方属性、技能均非随机 / 5 题
+//   standard: 双方精灵常见 / 防御方属性与技能随机 / 10 题
+//   hard    : 攻击方精灵常见 + 防御方精灵全部 / 防御方属性与技能随机 / 20 题
+const CHALLENGE_PRESETS = {
+  easy: {
+    pool:        { attacker: 'common', defender: 'common' },
+    randomStats: { attacker: true,     defender: true     },
+    randomSkill: { attacker: true,     defender: true     },
+    count: 5,
+  },
+  standard: {
+    pool:        { attacker: 'common', defender: 'all'    },
+    randomStats: { attacker: true,     defender: true     },
+    randomSkill: { attacker: true,     defender: true     },
+    count: 10,
+  },
+  hard: {
+    pool:        { attacker: 'all',    defender: 'all'    },
+    randomStats: { attacker: true,     defender: true     },
+    randomSkill: { attacker: true,     defender: true     },
+    count: 20,
+  },
+};
+
+// 取消预设 chip 选中（视觉 + state.challenge.preset = null）。
+// 用户不能通过点击预设 chip 自身来触发；仅由非预设 chip 的点击回调调用，
+// 表示「用户已偏离当前预设，按自定义处理」。
+function _clearPresetSelection() {
+  const group = document.querySelector('.challenge-setup-chips[data-group="preset"]');
+  if (group) {
+    group.querySelectorAll('.label-chip').forEach(c => {
+      c.classList.remove('active');
+      c.setAttribute('aria-pressed', 'false');
+    });
+  }
+  state.challenge.preset = null;
+}
+
+// 同步单侧精灵池 chip 视觉 + state
+function _syncPoolChip(side, value) {
+  const group = document.querySelector(`.label-chip-group[data-kind="pool"][data-side="${side}"]`);
+  if (group) _setSingleChoice(group, value);
+  state.challenge.pool[side] = value;
+}
+
+// 同步单侧 random chip 视觉 + state
+function _syncRandomChip(kind, side, value) {
+  const chip = document.querySelector(`.label-chip-group[data-kind="${kind}"][data-side="${side}"] .label-chip`);
+  if (chip) {
+    chip.classList.toggle('active', !!value);
+    chip.setAttribute('aria-pressed', value ? 'true' : 'false');
+  }
+  const key = kind === 'random-stats' ? 'randomStats' : 'randomSkill';
+  state.challenge[key][side] = !!value;
+}
+
+// 同步题数 chip 视觉 + state
+function _syncCountChip(value) {
+  const group = document.querySelector('.challenge-setup-chips[data-group="count"]');
+  if (group) _setSingleChoice(group, String(value));
+  state.challenge.count = value;
+}
+
+// 应用预设：写入 state.challenge 并同步所有相关 chip 视觉。
+// 注意：state.challenge.preset 由调用方负责更新；本函数不触碰它。
+function _applyChallengePreset(presetName) {
+  const cfg = CHALLENGE_PRESETS[presetName];
+  if (!cfg) return;
+  for (const side of ['attacker', 'defender']) {
+    _syncPoolChip(side, cfg.pool[side]);
+    _syncRandomChip('random-stats', side, cfg.randomStats[side]);
+    _syncRandomChip('random-skill', side, cfg.randomSkill[side]);
+  }
+  _syncCountChip(cfg.count);
+}
+
+// 初始化挑战模式：挂事件 + 让初始 chip 状态与 state.challenge 同步。
+function initChallengeMode() {
+  // —— 切换按钮：3 路分支（running / active / enter）——
+  const btn = document.getElementById('challenge-toggle-btn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      // 快速连点防御（2026-07-18）：
+      //   - answerAnimating 守卫：答题结果区还在播 220ms 切换动画时，
+      //     忽略 toggle 点击，避免动画进行中切模式状态导致 body class
+      //     被反向写入。
+      //   - **toggleAnimating 守卫（新增）**：enter/exit 正在播 440ms
+      //     过渡动画时忽略 click——避免"enter 220ms sections 淡出 + exit
+      //     220ms sections 淡入"在 880ms 内连续播放、视觉上闪两次。
+      //     由 enter/exit 末尾 onfinish 释放。
+      const c = state.challenge;
+      if (c.answerAnimating) return;
+      if (c.toggleAnimating) return;
+      if (c.running) {
+        // 答题阶段：原地退出（不弹 setup 过渡动画）
+        exitChallenge();
+      } else if (c.active) {
+        // 设置阶段：退出设置
+        exitChallengeMode();
+      } else {
+        // 首次进入挑战模式
+        enterChallengeMode();
+      }
+    });
+  }
+
+  // 侧栏 pool chip（精灵池单选）
+  document.querySelectorAll('.label-chip-group[data-kind="pool"]').forEach(group => {
+    const side = group.dataset.side;        // 'attacker' | 'defender'
+    const chips = group.querySelectorAll('.label-chip');
+    chips.forEach(chip => _attachLabelChipPressEffect(chip));
+
+    // 初始同步：state.challenge.pool[side] 与 chip.active 对齐
+    const current = state.challenge.pool[side];
+    _setSingleChoice(group, current);
+
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.label-chip');
+      if (!chip || !group.contains(chip)) return;
+      const val = chip.dataset.pool;
+      if (!val) return;
+      // 单选：点已选中的保持选中；不能空选
+      const changed = _setSingleChoice(group, val);
+      if (changed) {
+        state.challenge.pool[side] = val;
+        // 偏离当前预设 → 取消预设选中
+        _clearPresetSelection();
+      }
+    });
+  });
+
+  // 侧栏 random-stats / random-skill chip（开关）
+  document.querySelectorAll('.label-chip-group[data-kind="random-stats"], .label-chip-group[data-kind="random-skill"]').forEach(group => {
+    const side = group.dataset.side;        // 'attacker' | 'defender'
+    const kind = group.dataset.kind;        // 'random-stats' | 'random-skill'
+    const chip = group.querySelector('.label-chip');
+    if (!chip) return;
+    _attachLabelChipPressEffect(chip);
+
+    // 初始同步
+    const key = kind === 'random-stats' ? 'randomStats' : 'randomSkill';
+    chip.classList.toggle('active', state.challenge[key][side]);
+    chip.setAttribute('aria-pressed', state.challenge[key][side] ? 'true' : 'false');
+
+    chip.addEventListener('click', () => {
+      const newActive = _toggleChip(chip);
+      state.challenge[key][side] = newActive;
+      // 偏离当前预设 → 取消预设选中
+      _clearPresetSelection();
+    });
+  });
+
+  // 挑战设置区 chip（预设 / 题数，都是单选）
+  document.querySelectorAll('.challenge-setup-chips').forEach(group => {
+    const groupName = group.dataset.group;  // 'preset' | 'count'
+    const chips = group.querySelectorAll('.label-chip');
+    chips.forEach(c => _attachLabelChipPressEffect(c));
+
+    // 初始同步
+    const initial = groupName === 'preset' ? state.challenge.preset : String(state.challenge.count);
+    _setSingleChoice(group, initial);
+
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.label-chip');
+      if (!chip || !group.contains(chip)) return;
+      const val = chip.dataset.value;
+      if (val == null) return;
+      const changed = _setSingleChoice(group, val);
+      if (!changed) return;
+      if (groupName === 'preset') {
+        state.challenge.preset = val;
+        // 应用预设：覆盖其他相关 chip 与 state（用户主动选预设，不取消选中）
+        _applyChallengePreset(val);
+      } else if (groupName === 'count') {
+        const n = parseInt(val, 10);
+        if (Number.isFinite(n) && n > 0) {
+          state.challenge.count = n;
+          // 偏离当前预设 → 取消预设选中
+          _clearPresetSelection();
+        }
+      }
+    });
+  });
+
+  // —— 「开始挑战」按钮 ——
+  const startBtn = document.getElementById('challenge-start-btn');
+  if (startBtn) {
+    startBtn.addEventListener('click', () => {
+      if (state.challenge.running) return;   // 已在答题：忽略（防御性）
+      startChallenge();
+    });
+  }
+
+  // —— 「提交答案 / 下一道题 / 查看结果」按钮（按 phase 路由）——
+  const submitBtn = document.getElementById('challenge-submit-btn');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', () => {
+      const c = state.challenge;
+      if (!c.running) return;                // 非答题阶段：忽略
+      // 快速连点防御（2026-07-18）：submitAnswer / nextQuestion 自身已经有
+      // answerAnimating 守卫，这里再叠一层：动画进行中按钮直接 no-op，
+      // 防止 click 事件多次入队导致 setTimeout 链错乱。
+      if (c.answerAnimating) return;
+      if (c.phase === 'picking') submitAnswer();
+      else if (c.phase === 'answered') nextQuestion();
+      // 'done' 阶段按钮已 hidden，不触发
+    });
+  }
+}
+
 function init() {
   initStarCanvas();
   generateSealSVG();
@@ -3087,6 +4838,8 @@ function init() {
   // 威力 chip 占位（未选攻击方时也常驻显示）
   renderPowerBoostChip();
   renderWaiting();
+  // 挑战模式：仅挂事件、初始化 chip 状态，不主动进入
+  initChallengeMode();
 }
 
 window.addEventListener('DOMContentLoaded', async () => {

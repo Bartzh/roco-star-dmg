@@ -86,21 +86,53 @@
     </p>
   </header>
 
+  <!-- 挑战模式切换条：
+       静态布局：进度信息 | 切换按钮（"挑战模式" / "退出挑战"） | 提交按钮
+       ——三个元素都是 #challenge-bar 的直接子节点，靠 flex 排成一行。
+       进度信息与提交按钮默认不可见（CSS opacity:0 + visibility:hidden），
+       进入答题态由 JS 加 .is-shown 类触发 220ms 淡入；退出答题态移除该类
+       触发淡出。aria-hidden 与可见性同步更新，避免屏幕阅读器读出隐藏内容。
+  -->
+  <section class="challenge-bar" id="challenge-bar" aria-label="挑战模式">
+    <span id="challenge-progress-info" class="challenge-progress-info" aria-hidden="true">第 1 / 5 题</span>
+    <button type="button" class="challenge-toggle-btn" id="challenge-toggle-btn" aria-pressed="false">
+      <span class="challenge-toggle-icon" aria-hidden="true">⚔</span>
+      <span class="challenge-toggle-text">挑战模式</span>
+    </button>
+    <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled aria-hidden="true">提交答案</button>
+  </section>
+
   <section class="battle-area" aria-label="对战配置区">
     <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方">
-      <h2 class="panel-label">攻击方</h2>
+      <h2 class="panel-label">
+        <span class="label-text">攻击方</span>
+        <span class="label-chip-group" data-kind="pool" data-side="attacker" hidden>
+          <button type="button" class="label-chip" data-pool="all">全部</button>
+          <button type="button" class="label-chip active" data-pool="common" aria-pressed="true">常见</button>
+          <button type="button" class="label-chip" data-pool="custom">自选</button>
+        </span>
+      </h2>
       <div id="attacker-select-area">
         <!-- 由 JS 渲染：未选时为内嵌选择器，选后为精灵卡 -->
       </div>
       <div class="stats-section" id="attacker-stats" style="display:none">
         <h3 class="section-title">
-          属性配置
+          <span class="label-text">属性配置</span>
+          <span class="label-chip-group" data-kind="random-stats" data-side="attacker" hidden>
+            <button type="button" class="label-chip active" data-random="stats" aria-pressed="true">随机</button>
+          </span>
           <span class="buff-chips" id="attacker-buff-chips" aria-label="攻击方 buff 调节"></span>
         </h3>
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
-        <h3 class="section-title">攻击技能<span class="buff-chips" id="attacker-power-boost-chip" aria-label="连击数 / 威力 调节"></span></h3>
+        <h3 class="section-title">
+          <span class="label-text">攻击技能</span>
+          <span class="label-chip-group" data-kind="random-skill" data-side="attacker" hidden>
+            <button type="button" class="label-chip active" data-random="skill" aria-pressed="true">随机</button>
+          </span>
+          <span class="buff-chips" id="attacker-power-boost-chip" aria-label="连击数 / 威力 调节"></span>
+        </h3>
         <div class="skill-list" id="attacker-skill-list"></div>
       </div>
     </section>
@@ -124,12 +156,30 @@
         </div>
       </div>
 
-      <div class="seal-section seal-middle">
+      <div class="seal-section seal-middle" id="seal-middle">
         <div class="seal-hint">↔ 拖拽 · 滚轮 · 或滑块调节</div>
         <div class="seal-slider-container">
           <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0"
                  aria-label="星陨层数（数值滑块）">
           <div class="slider-labels" aria-hidden="true"><span>0</span><span>50</span><span>99</span></div>
+        </div>
+      </div>
+
+      <!-- 答题结果：默认 hidden；答完一题后由 JS 替换 .seal-middle 显示。
+           min-height 与 .seal-middle 保持一致，避免切换时高度抖动。
+           显示/隐藏用 JS Web Animations API（与 enterChallengeMode / exitChallengeMode
+           一致：opacity 0.22s + translateY 4-6px）。 -->
+      <div class="seal-section challenge-answer-result" id="challenge-answer-result" hidden
+           aria-label="答题结果" aria-live="polite">
+        <div class="challenge-answer-result-row">
+          <span class="challenge-answer-result-label">你的得分</span>
+          <span class="challenge-answer-result-value" id="challenge-answer-score">—</span>
+          <span class="challenge-answer-result-unit">分</span>
+        </div>
+        <div class="challenge-answer-result-row">
+          <span class="challenge-answer-result-label">最优层数</span>
+          <span class="challenge-answer-result-value" id="challenge-answer-optimal">—</span>
+          <span class="challenge-answer-result-unit">层</span>
         </div>
       </div>
 
@@ -150,22 +200,62 @@
           <div class="result-waiting-mini">选择双方精灵</div>
         </div>
       </div>
+
+      <!-- 挑战设置：默认 hidden，进入挑战模式后整段替换星陨/伤害结果 -->
+      <div class="challenge-setup" id="challenge-setup" hidden aria-label="挑战设置">
+        <h2 class="challenge-setup-label">挑战设置</h2>
+        <div class="challenge-setup-rows">
+          <div class="challenge-setup-row">
+            <div class="challenge-setup-row-label">预设</div>
+            <div class="challenge-setup-chips" data-group="preset" role="radiogroup" aria-label="预设难度">
+              <button type="button" class="label-chip active" data-value="easy" aria-pressed="true">简单</button>
+              <button type="button" class="label-chip" data-value="standard">标准</button>
+              <button type="button" class="label-chip" data-value="hard">困难</button>
+            </div>
+          </div>
+          <div class="challenge-setup-row">
+            <div class="challenge-setup-row-label">题数</div>
+            <div class="challenge-setup-chips" data-group="count" role="radiogroup" aria-label="题数">
+              <button type="button" class="label-chip" data-value="3">3</button>
+              <button type="button" class="label-chip active" data-value="5" aria-pressed="true">5</button>
+              <button type="button" class="label-chip" data-value="10">10</button>
+              <button type="button" class="label-chip" data-value="20">20</button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="challenge-start-btn" id="challenge-start-btn">开始挑战</button>
+      </div>
     </section>
 
     <section class="spirit-panel glass-panel" id="defender-panel" aria-label="防御方">
-      <h2 class="panel-label">防御方</h2>
+      <h2 class="panel-label">
+        <span class="label-text">防御方</span>
+        <span class="label-chip-group" data-kind="pool" data-side="defender" hidden>
+          <button type="button" class="label-chip" data-pool="all">全部</button>
+          <button type="button" class="label-chip active" data-pool="common" aria-pressed="true">常见</button>
+          <button type="button" class="label-chip" data-pool="custom">自选</button>
+        </span>
+      </h2>
       <div id="defender-select-area">
         <!-- 由 JS 渲染：未选时为内嵌选择器，选后为精灵卡 -->
       </div>
       <div class="stats-section" id="defender-stats" style="display:none">
         <h3 class="section-title">
-          属性配置
+          <span class="label-text">属性配置</span>
+          <span class="label-chip-group" data-kind="random-stats" data-side="defender" hidden>
+            <button type="button" class="label-chip active" data-random="stats" aria-pressed="true">随机</button>
+          </span>
           <span class="buff-chips" id="defender-buff-chips" aria-label="防御方 buff 调节"></span>
         </h3>
         <div class="stats-grid" id="defender-stats-grid"></div>
       </div>
       <div class="skills-section" id="defender-skills" style="display:none">
-        <h3 class="section-title">防御技能 <span style="font-size:0.65rem;color:var(--text-secondary);text-transform:none;letter-spacing:normal">(可选)</span></h3>
+        <h3 class="section-title">
+          <span class="label-text">防御技能<span class="label-optional">（可选）</span></span>
+          <span class="label-chip-group" data-kind="random-skill" data-side="defender" hidden>
+            <button type="button" class="label-chip active" data-random="skill" aria-pressed="true">随机</button>
+          </span>
+        </h3>
         <div class="skill-list" id="defender-skill-list"></div>
       </div>
     </section>

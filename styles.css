@@ -61,7 +61,7 @@ body {
 .container {
   position: relative;
   z-index: 2;
-  max-width: 1100px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 30px 12px 60px;
 }
@@ -122,7 +122,7 @@ body {
 }
 
 /* ============ Spirit Panel ============ */
-.spirit-panel { min-height: 698px; min-width: 0; }
+.spirit-panel { min-height: 697px; min-width: 0; }
 .spirit-panel .panel-label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -132,8 +132,24 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 始终预留 chip 高度空间，避免进入挑战模式时"攻击方/防御方"label 切换成
+     chip-group 后整个面板向下抖动。chip 高度 ≈ 2*padding(4) + font(0.65rem)*1.4
+     + 2*border(2) ≈ 20.56px，向上取整到 22px。section-title 因为本身有
+     buff-chips 占位，天然稳定，无需此处理。 */
+  min-height: 21px;
 }
 .spirit-panel .panel-label .icon { font-size: 1rem; }
+
+/* label-text 内的小字（如"（可选）"）：与 label-text 一起淡出，
+   避免进入挑战模式后留下孤儿小字。 */
+.label-optional {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  margin-left: 4px;
+}
 
 /* Spirit Card (selected) */
 .spirit-card {
@@ -225,7 +241,8 @@ body {
      进而让整列塌陷、卡片叠成一团。 */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  max-height: 450px;
+  min-height: 447px;
+  max-height: 447px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
@@ -238,6 +255,11 @@ body {
   /* 行内卡片高度不一致时，让每张卡片都从顶部对齐，而不是被拉伸到同行最高那张。
      同时减少 Safari 在重排时的不必要高度计算，提升移动端滚动流畅度。 */
   align-items: start;
+  /* 关键：默认 `align-content: normal` 解析为 `stretch`，当精灵数少（如只剩 2 排）
+     时会把 2 行都拉伸到各占容器一半高度，导致第 2 排被推到中下方、第 1 排与
+     第 2 排之间出现大段空隙。改为 `start` 让所有行紧贴顶部排列，剩余空间
+     （包括网格底部留白）自然落在最后一行之后。 */
+  align-content: start;
   /* 让 grid 内部布局不影响外部，减少含 backdrop-filter 父级重排的范围。 */
   contain: layout;
 }
@@ -343,11 +365,11 @@ body {
 
 /* 卡片 ↔ 选择器 切换时的过渡动画 */
 @keyframes spiritAreaIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .spirit-picker, .spirit-card {
-  animation: spiritAreaIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: spiritAreaIn 0.44s cubic-bezier(0.4, 1, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   .spirit-picker, .spirit-card { animation: none; }
@@ -517,6 +539,8 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 防止切换挑战模式时布局抖动 */
+  min-height: 21px;
 }
 .skills-section .section-title .icon { font-size: 1rem; }
 /* Scrollable + 2-column grid; fixed height to align both panels */
@@ -524,9 +548,11 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  min-height: 140px;
-  max-height: 140px;
+  min-height: 141px;
+  max-height: 141px;
   overflow-y: auto;
+  /* 始终为滚动条预留 gutter，避免技能数 ≤4 时滚动条消失导致内容宽度抖动 */
+  scrollbar-gutter: stable;
   padding-right: 2px;
   align-content: start;
   /* 避免动画遮挡边框 */
@@ -686,8 +712,10 @@ body {
   flex-direction: column;
   align-items: center;
   height: 100%;
-  min-width: 220px;
+  width: 240px;
+  min-width: 240px;
   gap: 0;
+  transition: width 0.3s ease, min-width 0.3s ease;
 }
 .seal-section {
   display: flex;
@@ -725,6 +753,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   border-radius: 50%;
+  transition: opacity 0.22s ease;
 }
 .seal-wrapper canvas {
   position: absolute;
@@ -977,6 +1006,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  /* Pin the waiting line to the same y position as .result-dmg-line
+     (below the 24px chips row) so the text does not visually shift
+     up/down when switching between "选择双方精灵" and "技能 N · 星陨 M".
+     Without this, the single-child waiting state is vertically centered
+     inside the 50px box (y≈14..36), while the calculated state puts
+     the dmg-line at y≈28..50 — a ~14px jump on every switch. */
+  margin-top: auto;
 }
 
 /* Kill confirmation (compact) */
@@ -1145,6 +1181,438 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ============ Challenge Mode ============
+   挑战模式的 UI 控件：切换条 (challenge-bar) + 挑战设置 (challenge-setup) +
+   复用 drag chip 视觉的 label-chip (用于替换/切换侧栏 label) + 进入/退出过渡。
+   本段只承载"控件外壳 + 过渡动画"；业务逻辑（出题、评分等）后续 PR 实现。 */
+
+/* 挑战模式切换条：副标题之下、battle-area 之上
+   三列网格 `1fr | auto | 1fr`：
+     - 第 1 列：进度信息（justify-self: end → 浮在右侧紧贴切换按钮）
+     - 第 2 列：切换按钮（auto → 始终居中，宽度变化不影响位置）
+     - 第 3 列：提交按钮（justify-self: start → 浮在左侧紧贴切换按钮）
+   切换按钮用 grid-column: 2 显式钉在中间列，不受两侧元素显隐影响。
+   信息/提交默认 hidden，display:none 会被 grid 跳过，但 1fr 1fr 的空列
+   仍存在，切换按钮始终位于容器几何中心。 */
+.challenge-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 14px;
+  margin: -16px 0 20px;
+}
+.challenge-toggle-btn {
+  /* 显式钉在中间列，避免被 grid auto-flow 放到第 1 列（导致偏左） */
+  grid-column: 2;
+  justify-self: center;
+}
+.challenge-progress-info {
+  /* 显式钉在第 1 列，靠右对齐（紧贴切换按钮左侧） */
+  grid-column: 1;
+  justify-self: end;
+  text-align: right;
+}
+.challenge-submit-btn {
+  /* 显式钉在第 3 列，靠左对齐（紧贴切换按钮右侧） */
+  grid-column: 3;
+  justify-self: start;
+}
+.challenge-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease,
+              box-shadow 0.2s ease, transform 0.1s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.challenge-toggle-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.22);
+}
+.challenge-toggle-btn:active {
+  transform: scale(0.97);
+}
+.challenge-toggle-btn.is-active {
+  color: var(--accent-red);
+  background: rgba(255,59,59,0.1);
+  border-color: rgba(255,59,59,0.4);
+  box-shadow: 0 0 12px rgba(255,59,59,0.18);
+}
+.challenge-toggle-btn.is-active:hover {
+  background: rgba(255,59,59,0.15);
+  border-color: rgba(255,59,59,0.55);
+}
+.challenge-toggle-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 挑战设置区：替换 seal-container 内星陨/伤害结果 */
+.challenge-setup {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 6px 6px;
+  /* 入场/出场动画由 JS 用 Web Animations API 控制（不用 CSS animation，
+     避免重新进入时与上次 exit 的 fill:'forwards' 残留互相覆盖导致闪一下就消失） */
+}
+.challenge-setup[hidden] {
+  display: none;
+}
+.challenge-setup-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.challenge-setup-rows {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.challenge-setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 28px;
+}
+.challenge-setup-row-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  /* 留出约 64px 给 label 文本，避免和 chip 组重叠 */
+  min-width: 56px;
+}
+.challenge-setup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+  align-items: center;
+  /* 右侧 chip 组占满剩余空间，让 label 在左、chip 在右 */
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.challenge-start-btn {
+  margin-top: 8px;
+  padding: 9px 28px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--bg-primary);
+  background: linear-gradient(135deg, var(--accent-cyan), #4dd0e1);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 22px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 0 14px rgba(0,229,255,0.25);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.challenge-start-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 0 22px rgba(0,229,255,0.4);
+}
+.challenge-start-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.challenge-start-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.4);
+}
+
+/* 挑战模式下隐藏星陨/伤害结果，避免空区域撑高 seal-container */
+body.challenge-mode .seal-top,
+body.challenge-mode .seal-middle,
+body.challenge-mode .result-bottom {
+  display: none;
+}
+/* 挑战模式下，seal-container 内只剩挑战设置，让其垂直居中显示（相对于精灵面板高度） */
+body.challenge-mode .seal-container {
+  justify-content: center;
+}
+
+/* ============================================================
+   挑战模式 · 答题阶段（progress-info / submit-btn / lock / running）
+   必须在 body.challenge-mode 规则之后写，让同特异性的 .seal-* 规则
+   后写覆盖前写（CSS 同特异性、晚写的胜出）。
+   ============================================================ */
+
+/* 进度信息：显示当前题号与累计分。min-width 防止数字变化时按钮抖动。
+   淡入淡出：默认 opacity:0 + visibility:hidden；进入答题态后由 .is-shown
+   触发 220ms 渐变；visibility 用 transition-delay 配合，避免动画期间被点击。 */
+.challenge-progress-info {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  /* 防止题号/分数变化时按钮抖动：min-width 留出 3 位数 + 标题 + 累计分 */
+  min-width: 220px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.22s ease, visibility 0s linear 0.22s;
+}
+.challenge-progress-info.is-shown {
+  opacity: 1;
+  visibility: visible;
+  /* 显示时 visibility 立即生效，避免被卡在 hidden 状态 */
+  transition: opacity 0.22s ease, visibility 0s linear 0s;
+}
+.challenge-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 22px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--accent-cyan, #00e5ff);
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 20px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* 默认隐藏态：opacity 0 + visibility hidden，配合 .is-shown 渐入。
+     关键：所有可视属性的过渡时长统一为 0.22s（与 opacity 一致），
+     否则 background/border/color 在 0.2s 结束、opacity 在 0.22s 结束，
+     在 0.2s→0.22s 这 20ms 会出现"颜色已变蓝但还隐约可见"的卡顿+变色闪烁。 */
+  opacity: 0;
+  visibility: hidden;
+  /* 在原有 background/border/transform 过渡基础上追加 opacity + visibility：
+     - 默认（隐藏）→ 移走 .is-shown 时：opacity 0.22s 渐变，visibility 在 0.22s 末尾切到 hidden
+     - .is-shown 时：visibility 立即切到 visible，opacity 0.22s 渐入 */
+  transition: background 0.22s, border-color 0.22s, color 0.22s,
+              transform 0.1s, box-shadow 0.22s, opacity 0.22s ease,
+              visibility 0s linear 0.22s;
+}
+.challenge-submit-btn.is-shown {
+  opacity: 1;
+  visibility: visible;
+  /* 显示时 visibility 立即生效（0s 延迟），opacity 仍用 0.22s 渐入 */
+  transition: background 0.22s, border-color 0.22s, color 0.22s,
+              transform 0.1s, box-shadow 0.22s, opacity 0.22s ease,
+              visibility 0s linear 0s;
+}
+.challenge-submit-btn:hover:not(:disabled) {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+}
+.challenge-submit-btn:active:not(:disabled) { transform: scale(0.97); }
+.challenge-submit-btn:disabled {
+  /* disabled 但仍 is-shown 时：保持可见但灰显（极少触发，仅作防御） */
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 答完一题后切换为"下一题 / 查看结果"：用黄色区分 */
+.challenge-submit-btn.is-next {
+  color: #ffeb3b;
+  background: rgba(255, 235, 59, 0.08);
+  border-color: rgba(255, 235, 59, 0.4);
+}
+.challenge-submit-btn.is-next:hover:not(:disabled) {
+  background: rgba(255, 235, 59, 0.15);
+  border-color: rgba(255, 235, 59, 0.6);
+  box-shadow: 0 0 12px rgba(255, 235, 59, 0.25);
+}
+
+/* 答题态：setup 隐藏、seal/result 回归显示
+   （放在 body.challenge-mode 之后覆盖其 display:none） */
+body.challenge-running .challenge-setup { display: none; }
+/* 覆盖 body.challenge-mode 的 hide，让星陨/滑块/伤害结果在 running 时显示 */
+body.challenge-running .seal-top,
+body.challenge-running .seal-middle,
+body.challenge-running .result-bottom {
+  display: flex;
+}
+
+/* 答题态 · 已提交：把 .seal-middle（滑条）替换为 .challenge-answer-result。
+   用 .challenge-answered 复合类（与 .challenge-running 一起生效）：
+   - .seal-middle → display: none（隐藏滑条 + hint + labels）
+   - .challenge-answer-result → display: flex（接管 .seal-middle 的位置）
+   切换时不抖动：两个元素在 CSS 上都设置 min-height: 64px（接近
+   .seal-middle 自然高度 50-70px），让外层 .seal-container 的 flex
+   布局在校准后保持高度稳定。 */
+.challenge-answer-result {
+  flex: 0 0 auto;
+  padding: 6px 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  /* 与 .seal-middle 同步：保证两者互换时 .seal-container 高度不变 */
+  min-height: 64px;
+}
+.challenge-answer-result[hidden] { display: none; }
+.challenge-answer-result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.challenge-answer-result-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+.challenge-answer-result-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px rgba(0,229,255,0.35);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+  /* 关键：固定宽度 + 右对齐，让"分/层"单位始终在固定位置。
+  - 固定 width: 1.8em（容纳 3 位数字 "100"，配合 tabular-nums），
+    不论数字是 0 / 28 / 100，value 列右边缘位置一致 */
+  width: 1.8em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* 分数等级：高分绿、中分黄、低分红。
+   用 data-grade 标记（JS 在 submitAnswer 时按分数段设置）。 */
+.challenge-answer-result-value[data-grade="high"] {
+  color: var(--accent-green);
+  text-shadow: 0 0 10px rgba(0,230,118,0.4);
+}
+.challenge-answer-result-value[data-grade="mid"] {
+  color: #ffeb3b;
+  text-shadow: 0 0 10px rgba(255,235,59,0.4);
+}
+.challenge-answer-result-value[data-grade="low"] {
+  color: var(--accent-red);
+  text-shadow: 0 0 10px rgba(255,59,59,0.4);
+}
+.challenge-answer-result-unit {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+/* 答完一题后：隐藏滑条 + 显示答题结果。
+   放在 body.challenge-running 规则之后覆盖其 display:flex。 */
+body.challenge-running.challenge-answered .seal-middle { display: none; }
+body.challenge-running.challenge-answered .challenge-answer-result { display: flex; }
+
+/* 同步 .seal-middle 的 min-height，确保两者高度一致。 */
+.seal-middle {
+  min-height: 66px;
+}
+
+/* 答题态：精灵面板锁定（不可点、灰显）。仅作用于 .spirit-panel 内部，
+   星陨层数控件（#seal-wrapper / #seal-slider）独立加 .challenge-locked，
+   不受 spirit-panel 锁影响。 */
+.challenge-locked {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /*filter: grayscale(0.55) brightness(0.78);*/
+  opacity: 0.8;
+}
+
+/* label-chip：与 .buff-chip 视觉一致的 chip（替换侧栏 label） */
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* 复用 drag chip 的过渡曲线，确保视觉一致；额外加 transform 用于按压 */
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.label-chip:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.22);
+}
+/* 选中态：与 .buff-chip.active 视觉一致（1px 蓝环 + 蓝色背景 + 蓝色 glow） */
+.label-chip.active {
+  color: var(--accent-cyan);
+  background: rgba(0,229,255,0.15);
+  border-color: rgba(0,229,255,0.45);
+  box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.2);
+}
+/* drag chip 的按压特效（pointerdown 期间 JS 加 .pressing 类） */
+.label-chip.pressing {
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
+}
+
+/* label-chip-group：在 panel-label / section-title 内是 inline-flex 容器 */
+.label-chip-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.label-chip-group[hidden] {
+  display: none;
+}
+
+/* 侧栏 label 与 chip 组切换过渡：
+   - 默认状态下，label-text 处于"在场"态（opacity 1 / translateY 0）；
+     label-chip-group 处于"离场"态（display: none，无动画）。
+   - challenge-mode 状态下两者互换；JS 通过 Web Animations API 播放
+     淡出/淡入过渡，并把 display 切换串在动画结束时点。 */
+.panel-label, .section-title {
+  position: relative;
+}
+.panel-label .label-text,
+.section-title .label-text,
+.panel-label .label-chip-group,
+.section-title .label-chip-group {
+  /* 在两侧都"在场"时也能用 transition 平滑过渡 opacity/transform。
+     注意：display 仍由 [hidden] / 内联样式控制，JS 负责切换时机。 */
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .battle-area {
@@ -1177,6 +1645,8 @@ body {
     grid-template-columns: repeat(2, 1fr);
     min-height: 125px;
     max-height: 125px;
+    /* 移动端：同样始终为滚动条预留 gutter，避免列表抖动 */
+    scrollbar-gutter: stable;
   }
   .skill-btn {
     min-height: 54px;
@@ -1217,6 +1687,10 @@ body {
   }
   .spirit-picker-option { min-height: 110px; padding: 6px; }
   .spirit-picker-option .picker-name { font-size: 0.72rem; }
+  /* 挑战模式：移动端调整 chip 大小，避免溢出 */
+  .challenge-setup-row-label { font-size: 0.65rem; min-width: 48px; }
+  .label-chip { font-size: 0.6rem; padding: 2px 6px; }
+  .challenge-start-btn { font-size: 0.78rem; padding: 8px 22px; }
 }
 
 /* Scrollbar */

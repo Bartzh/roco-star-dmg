@@ -2,6 +2,8 @@ import json
 import re
 
 from pypinyin import Style, lazy_pinyin
+from dataclasses import dataclass, field, asdict
+from typing import Literal, Optional
 
 with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
@@ -15,6 +17,35 @@ with open('datas/intermediate/pet_illustration_urls.json', 'r', encoding='utf-8'
     pet_illustration_urls = json.load(f)
 with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f:
     skill_icon_urls = json.load(f)
+
+
+# ============================================================
+# Build source-id → final-name mapping for skills, handling
+# duplicate names by appending a numeric suffix to disambiguate.
+# Skills with the same `name` are very rare but do exist; for
+# each duplicate group we sort by the source int id and let the
+# smallest keep the base name, while the rest get `name2`,
+# `name3`, …  The resulting name is what shows up as the key
+# in skills.json, as the value of `id` inside each skill, and
+# as the entries in sprites.json's `skills` field.
+# ============================================================
+from collections import defaultdict
+_name_to_source_ids: dict[str, list[str]] = defaultdict(list)
+for _source_id, _info in skill_catalog.items():
+    _name_to_source_ids[_info['name']].append(_source_id)
+id_to_final_name: dict[str, str] = {}
+for _base_name, _source_ids in _name_to_source_ids.items():
+    if len(_source_ids) == 1:
+        id_to_final_name[_source_ids[0]] = _base_name
+    else:
+        # 用技能数据里真正的 int id 排序，catalog 的 key 是 `skill_xxxxxx` 字符串。
+        _sorted = sorted(_source_ids, key=lambda x: int(skill_catalog[x]['id']))
+        for _i, _sid in enumerate(_sorted):
+            id_to_final_name[_sid] = _base_name if _i == 0 else f'{_base_name}{_i + 1}'
+        print(
+            f'重名技能 "{_base_name}"：共 {len(_sorted)} 个，已加后缀区分：'
+            + ', '.join(f'{skill_catalog[_sid]['id']}→{id_to_final_name[_sid]}' for _sid in _sorted)
+        )
 
 
 # ============================================================
@@ -113,15 +144,15 @@ for pet_id, pet_info in core.items():
     skills = []
     learnset = learnset_catalog[learnsets[pet_id]]
     if fs := learnset.get('fs'):
-        skills.append(f'sk_{skill_catalog[fs]['id']}')
+        skills.append(id_to_final_name[fs])
     if ns := learnset.get('ns'):
-        skills.extend(f'sk_{skill_catalog[s['sk']]['id']}' for s in ns)
+        skills.extend(id_to_final_name[s['sk']] for s in ns)
     if lg := learnset.get('lg'):
-        skills.append(f'sk_{skill_catalog[lg['sk']]['id']}')
+        skills.append(id_to_final_name[lg['sk']])
     if ss := learnset.get('ss'):
-        skills.extend(f'sk_{skill_catalog[s]['id']}' for s in ss)
+        skills.extend(id_to_final_name[s] for s in ss)
     if bs := learnset.get('bs'):
-        skills.extend(f'sk_{skill_catalog[s['sk']]['id']}' for s in bs)
+        skills.extend(id_to_final_name[s['sk']] for s in bs)
     if not skills:
         no_skills.append(pet_id)
         continue
@@ -182,7 +213,7 @@ sprites['拼图'] = {
     'def': 183,
     'mdef': 183,
     'spd': 145,
-    'skills': ['sk_7150080', 'sk_7150110', 'sk_7020970', 'sk_7190260', 'sk_7190440', 'sk_7190240'],
+    'skills': ['翼击', '龙卷风', '先发制人', '多维击打', '天体吸积'],
     'pinyin': 'pintu',
     'pinyin_initials': 'pt',
     'hbid': 789987,
@@ -190,7 +221,8 @@ sprites['拼图'] = {
 
 for skill_id, skill_info in skill_catalog.items():
     skill_info.pop('icon_id', None)
-    skill_info['id'] = f'sk_{skill_info['id']}'
+    # 技能的 key 与 id 都用最终名（重名时已加数字后缀），更便于使用。
+    skill_info['id'] = id_to_final_name[skill_id]
     if skill_info['category'] == '防御':
         if skill_info['desc'].startswith('减伤'):
             match = re.search(r'(\d+)%', skill_info['desc'])
@@ -211,7 +243,7 @@ for skill_id, skill_info in skill_catalog.items():
                 print('no combo:', skill_info['name'])
     if icon_url := skill_icon_urls.get(skill_id):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
-# 技能id作为key
+# 以技能最终名作为 key（重名时已加数字后缀以保证唯一）
 skill_catalog = {skill_info['id']: skill_info for skill_info in skill_catalog.values()}
 
 
@@ -219,6 +251,1566 @@ with open('datas/final/sprites.json', 'w', encoding='utf-8') as f:
     json.dump(sprites, f, ensure_ascii=False)
 with open('datas/final/skills.json', 'w', encoding='utf-8') as f:
     json.dump(skill_catalog, f, ensure_ascii=False)
+
+
+
+@dataclass
+class Nature:
+    up: Literal['hp', 'atk', 'def', 'matk', 'mdef', 'spd']
+    down: Literal['hp', 'atk', 'def', 'matk', 'mdef', 'spd']
+
+@dataclass
+class StatsCombo:
+    nature: Nature
+    ivs: list[Literal['hp', 'atk', 'def', 'matk', 'mdef', 'spd']]
+
+@dataclass
+class WeightedStatsCombo:
+    combo: StatsCombo
+    weight: float
+
+@dataclass
+class StatsPool:
+    default_weight: float
+    combos: list[WeightedStatsCombo]
+
+@dataclass
+class WeightedBuffCombo:
+    combo: list[dict[str, int]]  # 例如 [{'atk': 100}]
+    weight: float
+
+@dataclass
+class BuffsPool:
+    default_weight: float
+    combos: list[WeightedBuffCombo]
+
+@dataclass
+class WeightedSkillCombo:
+    combo: str  # 技能名（重名时带数字后缀），例如 '先发制人' / '腾挪2'
+    weight: float
+
+@dataclass
+class SkillsPool:
+    default_weight: float
+    combos: list[WeightedSkillCombo]
+
+@dataclass
+class RandomPool:
+    stats: Optional[StatsPool] = None
+    buffs: Optional[BuffsPool] = None
+    skills: Optional[SkillsPool] = None
+
+
+attacker_random_pools: dict[str, RandomPool] = {
+    '龙息帕尔': RandomPool(
+        stats=StatsPool(
+            default_weight=20,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=80
+                )
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=70,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'atk': 100}],
+                    weight=30
+                )
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=70,
+            combos=[
+                WeightedSkillCombo(
+                    combo='先发制人',
+                    weight=30
+                )
+            ]
+        )
+    ),
+    '暮星辰': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                )
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=10,
+            combos=[
+                WeightedSkillCombo(
+                    combo='翼击',
+                    weight=65
+                ),
+                WeightedSkillCombo(
+                    combo='追打',
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='倾泻',
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='先发制人',
+                    weight=5
+                )
+            ]
+        )
+    ),
+    '落陨星兔': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                )
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=40,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'power': 40}],
+                    weight=60
+                ),
+                WeightedBuffCombo(
+                    combo=[{'power': 80}],
+                    weight=10
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='多维击打',
+                    weight=9
+                ),
+                WeightedSkillCombo(
+                    combo='灵光',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='流火',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '粉耳星兔': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                )
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=1,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'power': 20}],
+                    weight=7
+                ),
+                WeightedBuffCombo(
+                    combo=[{'power': 40}],
+                    weight=3
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='多维击打',
+                    weight=8
+                ),
+                WeightedSkillCombo(
+                    combo='流火',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '音速犬': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=6
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=4
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=3,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'atk': 100}],
+                    weight=7
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='灼伤',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='火云车',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='跌落',
+                    weight=4
+                ),
+                WeightedSkillCombo(
+                    combo='闪燃',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_冰__',
+                    weight=0.75
+                ),
+            ]
+        )
+    ),
+    '锤头鹳': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=6
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='matk', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=6
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='潮涌',
+                    weight=6
+                ),
+                WeightedSkillCombo(
+                    combo='水弹枪',
+                    weight=6
+                ),
+                WeightedSkillCombo(
+                    combo='风矢',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='撕咬',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '祭礼巨像': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='多维击打',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='四维降解',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='天体吸积',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='热砂',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='陨石',
+                    weight=3
+                ),
+            ]
+        )
+    ),
+    '怖哭菇': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=7
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='spd'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=3
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='spd'),
+                        ivs=['hp', 'matk', 'def']
+                    ),
+                    weight=1
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=20,
+            combos=[
+                # 防反
+                WeightedBuffCombo(
+                    combo=[{'atk': 70, 'matk': 70}],
+                    weight=1
+                ),
+                # 翠顶
+                WeightedBuffCombo(
+                    combo=[{'atk': 100}],
+                    weight=3
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='先发制人',
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='多维击打',
+                    weight=0.75
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_地__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_幽__',
+                    weight=3
+                ),
+            ]
+        ),
+    ),
+    '圣羽翼王': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=2
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=20,
+            combos=[
+                # 力增
+                WeightedBuffCombo(
+                    combo=[{'atk': 100}],
+                    weight=5
+                ),
+                # 力增2次
+                WeightedBuffCombo(
+                    combo=[{'atk': 200}],
+                    weight=2
+                ),
+                # 伺机而动
+                WeightedBuffCombo(
+                    combo=[{'power': 70}],
+                    weight=4
+                ),
+                WeightedBuffCombo(
+                    combo=[{'matk': 70}],
+                    weight=1
+                ),
+                WeightedBuffCombo(
+                    combo=[{'power': 70, 'matk': 70}],
+                    weight=2
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='水刃',
+                    weight=8
+                ),
+                WeightedSkillCombo(
+                    combo='闪击',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='水花四溅',
+                    weight=4
+                ),
+                WeightedSkillCombo(
+                    combo='扇风',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='离子震荡',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_冰__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_武__',
+                    weight=3
+                ),
+            ]
+        ),
+    ),
+    '翼龙': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='龙爪',
+                    weight=8
+                ),
+            ]
+        ),
+    ),
+    '噼啪鸟': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=8
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=3
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='翼击',
+                    weight=9
+                ),
+                WeightedSkillCombo(
+                    combo='龙卷风',
+                    weight=2
+                ),
+            ]
+        ),
+    ),
+    '龙鱼': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=7
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='翼击',
+                    weight=6
+                ),
+            ]
+        ),
+    ),
+    '离心舞者': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=0,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'matk': 50, 'power': 20}],
+                    weight=10
+                ),
+                WeightedBuffCombo(
+                    combo=[{'matk': 50, 'power': 40}],
+                    weight=2
+                ),
+                WeightedBuffCombo(
+                    combo=[{'matk': 100, 'power': 20}],
+                    weight=1
+                ),
+                WeightedBuffCombo(
+                    combo=[{'matk': 100, 'power': 40}],
+                    weight=0.5
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='多维击打',
+                    weight=8
+                ),
+                WeightedSkillCombo(
+                    combo='离子震荡',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+}
+attacker_random_pools = {k: asdict(v) for k, v in attacker_random_pools.items()}
+
+
+defender_random_pools: dict[str, RandomPool] = {
+    '音速犬': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=4
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['def', 'atk', 'spd']
+                    ),
+                    weight=2
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['def', 'atk', 'spd']
+                    ),
+                    weight=1
+                )
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '嘟嘟锅': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=2
+                ),
+            ]
+        )
+    ),
+    '兽花蕾': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=1
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '恶魔狼王': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=9
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+            ]
+        )
+    ),
+    '尖嘴狐仙': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=11
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=4
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=4
+                ),
+                WeightedSkillCombo(
+                    combo='火焰护盾',
+                    weight=3
+                ),
+            ]
+        )
+    ),
+    '荆棘电环': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=7
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '迷迷箱怪': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=8
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=4
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=2
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=2
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=4
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=0.5
+                ),
+                WeightedSkillCombo(
+                    combo='风墙',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='吓退',
+                    weight=2
+                ),
+            ]
+        )
+    ),
+    '火焰猿': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '冰钻布鲁斯': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=8
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=6
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='有效预防',
+                    weight=3
+                ),
+            ]
+        )
+    ),
+    '帕帕斯卡': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=6
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '绒光优优': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='硬化',
+                    weight=3
+                ),
+            ]
+        )
+    ),
+    '噼啪鸟': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+    ),
+    '泥吼牙': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=8,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'def': 60}],
+                    weight=2
+                ),
+                WeightedBuffCombo(
+                    combo=[{'def': 120}],
+                    weight=1
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '食尘短绒': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=8
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='风墙',
+                    weight=4
+                ),
+                WeightedSkillCombo(
+                    combo='壁垒',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '利灯鱼': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=8
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='matk', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=5
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '窃光蚊': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        )
+    ),
+    '燃薪虫': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'mdef']
+                    ),
+                    weight=2
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='火焰护盾',
+                    weight=2
+                ),
+            ]
+        )
+    ),
+    '贝古斯': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=7
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=5
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=2
+                ),
+            ]
+        )
+    ),
+    '春花兔': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='酶浓度调整',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '暮星辰': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '机幕方舟': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=4
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='有效预防',
+                    weight=3
+                ),
+            ]
+        ),
+    ),
+    '爆焰喷喷': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=7
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=5
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='淬火',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '音碟吼': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='matk', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=8
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'matk', 'mdef']
+                    ),
+                    weight=3
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=15
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=7
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '女王蜂': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=0,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'def': 75, 'mdef': 75, 'spd': 75}],
+                    weight=10
+                ),
+                WeightedBuffCombo(
+                    combo=[{'def': 60, 'mdef': 60, 'spd': 60}],
+                    weight=1
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='有效预防',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '巨鼓象': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=7
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'def']
+                    ),
+                    weight=4
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=3,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'def': 20}],
+                    weight=5
+                ),
+                WeightedBuffCombo(
+                    combo=[{'def': 40}],
+                    weight=3
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='相位移动',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '飞飞钥': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=3
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=1
+                ),
+            ]
+        ),
+    ),
+    '离心舞者': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='spd', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=9
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=0,
+            combos=[
+                WeightedSkillCombo(
+                    combo='__none__',
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='__state__',
+                    weight=5
+                ),
+                WeightedSkillCombo(
+                    combo='能量守恒',
+                    weight=1
+                ),
+            ]
+        ),
+    )
+}
+defender_random_pools = {k: asdict(v) for k, v in defender_random_pools.items()}
+
 
 
 # ============================================================
@@ -230,6 +1822,8 @@ with open('datas/final/skills.json', 'w', encoding='utf-8') as f:
 others = {
     'common_attackers': COMMON_ATTACKERS,
     'common_defenders': COMMON_DEFENDERS,
+    'attacker_random_pools': attacker_random_pools,
+    'defender_random_pools': defender_random_pools,
 }
 with open('datas/final/others.json', 'w', encoding='utf-8') as f:
-    json.dump(others, f, ensure_ascii=False, indent=2)
+    json.dump(others, f, ensure_ascii=False)
