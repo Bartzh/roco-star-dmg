@@ -3235,7 +3235,7 @@ function initInfoModal() {
 // ============================================================
 // CHALLENGE MODE (UI 控件层)
 // ------------------------------------------------------------
-// 本文件此次只承载"控件 + 过渡"：进入/退出挑战模式、预设/题目数 chip、
+// 本文件此次只承载"控件 + 过渡"：进入/退出挑战模式、预设/题数 chip、
 // 侧栏 label ↔ chip 切换动画。业务逻辑（出题、提交、评分）后续 PR。
 //
 // 关键不变量：
@@ -4653,7 +4653,7 @@ function _syncRandomChip(kind, side, value) {
   state.challenge[key][side] = !!value;
 }
 
-// 同步题目数 chip 视觉 + state
+// 同步题数 chip 视觉 + state
 function _syncCountChip(value) {
   const group = document.querySelector('.challenge-setup-chips[data-group="count"]');
   if (group) _setSingleChoice(group, String(value));
@@ -4749,7 +4749,7 @@ function initChallengeMode() {
     });
   });
 
-  // 挑战设置区 chip（预设 / 题目数，都是单选）
+  // 挑战设置区 chip（预设 / 题数，都是单选）
   document.querySelectorAll('.challenge-setup-chips').forEach(group => {
     const groupName = group.dataset.group;  // 'preset' | 'count'
     const chips = group.querySelectorAll('.label-chip');
