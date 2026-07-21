@@ -753,7 +753,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   border-radius: 50%;
-  transition: opacity 0.22s ease;
+  transition: filter 0.3s ease;
 }
 .seal-wrapper canvas {
   position: absolute;
@@ -1539,11 +1539,21 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
    星陨层数控件（#seal-wrapper / #seal-slider）独立加 .challenge-locked，
    不受 spirit-panel 锁影响。 */
 .challenge-locked {
-  pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
-  /*filter: grayscale(0.55) brightness(0.78);*/
-  opacity: 0.8;
+  filter: contrast(0.94);
+  /*opacity: 0.8;*/
+}
+/* 用一个透明遮罩拦截所有点击，不使用 pointer-events: none，因为需要使 cursor 变为 not-allowed */
+.challenge-locked::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* 不需要 z-index 太复杂，覆盖住就行 */
+  cursor: not-allowed;
 }
 
 /* label-chip：与 .buff-chip 视觉一致的 chip（替换侧栏 label） */
