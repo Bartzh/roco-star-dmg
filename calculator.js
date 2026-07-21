@@ -4139,9 +4139,18 @@ function _scrollSkillListToSelected(side) {
   const list = document.getElementById(side + '-skill-list');
   if (!list) return;
   const selected = list.querySelector('.skill-btn.active');
-  if (!selected || typeof selected.scrollIntoView !== 'function') return;
-  // 用 scrollIntoView({ block: 'start' }) 把目标技能滚动到顶部；
-  selected.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' });
+  if (!selected) return;
+  // 直接滚 list 自身的滚动条，不动整页。
+  // 原实现用 selected.scrollIntoView() 会把所有祖先滚动容器（包括 <html>
+  // 页面）都滚到元素可见；移动端竖向布局（attacker → seal → defender）下，
+  // defender 那次调用会把整页跳到防御方位置，体验割裂。
+  const listRect = list.getBoundingClientRect();
+  const selectedRect = selected.getBoundingClientRect();
+  // 选中技能顶部到列表可见区域顶部的偏移；scrollTo 把元素对齐到列表顶部，
+  // 行为与 scrollIntoView({ block: 'start' }) 等价。
+  const offsetInList = selectedRect.top - listRect.top;
+  if (offsetInList === 0) return;
+  list.scrollTo({ top: list.scrollTop + offsetInList, behavior: 'smooth' });
 }
 
 // 应用一道题：替换 state 全字段并重渲染。
