@@ -3440,6 +3440,7 @@ function enterChallengeMode() {
     btn.setAttribute('aria-pressed', 'true');
   }
   if (text) text.textContent = '退出挑战';
+  // 现在没有icon了
   if (icon) icon.textContent = '✕';
 
   // 1) 星陨/伤害结果淡出 → 2) body.challenge-mode + challenge-setup 淡入
