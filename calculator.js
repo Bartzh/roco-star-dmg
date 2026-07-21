@@ -2013,6 +2013,7 @@ function renderSkills(side) {
       else if (eff === 0.25) powerClass = 'not-effective double';
       return `
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
+                data-idx="${idx}"
                 onclick="selectAttackSkill(${idx})">
           <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
@@ -2033,6 +2034,7 @@ function renderSkills(side) {
         : renderSkillIconHTML(sk, el);
       return `
         <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''} ${isNone ? 'none-skill' : ''}"
+                data-idx="${idx}"
                 onclick="selectDefenseSkill(${idx})">
           <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${iconHTML}</div>
           <div class="skill-content">
@@ -2048,18 +2050,40 @@ function renderSkills(side) {
 function selectAttackSkill(idx) {
   const opts = getAttackSkillOptions(state.attacker);
   if (idx < 0 || idx >= opts.length) return;
+  // 仅切换 active class；不要重渲 list —— 重渲会把所有 <img> 重新插入 DOM，
+  // 在 iOS Safari 滚动容器 + display:grid 内会触发图标整体闪烁（cached
+  // image 短暂回到底色再重绘）。list 真正变化时（精灵切换 / 防御方切
+  // 换 / 挑战切题 / 退出挑战）renderSkills 仍会被调用。
+  const prevIdx = state.attackSkillIdx;
+  if (prevIdx === idx) return;
   state.attackSkillIdx = idx;
   state.attackSkill = opts[idx];
-  renderSkills('attacker');
+  _setActiveSkill('attacker', prevIdx, idx);
   calculateDamage();
 }
 function selectDefenseSkill(idx) {
   const opts = getDefenseSkillOptions(state.defender);
   if (idx < 0 || idx >= opts.length) return;
+  // 同 selectAttackSkill：仅切 active class，不重渲。
+  const prevIdx = state.defenseSkillIdx;
+  if (prevIdx === idx) return;
   state.defenseSkillIdx = idx;
   state.defenseSkill = opts[idx];
-  renderSkills('defender');
+  _setActiveSkill('defender', prevIdx, idx);
   calculateDamage();
+}
+
+// 切换 .skill-btn 的 active class；list 元素必须是当前已渲染的子集
+// （prevIdx / newIdx 在 list 范围内）。找不到对应按钮时静默失败。
+function _setActiveSkill(side, prevIdx, newIdx) {
+  const list = document.getElementById(side + '-skill-list');
+  if (!list) return;
+  if (prevIdx >= 0) {
+    const prevBtn = list.querySelector('.skill-btn[data-idx="' + prevIdx + '"]');
+    if (prevBtn) prevBtn.classList.remove('active');
+  }
+  const newBtn = list.querySelector('.skill-btn[data-idx="' + newIdx + '"]');
+  if (newBtn) newBtn.classList.add('active');
 }
 
 // ============================================================
