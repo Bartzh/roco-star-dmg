@@ -683,13 +683,21 @@ attacker_random_pools: dict[str, RandomPool] = {
                 ),
                 # 力增2次
                 WeightedBuffCombo(
-                    combo=[{'atk': 200,}],
+                    combo=[{'atk': 200}],
                     weight=2
                 ),
                 # 伺机而动
                 WeightedBuffCombo(
                     combo=[{'power': 70}],
                     weight=4
+                ),
+                WeightedBuffCombo(
+                    combo=[{'matk': 70}],
+                    weight=1
+                ),
+                WeightedBuffCombo(
+                    combo=[{'power': 70, 'matk': 70}],
+                    weight=2
                 ),
             ]
         ),
