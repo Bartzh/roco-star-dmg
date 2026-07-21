@@ -574,7 +574,7 @@ body {
   padding-right: 2px;
   align-content: start;
   /* 避免动画遮挡边框 */
-  padding-top: 1px;
+  /*padding-top: 1px;/*
   /* 纵向强制吸附（暂时不考虑启用） */
   /* scroll-snap-type: y mandatory; */
 }
@@ -615,7 +615,8 @@ body {
 .skill-btn:hover {
   background: rgba(255,255,255,0.08);
   border-color: rgba(255,255,255,0.2);
-  transform: translateY(-1px);
+  /* 暂时无法解决抖动问题 */
+  /*transform: translateY(-1px);*/
 }
 .skill-btn.active {
   background: rgba(0,229,255,0.1);
