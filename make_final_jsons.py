@@ -517,15 +517,29 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='atk', down='matk'),
                         ivs=['hp', 'atk', 'spd']
                     ),
-                    weight=6
+                    weight=7
                 ),
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='matk', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=6
+                    weight=7
                 ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='matk'),
+                        ivs=['hp', 'atk', 'mdef']
+                    ),
+                    weight=2
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'matk', 'mdef']
+                    ),
+                    weight=2
+                )
             ]
         ),
         skills=SkillsPool(
