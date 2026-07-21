@@ -743,7 +743,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 2px;
   color: var(--text-secondary);
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
 .seal-wrapper {
   position: relative;
@@ -1633,13 +1633,18 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     /* On mobile, drop the strict top/result flex split — content height */
     height: auto;
     min-width: 0;
+    /* seal-container 仍有显式 width: 240px，grid 默认 justify-self: stretch
+       在有显式宽度时不会生效，元素会贴着网格单元左边缘。改为 center 让
+       seal 区域在移动端单列网格中水平居中。 */
+    justify-self: center;
   }
   .seal-top, .result-bottom {
     flex: 0 0 auto;
     min-height: 0;
     padding: 4px 0;
   }
-  .seal-middle { padding: 4px 0; }
+  .seal-label { margin-bottom: 16px; }
+  .seal-middle { padding: 14px 0 4px 0; }
   .spirit-panel { min-height: auto; }
   .result-ring-wrap { width: 160px; height: 160px; }
   .result-pct { font-size: 1.5rem; }
@@ -1701,6 +1706,9 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .challenge-setup-row-label { font-size: 0.65rem; min-width: 48px; }
   .label-chip { font-size: 0.6rem; padding: 2px 6px; }
   .challenge-start-btn { font-size: 0.78rem; padding: 8px 22px; }
+  body.challenge-mode .seal-container {
+    min-height: 400px;
+  }
 }
 
 /* Scrollbar */
