@@ -543,13 +543,31 @@ body {
   min-height: 21px;
 }
 .skills-section .section-title .icon { font-size: 1rem; }
-/* Scrollable + 2-column grid; fixed height to align both panels */
+/* Scrollable + 2-column grid; fixed height to align both panels
+   结构（2026-07-21）：外层 .skill-list 仅负责高度 + 宽度对齐
+   （含 margin-right: -8px 把滚动条让出的空间补回 spirit-card 右边缘），
+   实际滚动 + grid 全部交给内层 .skill-list-inner。原因是滚动条
+   (scrollbar-gutter: stable ~6px) + padding-right: 2px 共 8px 会把
+   最右一列 skill-btn 推得比 spirit-card / stats-grid / buff-chip
+   短一截；把滚动条关进 .skill-list-inner 后，外层向右多占 8px，
+   内层的 grid 右列右边框能精确贴齐 spirit-card 的右边框。
+   滚动条本身仍画在 .skill-list-inner 的右内边缘（即外层右内边缘
+   缩进 8px 处），宽度未变，视觉上只是位置向右挪了 8px。
+   注意：外层必须用显式 `height: 141px`（不能只写 min/max-height），
+   否则内层 `height: 100%` 拿不到确定的父级高度，会按自身内容撑到
+   2000+px 高度（CSS 百分比高度的父级高度必须是显式的，不能由
+   min/max-height 间接确定）。 */
 .skill-list {
+  height: 141px;
+  margin-right: -8px;   /* 抵消 .skill-list-inner 的滚动条 6px + padding-right 2px */
+  position: relative;
+  overflow: hidden;      /* 防止内层任何意外溢出 */
+}
+.skill-list-inner {
+  height: 100%;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  min-height: 141px;
-  max-height: 141px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免技能数 ≤4 时滚动条消失导致内容宽度抖动 */
   scrollbar-gutter: stable;
@@ -568,7 +586,7 @@ body {
   gap: 12px;
   align-items: center;
   padding: 8px 10px;
-  min-height: 58px;
+  min-height: 66px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
@@ -1662,9 +1680,11 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .breakdown-section { margin: 16px 0 0; }
   /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills */
   .skill-list {
+    height: 125px;       /* 显式 height 而非 min/max，让 .skill-list-inner 的 height: 100% 能正确解析（见桌面端注释） */
+    margin-right: -8px;  /* 与桌面端一致：抵消 .skill-list-inner 的滚动条 + padding */
+  }
+  .skill-list-inner {
     grid-template-columns: repeat(2, 1fr);
-    min-height: 125px;
-    max-height: 125px;
     /* 移动端：同样始终为滚动条预留 gutter，避免列表抖动 */
     scrollbar-gutter: stable;
   }

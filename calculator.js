@@ -1989,11 +1989,16 @@ function renderInlineBadge(sk, powerClass = '') {
 }
 
 function renderSkills(side) {
+  // .skill-list 是外层（高度对齐 + 宽度补偿），实际 grid 在
+  // .skill-list-inner 里（见 styles.css .skill-list 结构注释）。
+  // 这里拿到 inner，renderSkills 的输出直接进 grid。
+  const _inner = (list) => list.querySelector('.skill-list-inner') || list;
   if (side === 'attacker') {
     const list = document.getElementById('attacker-skill-list');
+    const inner = _inner(list);
     const opts = getAttackSkillOptions(state.attacker);
     if (!opts.length) {
-      list.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
+      inner.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
       return;
     }
     // For each attack skill, determine power-badge color based on
@@ -2003,7 +2008,7 @@ function renderSkills(side) {
     // 0.5 = 单重抵抗 (light red)
     // 0.25 = 双重抵抗 (darker red)
     const defenderTypes = state.defender ? (state.defender.types || []) : [];
-    list.innerHTML = opts.map((sk, idx) => {
+    inner.innerHTML = opts.map((sk, idx) => {
       const el = elOf(sk.element);
       const eff = effectiveness(sk.element, defenderTypes);
       let powerClass = '';
@@ -2025,8 +2030,9 @@ function renderSkills(side) {
     }).join('');
   } else {
     const list = document.getElementById('defender-skill-list');
+    const inner = _inner(list);
     const opts = getDefenseSkillOptions(state.defender);
-    list.innerHTML = opts.map((sk, idx) => {
+    inner.innerHTML = opts.map((sk, idx) => {
       const isNone = sk._pseudo;
       const el = elOf(isNone ? '' : sk.element);
       const iconHTML = isNone
@@ -2075,14 +2081,17 @@ function selectDefenseSkill(idx) {
 
 // 切换 .skill-btn 的 active class；list 元素必须是当前已渲染的子集
 // （prevIdx / newIdx 在 list 范围内）。找不到对应按钮时静默失败。
+// 注意：.skill-btn 现在挂在 .skill-list-inner 里（见 styles.css
+// .skill-list 结构注释），所以 querySelector 要走 inner。
 function _setActiveSkill(side, prevIdx, newIdx) {
   const list = document.getElementById(side + '-skill-list');
   if (!list) return;
+  const scope = list.querySelector('.skill-list-inner') || list;
   if (prevIdx >= 0) {
-    const prevBtn = list.querySelector('.skill-btn[data-idx="' + prevIdx + '"]');
+    const prevBtn = scope.querySelector('.skill-btn[data-idx="' + prevIdx + '"]');
     if (prevBtn) prevBtn.classList.remove('active');
   }
-  const newBtn = list.querySelector('.skill-btn[data-idx="' + newIdx + '"]');
+  const newBtn = scope.querySelector('.skill-btn[data-idx="' + newIdx + '"]');
   if (newBtn) newBtn.classList.add('active');
 }
 
@@ -4159,22 +4168,25 @@ function renderChallengeResult() {
 // 答题阶段：自动把技能列表滚动到当前选中的技能（.skill-btn.active）。
 // 精灵面板已锁定交互（pointer-events: none），用户无法自己滚列表，
 // 必须由 JS 在 renderSkills 后代为滚到中心位置，避免选中技能被遮挡。
+// 注意：2026-07-21 把 .skill-list 拆成外层 + .skill-list-inner 后，
+// overflow-y: auto 移到 inner 上，所以滚动的容器也是 inner。
 function _scrollSkillListToSelected(side) {
   const list = document.getElementById(side + '-skill-list');
   if (!list) return;
-  const selected = list.querySelector('.skill-btn.active');
+  const scrollEl = list.querySelector('.skill-list-inner') || list;
+  const selected = scrollEl.querySelector('.skill-btn.active');
   if (!selected) return;
   // 直接滚 list 自身的滚动条，不动整页。
   // 原实现用 selected.scrollIntoView() 会把所有祖先滚动容器（包括 <html>
   // 页面）都滚到元素可见；移动端竖向布局（attacker → seal → defender）下，
   // defender 那次调用会把整页跳到防御方位置，体验割裂。
-  const listRect = list.getBoundingClientRect();
+  const listRect = scrollEl.getBoundingClientRect();
   const selectedRect = selected.getBoundingClientRect();
   // 选中技能顶部到列表可见区域顶部的偏移；scrollTo 把元素对齐到列表顶部，
   // 行为与 scrollIntoView({ block: 'start' }) 等价。
   const offsetInList = selectedRect.top - listRect.top;
   if (offsetInList === 0) return;
-  list.scrollTo({ top: list.scrollTop + offsetInList, behavior: 'smooth' });
+  scrollEl.scrollTo({ top: scrollEl.scrollTop + offsetInList, behavior: 'smooth' });
 }
 
 // 应用一道题：替换 state 全字段并重渲染。
