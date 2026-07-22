@@ -1570,6 +1570,7 @@ function selectSpirit(side, id) {
     }
     state.spiritPicking.attacker = false;
     renderSpiritArea('attacker');
+    _scrollSkillListToSelected('attacker');
   } else if (side === 'defender') {
     state.defender = spirit;
     // 加载该精灵防御方侧的全部可调配置（性格/个体/buff/skill）。
@@ -1601,6 +1602,7 @@ function selectSpirit(side, id) {
     }
     state.spiritPicking.defender = false;
     renderSpiritArea('defender');
+    _scrollSkillListToSelected('defender');
     // 防御方精灵换 → 攻击方 power-badge 颜色依赖防御方减伤率，需刷新
     if (state.attacker) renderSkills('attacker');
   }
