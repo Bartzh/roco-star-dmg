@@ -157,7 +157,6 @@ uv run build.py
 ## TODO
 
 - 过山车/奇异
-- 测验游戏
 
 ---
 
