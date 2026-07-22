@@ -3299,7 +3299,7 @@ const MODAL_CONTENT = {
       <ul>
         <li>挑战模式上线：这是一个考验你对星陨斩杀线的把握，辅助记忆斩杀线的小游戏。</li>
         <li>基本流程：挑战设置 → 开始挑战 → 自动出题 → 拖动星陨层数 → 提交答案 → 评分 → 下一道题 / 结算。</li>
-        <li>双方精灵池支持「全部 / 常见 / 自选」；属性配置与技能选择支持「固定当前 / 随机每题」；防御技能按相同减伤率兜底匹配。</li>
+        <li>双方精灵池支持「全部 / 常见 / 固定」；属性配置与技能选择支持「固定当前 / 随机每题」；防御技能按相同减伤率兜底匹配。</li>
         <li>答题阶段精灵面板自动锁定（灰显、不可点），仅星陨层数可调；随时可「退出挑战」回到计算器状态。</li>
         <li>适配了「星痕」和「急中生智」两个技能。</li>
         <li>以及其他一些细节优化和bug修复。</li>
@@ -3465,7 +3465,7 @@ function initInfoModal() {
 // 侧栏 label ↔ chip 切换动画。业务逻辑（出题、提交、评分）后续 PR。
 //
 // 关键不变量：
-//   1. 精灵池（攻击方/防御方）是**单选** chip 组：3 个 chip（全部/常见/自选）
+//   1. 精灵池（攻击方/防御方）是**单选** chip 组：3 个 chip（全部/常见/固定）
 //      同时只有一个 .active，**不能空选**。点击当前选中项保持选中不变。
 //   2. 「随机」chip 是**开关**：在 .active 和无 .active 之间切换。
 //   3. 所有 chip 都复用 .buff-chip 的视觉（.label-chip），并带按压特效
@@ -3879,7 +3879,7 @@ function _pickWeightedSkill(opts, side) {
 // 精灵池工厂：返回 () => 精灵 id
 //   pool[side] = 'all'    : 从所有 SPRITES 中等概率采样
 //   pool[side] = 'common' : 从 OTHERS.common_attackers/defenders 中等概率采样
-//   pool[side] = 'custom' : 固定返回 state[side].id（自选必须已选好精灵）
+//   pool[side] = 'custom' : 固定返回 state[side].id（固定必须已选好精灵）
 function buildSpiritRng(side) {
   const mode = state.challenge.pool[side];
   if (mode === 'all') {
@@ -3895,7 +3895,7 @@ function buildSpiritRng(side) {
   // 'custom' — 固定当前用户选的精灵
   const fixedId = (side === 'attacker') ? state.attacker?.id : state.defender?.id;
   if (!fixedId) {
-    // 自选池但精灵未选：兜底用常见池（避免抛错）
+    // 固定池但精灵未选：兜底用常见池（避免抛错）
     const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
                                        : (OTHERS.common_defenders || []);
     return () => _pickRandom(list);
@@ -4526,7 +4526,7 @@ function applyQuestion(index) {
   }
   // 10. 答题阶段：把侧栏 label-chip（精灵池单选/随机 chip）淡出，让 label-text
   //     淡入回归——与「从挑战设置退出挑战」时的视觉一致（见 exitChallengeMode）。
-  //     不然进入答题态后还会看到「全部/常见/自选」「随机」等 chip，干扰注意力。
+  //     不然进入答题态后还会看到「全部/常见/固定」「随机」等 chip，干扰注意力。
   //     **只在第一题播**：后续题目（nextQuestion）的 label 已经在第一题被换回 text，
   //     再播一次 _swapLabelVisibility 就是无意义的"文字淡入"——文字其实一直在那，
   //     看起来很奇怪。
@@ -4748,7 +4748,7 @@ function exitChallenge() {
 // 开始挑战：生成题目池 + 启动第一题
 function startChallenge() {
   const c = state.challenge;
-  // 1. 校验自选池精灵已选
+  // 1. 校验固定池精灵已选
   for (const side of ['attacker', 'defender']) {
     if (c.pool[side] === 'custom') {
       const has = side === 'attacker' ? !!state.attacker : !!state.defender;
@@ -4760,7 +4760,7 @@ function startChallenge() {
         if (modal && title && body) {
           title.textContent = '无法开始挑战';
           const whichSide = side === 'attacker' ? '攻击方' : '防御方';
-          body.innerHTML = `<div style="line-height:1.7">「自选」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 常见」池。</div>`;
+          body.innerHTML = `<div style="line-height:1.7">「固定」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 常见」池。</div>`;
           modal.classList.add('is-open');
           modal.setAttribute('aria-hidden', 'false');
         }
