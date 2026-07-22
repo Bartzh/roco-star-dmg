@@ -1570,13 +1570,6 @@ function selectSpirit(side, id) {
     }
     state.spiritPicking.attacker = false;
     renderSpiritArea('attacker');
-    // 攻击方精灵换 → 重新渲 attack skill 列表（active 高亮 / 状态）
-    renderSkills('attacker');
-    // 重新渲 power / combo chip（新值）
-    renderPowerBoostChip();
-    // 速度 chip 总是双方显示，攻击方换了也要把 defender chip 重建
-    // （chip 元素的 click handler 跟着重建，defender 自己的值不受影响）。
-    renderBuffChips('defender');
   } else if (side === 'defender') {
     state.defender = spirit;
     // 加载该精灵防御方侧的全部可调配置（性格/个体/buff/skill）。
@@ -1608,8 +1601,6 @@ function selectSpirit(side, id) {
     }
     state.spiritPicking.defender = false;
     renderSpiritArea('defender');
-    // 重新渲 defender 的 skill 列表（active 高亮 / 状态）
-    renderSkills('defender');
     // 防御方精灵换 → 攻击方 power-badge 颜色依赖防御方减伤率，需刷新
     if (state.attacker) renderSkills('attacker');
   }
