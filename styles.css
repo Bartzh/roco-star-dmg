@@ -106,6 +106,9 @@ body {
   margin-bottom: 24px;
 }
 
+/* 桌面端：carousel 透明包裹层，不影响 grid 布局 */
+.battle-carousel { display: contents; }
+
 /* ============ Glass Panel ============ */
 .glass-panel {
   background: var(--glass-bg);
@@ -778,6 +781,9 @@ body {
   -webkit-user-select: none;
   border-radius: 50%;
   transition: filter 0.3s ease;
+  /* 移动端 carousel 中，防止星陨拖拽被横向滑动拦截。
+     如需允许 carousel 滑动与星陨拖拽共存，可移除此行实测。 */
+  touch-action: none;
 }
 .seal-wrapper canvas {
   position: absolute;
@@ -888,6 +894,11 @@ body {
   border: 1px solid rgba(255,215,0,0.2);
   border-radius: 20px;
   transition: all 0.3s;
+}
+
+/* ============ Mobile Result Bar (hidden on desktop, shown on mobile) ============ */
+.mobile-result-bar {
+  display: none;   /* 桌面端隐藏，移动端 media query 中覆盖 */
 }
 
 /* ============ Result Ring (lower half, mirrors the seal ring) ============ */
@@ -1649,18 +1660,144 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  .battle-area {
-    grid-template-columns: 1fr;
-    gap: 16px;
+  /* --- 移动端结果条：横向进度条替代圆形伤害环，置于页面顶部 --- */
+  .mobile-result-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
   }
-  .seal-container {
-    /* On mobile, drop the strict top/result flex split — content height */
-    height: auto;
+  .mobile-result-bar-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .mobile-result-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--hp-bar-color, var(--accent-green));
+    border-radius: 4px;
+    transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                background 0.5s ease;
+    filter: drop-shadow(0 0 6px var(--hp-bar-color, var(--accent-green)));
+  }
+  .mobile-result-bar-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .mobile-result-pct {
+    font-size: 1.5rem;
+    font-weight: 800;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    text-shadow: 0 0 12px var(--hp-bar-color, var(--accent-green));
+    transition: text-shadow 0.5s ease;
+  }
+  .mobile-result-dmg {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+  }
+  .mobile-result-info {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-align: center;
+    letter-spacing: 0.5px;
+    min-height: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+  }
+  .mobile-result-info .result-chip {
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-secondary);
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .mobile-result-info .result-chip.super-effective {
+    background: rgba(0,230,118,0.12);
+    border-color: rgba(0,230,118,0.4);
+    color: #00e676;
+  }
+  .mobile-result-info .result-chip.not-effective {
+    background: rgba(255,140,0,0.1);
+    border-color: rgba(255,140,0,0.3);
+    color: #ff8c00;
+  }
+  .mobile-result-info .result-chip.overflow {
+    background: rgba(255,59,59,0.15);
+    border-color: rgba(255,59,59,0.4);
+    color: var(--accent-red);
+  }
+  .mobile-result-info .result-dmg-line {
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+  }
+  .mobile-result-info .result-dmg-line strong {
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+  .mobile-result-info .result-dmg-line .star-val {
+    color: var(--accent-gold);
+  }
+  .mobile-result-info .result-waiting-mini {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  /* --- 横向滑动吸附 carousel --- */
+  .battle-area {
+    display: block;   /* 覆盖桌面端 grid，由 carousel 接管布局 */
+    gap: 0;
+    margin-bottom: 16px;
+  }
+  .battle-carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;          /* Firefox 隐藏滚动条 */
+    gap: 0;
+    /* 左右各留出一点 padding 让 snap 后的面板不贴边 */
+    /* padding: 0 8px; */
+  }
+  .battle-carousel::-webkit-scrollbar { display: none; }
+
+  .battle-carousel > * {
+    flex: 0 0 100%;
     min-width: 0;
-    /* seal-container 仍有显式 width: 240px，grid 默认 justify-self: stretch
-       在有显式宽度时不会生效，元素会贴着网格单元左边缘。改为 center 让
-       seal 区域在移动端单列网格中水平居中。 */
-    justify-self: center;
+    scroll-snap-align: start;
+  }
+
+  /* carousel 内的 seal-container：宽度撑满、居中 */
+  .seal-container {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    justify-self: auto;   /* 不再是 grid 子项，无需 justify-self */
   }
   .seal-top, .result-bottom {
     flex: 0 0 auto;
@@ -1719,9 +1856,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     gap: 4px;
   }
   .iv-slot { min-width: 38px; font-size: 0.6rem; }
-  /* Spirit picker: 3 columns on mobile, taller scroll area.
-     同样用 minmax(0, 1fr) 防止列塌陷；并把 max-height 调高一点，
-     让 3 列布局下能完整显示 2 行卡片（图片+名称+类型），避免视觉上"挤成一团"。 */
+  /* Spirit picker: 2 columns on mobile, taller scroll area. */
   .spirit-picker-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-height: 404px;
@@ -1734,6 +1869,10 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .challenge-start-btn { font-size: 0.78rem; padding: 8px 22px; }
   body.challenge-mode .seal-container {
     min-height: 400px;
+  }
+  /* 挑战模式（设置阶段）：移动端结果条隐藏 */
+  body.challenge-mode .mobile-result-bar {
+    display: none;
   }
 }
 

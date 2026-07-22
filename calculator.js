@@ -2999,6 +2999,80 @@ function renderResult(data) {
   }
 
   if (data.isKill) triggerKillEffects();
+
+  // 同步移动端结果条
+  updateMobileResultBar(data);
+}
+
+/** 移动端横向进度条：从 renderResult / renderWaiting 调用，保持与桌面端圆环同步。 */
+function updateMobileResultBar(data) {
+  const fill = document.getElementById('mobile-result-bar-fill');
+  const pctEl = document.getElementById('mobile-result-pct');
+  const dmgEl = document.getElementById('mobile-result-dmg');
+  const infoEl = document.getElementById('mobile-result-info-mob');
+
+  if (!fill || !pctEl || !dmgEl || !infoEl) return;
+
+  if (data === null) {
+    // waiting 态：清空
+    fill.style.width = '0%';
+    fill.style.background = 'rgba(255,255,255,0.1)';
+    fill.style.filter = 'none';
+    pctEl.textContent = '—';
+    pctEl.style.textShadow = 'none';
+    dmgEl.textContent = '—';
+    infoEl.innerHTML = '<span class="result-waiting-mini">选择双方精灵开始计算</span>';
+    return;
+  }
+
+  if (data._waitingMsg) {
+    // renderWaiting 带自定义文案（如"提交答案后计算结果"）
+    fill.style.width = '0%';
+    fill.style.background = 'rgba(255,255,255,0.1)';
+    fill.style.filter = 'none';
+    pctEl.textContent = '—';
+    pctEl.style.textShadow = 'none';
+    dmgEl.textContent = '—';
+    infoEl.innerHTML = `<span class="result-waiting-mini">${data._waitingMsg}</span>`;
+    return;
+  }
+
+  const barColor = ringBarColor(data);
+  document.documentElement.style.setProperty('--hp-bar-color', barColor);
+
+  // 进度条宽度
+  const damageRatio = Math.min(data.hpPercent, 100) / 100;
+  fill.style.width = (damageRatio * 100) + '%';
+  fill.style.background = barColor;
+  fill.style.filter = `drop-shadow(0 0 6px ${barColor})`;
+
+  // 百分比 + 伤害数值
+  const displayPercent = Math.min(data.hpPercent, 999.9);
+  pctEl.textContent = displayPercent.toFixed(1) + '%';
+  pctEl.style.textShadow = `0 0 12px ${barColor}`;
+  dmgEl.textContent = data.finalDamage.toLocaleString();
+
+  // info 行：克制/抵抗 chip + 技能/星陨伤害
+  let chipsHTML = '';
+  const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
+  if (data.skillEff > 1) {
+    chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
+  } else if (data.skillEff < 1 && !ignoredResist) {
+    chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+  }
+  if (ignoredResist) {
+    chipsHTML += `<span class="result-chip not-effective">无视抵抗</span>`;
+  }
+  if (data.n > 0 && !data.isSkillIllusion && data.starEff !== 1) {
+    const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
+    const label = data.starEff > 1 ? '星陨克制' : '星陨抵抗';
+    chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
+  }
+  if (data.isKill) {
+    chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
+  }
+  const dmgLine = `<span class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></span>`;
+  infoEl.innerHTML = chipsHTML + dmgLine;
 }
 
 function renderBreakdownList(breakdownList, data) {
@@ -3180,6 +3254,7 @@ function renderWaiting() {
     const breakdownContent = document.getElementById('breakdown-content');
     if (breakdownContent) breakdownContent.classList.remove('open');
     updateAtmosphere(0, false);
+    updateMobileResultBar({ _waitingMsg: '提交答案后计算结果' });
     return;
   }
 
@@ -3214,6 +3289,7 @@ function renderWaiting() {
   const breakdownContent = document.getElementById('breakdown-content');
   if (breakdownContent) breakdownContent.classList.remove('open');
   updateAtmosphere(0, false);
+  updateMobileResultBar(null);
 }
 
 // ============================================================

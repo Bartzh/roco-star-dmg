@@ -101,7 +101,21 @@
     <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled aria-hidden="true">提交答案</button>
   </section>
 
+  <!-- 移动端伤害结果条：桌面端隐藏，移动端置于页面顶部。
+       用横向进度条替代圆形伤害环，显示百分比 + 伤害数值 + 克制/抵抗信息。 -->
+  <div class="mobile-result-bar" id="mobile-result-bar" aria-hidden="true">
+    <div class="mobile-result-bar-track">
+      <div class="mobile-result-bar-fill" id="mobile-result-bar-fill"></div>
+    </div>
+    <div class="mobile-result-bar-stats">
+      <span class="mobile-result-pct" id="mobile-result-pct">—</span>
+      <span class="mobile-result-dmg" id="mobile-result-dmg">—</span>
+    </div>
+    <div class="mobile-result-info" id="mobile-result-info-mob">选择双方精灵开始计算</div>
+  </div>
+
   <section class="battle-area" aria-label="对战配置区">
+    <div class="battle-carousel">
     <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方">
       <h2 class="panel-label">
         <span class="label-text">攻击方</span>
@@ -258,6 +272,7 @@
         <div class="skill-list" id="defender-skill-list"><div class="skill-list-inner"></div></div>
       </div>
     </section>
+    </div><!-- .battle-carousel -->
   </section>
 
   <section class="breakdown-section" id="breakdown-section" style="display:none" aria-label="伤害计算明细">
