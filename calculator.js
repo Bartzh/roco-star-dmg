@@ -533,6 +533,8 @@ let starLayers = [];
 let starCanvas, starCtx;
 let mouseParallax = { x: 0, y: 0 };
 let starTargetParallax = { x: 0, y: 0 };
+let starLastTime = 0;                 // 上一帧时间戳，用于 delta time 相位累积
+let starPrevLayer = 0;                // 上一帧星陨层数，检测变化后触发相位跳变
 
 const STAR_SEED = 0x5A7C0E;          // 固定种子：星空布局每次刷新都一致
 const PARALLAX_EASE = 0.06;          // 鼠标→视差平滑系数（越小越柔）
@@ -618,13 +620,16 @@ function buildStarLayers() {
     const rng = mulberry32(STAR_SEED + layerIdx * 1009);
     const stars = [];
     for (let i = 0; i < cfg.count; i++) {
+      const phase = rng() * Math.PI * 2;
       stars.push({
         x: rng() * w,
         y: rng() * h,
         r: cfg.radiusMin + rng() * (cfg.radiusMax - cfg.radiusMin),
         alpha: cfg.alphaBase + rng() * cfg.alphaVar,
         twinkleSpeed: cfg.twinkleSpeedMin + rng() * (cfg.twinkleSpeedMax - cfg.twinkleSpeedMin),
-        twinklePhase: rng() * Math.PI * 2,
+        twinklePhase: phase,
+        phase: phase,                    // 累积相位，每帧按 delta time 推进
+        twinkleJitter: 0.7 + rng() * 0.6, // 每颗星对 twinkleBoost 的响应系数不同（0.7~1.3）
         hue: cfg.colorHueRange[0] + rng() * (cfg.colorHueRange[1] - cfg.colorHueRange[0]),
       });
     }
@@ -636,7 +641,12 @@ function drawStarCanvas() {
   const ctx = starCtx;
   const w = starCanvas.width;
   const h = starCanvas.height;
-  const time = performance.now() * 0.001;
+  const now = performance.now();
+  const time = now * 0.001;
+  // 帧间 delta time（秒），首帧或长时间暂停后 clamp 到合理范围防止跳帧
+  const rawDt = starLastTime ? (now - starLastTime) * 0.001 : 0;
+  const dt = Math.min(rawDt, 0.1); // 上限 100ms，防止切 tab 回来后相位跳变
+  starLastTime = now;
 
   // 视差平滑跟随 —— 指数缓动，给出柔软的"凝望"感。
   mouseParallax.x += (starTargetParallax.x - mouseParallax.x) * PARALLAX_EASE;
@@ -645,6 +655,9 @@ function drawStarCanvas() {
   // 全局星陨强度（0..1），驱动背景星亮度 / 闪烁节奏。
   const layerT = (typeof state !== 'undefined' && state.starLayer != null)
     ? state.starLayer / 99 : 0;
+  const layer = Math.round(layerT * 99);
+  const layerDelta = layer - starPrevLayer;
+  starPrevLayer = layer;
   // 整体提亮 1.0 → 1.5（高层数时整片星空微微"燃烧"）
   const globalGain = 1 + layerT * 0.5;
   // 共振脉冲：高层数时整片星空以约 0.25Hz 做轻微呼吸（+0..0.18 振幅）
@@ -659,13 +672,24 @@ function drawStarCanvas() {
     const layer = starLayers[i];
     const offsetX = -mouseParallax.x * layer.parallax;
     const offsetY = -mouseParallax.y * layer.parallax;
-    // 闪烁节奏在高层数时略微加快，避免长时间高数时画面"死板"
+    // 闪烁节奏在高层数时略微加快，每颗星独立响应系数打破整齐划一的抖动
     const twinkleBoost = 1 + layerT * 0.6;
 
     for (let j = 0; j < layer.stars.length; j++) {
       const s = layer.stars[j];
-      // 闪烁 = 全局时间 × 每颗星独立速度 + 独立相位 → 不同步的呼吸。
-      const tw = 0.55 + 0.45 * Math.sin(time * s.twinkleSpeed * twinkleBoost + s.twinklePhase);
+      if (dt > 0) {
+        // 基础相位累积：每帧按 delta time 推进，保证闪烁平滑
+        s.phase += dt * s.twinkleSpeed * twinkleBoost * s.twinkleJitter;
+      }
+      // 层数变化时：每颗星按变化量 × 独立 jitter 做相位跳变，
+      // 模拟原来 time × twinkleBoost 变化产生的"闪"的效果，
+      // 但不受页面打开时长影响，且每颗星跳变幅度不同打破整齐感
+      // 1.0 是一个系数，决定闪的幅度
+      if (layerDelta !== 0) {
+        s.phase += layerDelta * 1.0 * s.twinkleJitter;
+      }
+      // 闪烁 = sin(累积相位)，只依赖相位自身，不依赖绝对时间
+      const tw = 0.55 + 0.45 * Math.sin(s.phase);
       const a  = Math.min(1, s.alpha * tw * globalGain + pulse);
 
       // 视差把星推出视区时做环形卷绕，避免边缘出现空缺。
