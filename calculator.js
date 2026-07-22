@@ -292,8 +292,7 @@ let state = {
   starLayer: 0,
   // 精灵面板是否处于“选择中”状态（true 时渲染内嵌选择器而非卡片）
   spiritPicking: { attacker: false, defender: false },
-  // 精灵选择器内临时筛选/搜索状态。每次进入选择器时重置；
-  // 退出选择器（选中或取消）后丢弃。
+  // 精灵选择器内筛选/搜索状态。退出选择器后保留，下次打开时恢复。
   //   text    : 搜索框原文（实时、原文大小写）
   //   common  : 是否启用"常见"过滤
   //   elements: 当前选中的系别 key 集合（最多 2 个；OR 关系）
@@ -301,6 +300,8 @@ let state = {
     attacker: { text: '', common: false, elements: new Set() },
     defender: { text: '', common: false, elements: new Set() },
   },
+  // 精灵选择器 grid 滚动位置，退出时保存、下次进入时恢复
+  _pickerScrollTop: { attacker: 0, defender: 0 },
   // Per-side nature { up: statKey|null, down: statKey|null } and IVs (array of statKeys)
   attackerNature: { up: null, down: null },
   defenderNature: { up: null, down: null },
@@ -1517,11 +1518,18 @@ function renderSpiritCard(side, opts) {
 // 进入/退出“选择中”状态
 function enterSpiritPicker(side) {
   state.spiritPicking[side] = true;
-  // 每次重新进入选择器时重置筛选/搜索状态（关闭时丢弃）
-  state.spiritPickerFilter[side] = { text: '', common: false, elements: new Set() };
+  // 保留上次筛选状态与滚动位置
+  const savedScroll = state._pickerScrollTop[side] || 0;
   renderSpiritArea(side);
+  if (savedScroll > 0) {
+    const grid = document.getElementById(`${side}-picker-grid`);
+    if (grid) grid.scrollTop = savedScroll;
+  }
 }
 function exitSpiritPicker(side) {
+  // 保存当前滚动位置，下次打开时恢复
+  const grid = document.getElementById(`${side}-picker-grid`);
+  state._pickerScrollTop[side] = grid ? grid.scrollTop : 0;
   state.spiritPicking[side] = false;
   renderSpiritArea(side);
 }
@@ -1569,6 +1577,8 @@ function selectSpirit(side, id) {
       state.attackSkillIdx     = state.attackSkill ? 0 : -1;
     }
     state.spiritPicking.attacker = false;
+    // 保存滚动位置以便下次打开时恢复
+    { const g = document.getElementById('attacker-picker-grid'); state._pickerScrollTop.attacker = g ? g.scrollTop : 0; }
     renderSpiritArea('attacker');
     _scrollSkillListToSelected('attacker');
   } else if (side === 'defender') {
@@ -1601,6 +1611,8 @@ function selectSpirit(side, id) {
       state.defenseSkillIdx = 0;
     }
     state.spiritPicking.defender = false;
+    // 保存滚动位置以便下次打开时恢复
+    { const g = document.getElementById('defender-picker-grid'); state._pickerScrollTop.defender = g ? g.scrollTop : 0; }
     renderSpiritArea('defender');
     _scrollSkillListToSelected('defender');
     // 防御方精灵换 → 攻击方 power-badge 颜色依赖防御方减伤率，需刷新
