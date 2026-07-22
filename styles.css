@@ -1786,21 +1786,25 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   }
   .battle-carousel::-webkit-scrollbar { display: none; }
 
-  .battle-carousel > * {
-    flex: 0 0 auto;
-    width: calc(100% - 32px);  /* 两侧各留 16px，由 margin 撑开 */
-    margin: 0 16px;
-    scroll-snap-align: start;
+  /* 左右垫片：确保首尾面板在 snap 后也有 16px 留白 */
+  .battle-carousel::before,
+  .battle-carousel::after {
+    content: '';
+    flex: 0 0 16px;
   }
 
-  /* carousel 内的 seal-container：宽度撑满、内容垂直居中、左右留空隙 */
+  .battle-carousel > * {
+    flex: 0 0 calc(100% - 32px);  /* 面板宽度 = 视口 - 32px（两侧各 16px） */
+    margin-right: 32px;            /* 右侧留白 16px + 下一个面板左侧 16px */
+    scroll-snap-align: center;     /* center 对齐，确保每个面板在视口中居中 */
+  }
+  .battle-carousel > *:last-child {
+    margin-right: 0;               /* 最后一项不需要右侧间距（::after 补足） */
+  }
+
+  /* carousel 内的 seal-container：内容垂直居中 */
   .seal-container {
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    justify-self: auto;          /* 不再是 grid 子项，无需 justify-self */
     justify-content: center;     /* 星陨圆环 + 滑块在容器中垂直居中 */
-    padding: 0 16px;             /* 左右留空隙，与 spirit-panel 的 glass-panel padding 对齐 */
   }
   .seal-top, .result-bottom {
     flex: 0 0 auto;
