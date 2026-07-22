@@ -900,20 +900,6 @@ body {
 .mobile-result-bar {
   display: none;   /* 桌面端隐藏，移动端 media query 中覆盖 */
 }
-.mobile-result-chips {
-  min-height: 24px;   /* 始终占位，防止芯片行出现/消失导致抖动 */
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-}
-.mobile-result-line {
-  min-height: 18px;   /* 始终占位，防止伤害行出现/消失导致抖动 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 /* ============ Result Ring (lower half, mirrors the seal ring) ============ */
 .result-label {
@@ -1728,10 +1714,12 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   }
   .mobile-result-info {
     width: 100%;
+    min-height: 24px;        /* 始终占位，防止芯片行出现/消失导致抖动 */
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: center;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
   }
   .mobile-result-info .result-chip {
     padding: 1px 7px;
@@ -1759,21 +1747,21 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     border-color: rgba(255,59,59,0.4);
     color: var(--accent-red);
   }
-  .mobile-result-line {
+  .mobile-result-info .result-dmg-line {
     font-size: 0.65rem;
     font-family: var(--font-mono);
     color: var(--text-secondary);
     letter-spacing: 0.2px;
     white-space: nowrap;
   }
-  .mobile-result-line strong {
+  .mobile-result-info .result-dmg-line strong {
     color: var(--text-primary);
     font-weight: 700;
   }
-  .mobile-result-line .star-val {
+  .mobile-result-info .result-dmg-line .star-val {
     color: var(--accent-gold);
   }
-  .mobile-result-waiting {
+  .mobile-result-info .result-waiting-mini {
     color: var(--text-secondary);
     font-size: 0.7rem;
     letter-spacing: 0.5px;
@@ -1795,28 +1783,24 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;     /* Firefox 隐藏滚动条 */
     gap: 0;
-    /* 上下留 50px 给星陨发光效果（box-shadow + particle canvas）延伸空间 */
-    padding: 50px 0;
-    /* 左右留 16px 让 snap 后面板内容不贴屏幕边缘 */
-    padding-left: 16px;
-    padding-right: 16px;
-    scroll-padding: 0 16px;   /* snap 吸附点对齐到 padding 内边缘 */
   }
   .battle-carousel::-webkit-scrollbar { display: none; }
 
   .battle-carousel > * {
-    flex: 0 0 calc(100% - 32px);   /* 减去左右 scroll-padding，每个面板恰好占满可视区 */
-    min-width: 0;
+    flex: 0 0 auto;
+    width: calc(100% - 32px);  /* 两侧各留 16px，由 margin 撑开 */
+    margin: 0 16px;
     scroll-snap-align: start;
   }
 
-  /* carousel 内的 seal-container：宽度撑满、内容垂直居中 */
+  /* carousel 内的 seal-container：宽度撑满、内容垂直居中、左右留空隙 */
   .seal-container {
     width: 100%;
     min-width: 0;
     height: auto;
     justify-self: auto;          /* 不再是 grid 子项，无需 justify-self */
     justify-content: center;     /* 星陨圆环 + 滑块在容器中垂直居中 */
+    padding: 0 16px;             /* 左右留空隙，与 spirit-panel 的 glass-panel padding 对齐 */
   }
   .seal-top, .result-bottom {
     flex: 0 0 auto;
