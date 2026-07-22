@@ -534,7 +534,6 @@ let starCanvas, starCtx;
 let mouseParallax = { x: 0, y: 0 };
 let starTargetParallax = { x: 0, y: 0 };
 let starLastTime = 0;                 // 上一帧时间戳，用于 delta time 相位累积
-let starPrevLayer = 0;                // 上一帧星陨层数，检测变化后触发相位跳变
 
 const STAR_SEED = 0x5A7C0E;          // 固定种子：星空布局每次刷新都一致
 const PARALLAX_EASE = 0.06;          // 鼠标→视差平滑系数（越小越柔）
@@ -630,6 +629,7 @@ function buildStarLayers() {
         twinklePhase: phase,
         phase: phase,                    // 累积相位，每帧按 delta time 推进
         twinkleJitter: 0.7 + rng() * 0.6, // 每颗星对 twinkleBoost 的响应系数不同（0.7~1.3）
+        layerPhase: rng() * Math.PI * 2,  // 层数亮度调制的独立相位偏移，打破整齐闪烁
         hue: cfg.colorHueRange[0] + rng() * (cfg.colorHueRange[1] - cfg.colorHueRange[0]),
       });
     }
@@ -655,9 +655,6 @@ function drawStarCanvas() {
   // 全局星陨强度（0..1），驱动背景星亮度 / 闪烁节奏。
   const layerT = (typeof state !== 'undefined' && state.starLayer != null)
     ? state.starLayer / 99 : 0;
-  const layer = Math.round(layerT * 99);
-  const layerDelta = layer - starPrevLayer;
-  starPrevLayer = layer;
   // 整体提亮 1.0 → 1.5（高层数时整片星空微微"燃烧"）
   const globalGain = 1 + layerT * 0.5;
   // 共振脉冲：高层数时整片星空以约 0.25Hz 做轻微呼吸（+0..0.18 振幅）
@@ -681,16 +678,13 @@ function drawStarCanvas() {
         // 基础相位累积：每帧按 delta time 推进，保证闪烁平滑
         s.phase += dt * s.twinkleSpeed * twinkleBoost * s.twinkleJitter;
       }
-      // 层数变化时：每颗星按变化量 × 独立 jitter 做相位跳变，
-      // 模拟原来 time × twinkleBoost 变化产生的"闪"的效果，
-      // 但不受页面打开时长影响，且每颗星跳变幅度不同打破整齐感
-      // 1.0 是一个系数，决定闪的幅度
-      if (layerDelta !== 0) {
-        s.phase += layerDelta * 1.0 * s.twinkleJitter;
-      }
       // 闪烁 = sin(累积相位)，只依赖相位自身，不依赖绝对时间
       const tw = 0.55 + 0.45 * Math.sin(s.phase);
-      const a  = Math.min(1, s.alpha * tw * globalGain + pulse);
+      // 层数亮度调制：每颗星以 layerT 为输入、独立 phase 做正弦调制。
+      // layerT 0→1 对应 6 个完整周期，每颗星 offset 不同，
+      // 层数变化时有的星变亮、有的变暗、有的几乎不变 → 流动感而非整齐闪烁
+      const layerMod = 1 + 2 * Math.sin(layerT * Math.PI * 12 + s.layerPhase);
+      const a  = Math.min(1, s.alpha * tw * globalGain * layerMod + pulse);
 
       // 视差把星推出视区时做环形卷绕，避免边缘出现空缺。
       let px = s.x + offsetX;
