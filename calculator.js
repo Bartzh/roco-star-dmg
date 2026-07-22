@@ -128,7 +128,7 @@ const DEFAULT_IVS = {
 };
 
 // ============================================================
-// 按精灵 × side 维度的全部可调配置自动保存（localStorage）。无 UI：
+// 按精灵 × side 维度的全部可调配置自动记忆（localStorage）。无 UI：
 // 每次修改任一字段（性格 / 个体 / buff / 技能）后写入一条
 // localStorage 记录；下次选中同一只精灵同一侧时整体回放。
 // 同一只精灵在攻击方 / 防御方各存一份独立配置，互不干扰。
@@ -326,7 +326,7 @@ let state = {
   defenderSpeed: 0,
   // 挑战模式状态（UI 控件 + 用户偏好 + 答题运行时）
   //   active      : 是否处于挑战设置阶段（chip 可见）
-  //   preset/count/pool/randomStats/randomSkill：用户偏好，退出答题时保留
+  //   preset/count/pool/useMemoryStats/useMemorySkill：用户偏好，退出答题时保留
   //   running     : 是否处于答题阶段（精灵面板锁定）
   //   phase       : 'idle' | 'picking'（已出题未提交）| 'answered'（已提交）
   //   current     : 当前题号（0-based）
@@ -354,8 +354,8 @@ let state = {
     preset: 'easy',
     count: 5,
     pool: { attacker: 'common', defender: 'common' },
-    randomStats: { attacker: true, defender: true },
-    randomSkill: { attacker: true, defender: true },
+    useMemoryStats: { attacker: false, defender: false },
+    useMemorySkill: { attacker: false, defender: false },
     running: false,
     phase: 'idle',
     current: 0,
@@ -3290,9 +3290,9 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
-      <h3>buff / 技能自动保存 <span class="modal-date">· 2026-07-22</span></h3>
+      <h3>buff / 技能自动记忆 <span class="modal-date">· 2026-07-22</span></h3>
       <ul>
-        <li>作为之前性格个体自动保存的补充：现在为每只精灵的 buff 和所选技能自动保存，下次选择同一只精灵时会自动加载。</li>
+        <li>作为之前性格个体自动记忆的补充：现在为每只精灵的 buff 和所选技能自动记忆，下次选择同一只精灵时会自动使用记忆配置。</li>
       </ul>
       <hr>
       <h3>挑战模式 <span class="modal-date">· 2026-07-21</span></h3>
@@ -3305,9 +3305,9 @@ const MODAL_CONTENT = {
         <li>以及其他一些细节优化和bug修复。</li>
       </ul>
       <hr>
-      <h3>性格个体自动保存 <span class="modal-date">· 2026-07-20</span></h3>
+      <h3>性格个体自动记忆 <span class="modal-date">· 2026-07-20</span></h3>
       <ul>
-        <li>现在在每次修改性格和个体后都会自动保存（到localStorage），下次选择精灵时会自动加载。</li>
+        <li>现在在每次修改性格和个体后都会自动记忆（到localStorage），下次选择精灵时会自动使用记忆配置。</li>
       </ul>
       <hr>
       <h3>S3 数据更新 <span class="modal-date">· 2026-07-16</span></h3>
@@ -3904,79 +3904,83 @@ function buildSpiritRng(side) {
 }
 
 // 属性配置工厂：返回 (spirit) => { nature, ivs, buff, speed, power, combo }
-//   randomStats[side] = false: 深拷贝当前 state（不污染用户原值，spirit 参数忽略）
-//   randomStats[side] = true : 先按 spirit 的随机池抽 nature+ivs / buff-spd /
-//                              power / combo（落入 default_weight 区间则走普通随机）；
-//                              威力/连击仅攻击方，防御方恒为 0
+//   useMemoryStats[side] = true : 优先从 loadSpiritConfig 加载已记忆配置；
+//                                 无存档或数据不合法时走随机兜底
+//   useMemoryStats[side] = false: 直接走随机：先按 spirit 的随机池抽 nature+ivs /
+//                                 buff-spd / power / combo（落入 default_weight
+//                                 区间则走普通随机）；威力/连击仅攻击方，防御方恒为 0
 //   关键：必须传入"本道题新生成的精灵"——与 buildSkillRng 一致，避免误用
 //   state.[side]（上一个题目 / 用户在普通计算器里选的精灵）的旧 pool。
 function buildStatsRng(side) {
-  if (!state.challenge.randomStats[side]) {
-    // 固定：从当前 state 深拷贝
-    return (_spirit) => ({
-      nature: side === 'attacker'
-        ? { ...state.attackerNature }
-        : { ...state.defenderNature },
-      ivs: side === 'attacker'
-        ? state.attackerIVs.slice()
-        : state.defenderIVs.slice(),
-      buff: side === 'attacker'
-        ? { ...state.attackerBuff }
-        : { ...state.defenderBuff },
-      speed: side === 'attacker' ? state.attackerSpeed : state.defenderSpeed,
-      // 威力 / 连击：仅攻击方有意义；防御方恒 0（其状态字段也不存在）
-      power: side === 'attacker' ? state.attackerPowerBoost : 0,
-      combo: side === 'attacker' ? state.attackerCombo : 0,
-    });
+  if (state.challenge.useMemoryStats[side]) {
+    // 记忆配置：优先从 localStorage 加载已记忆配置；无存档走随机兜底
+    return (spirit) => {
+      const saved = loadSpiritConfig(spirit.id, side);
+      if (saved) {
+        return {
+          nature: saved.nature,
+          ivs: saved.ivs,
+          buff: saved.buff,
+          speed: saved.buff.spd || 0,
+          power: side === 'attacker' ? (saved.buff.power || 0) : 0,
+          combo: side === 'attacker' ? (saved.buff.combo || 0) : 0,
+        };
+      }
+      // 无存档：走随机兜底（与 !useMemoryStats 分支共享）
+      return _randomStatsFallback(spirit, side);
+    };
   }
   // 随机：先看 spirit 的随机池，再走普通兜底
-  return (spirit) => {
-    const pool = _getRandomPool(side, spirit?.id);
-    // 1. nature + ivs（来自 pool.stats；未命中走普通随机）
-    const statsPicked = _pickFromPool(pool?.stats);
-    let nature, ivs;
-    if (statsPicked) {
-      nature = { up: statsPicked.nature.up, down: statsPicked.nature.down };
-      ivs = statsPicked.ivs.slice();
-    } else {
-      // 兜底：性格从 6 个 statKey 里抽 2 个不同（up != down）
-      const keys = STAT_KEYS.slice();
-      const upIdx = Math.floor(Math.random() * keys.length);
-      let downIdx = Math.floor(Math.random() * (keys.length - 1));
-      if (downIdx >= upIdx) downIdx += 1;
-      nature = { up: keys[upIdx], down: keys[downIdx] };
-      // 兜底：IVs 从 6 个 statKey 里抽 3 个不同
-      const ivKeys = keys.slice();
-      ivs = [];
-      for (let i = 0; i < MAX_IV; i++) {
-        const idx = Math.floor(Math.random() * ivKeys.length);
-        ivs.push(ivKeys.splice(idx, 1)[0]);
-      }
+  return (spirit) => _randomStatsFallback(spirit, side);
+}
+
+// 随机属性兜底（抽随机池 → 普通随机）
+function _randomStatsFallback(spirit, side) {
+  const pool = _getRandomPool(side, spirit?.id);
+  // 1. nature + ivs（来自 pool.stats；未命中走普通随机）
+  const statsPicked = _pickFromPool(pool?.stats);
+  let nature, ivs;
+  if (statsPicked) {
+    nature = { up: statsPicked.nature.up, down: statsPicked.nature.down };
+    ivs = statsPicked.ivs.slice();
+  } else {
+    // 兜底：性格从 6 个 statKey 里抽 2 个不同（up != down）
+    const keys = STAT_KEYS.slice();
+    const upIdx = Math.floor(Math.random() * keys.length);
+    let downIdx = Math.floor(Math.random() * (keys.length - 1));
+    if (downIdx >= upIdx) downIdx += 1;
+    nature = { up: keys[upIdx], down: keys[downIdx] };
+    // 兜底：IVs 从 6 个 statKey 里抽 3 个不同
+    const ivKeys = keys.slice();
+    ivs = [];
+    for (let i = 0; i < MAX_IV; i++) {
+      const idx = Math.floor(Math.random() * ivKeys.length);
+      ivs.push(ivKeys.splice(idx, 1)[0]);
     }
-    // 2. buff / spd / power / combo（来自 pool.buffs；未命中则全 0）
-    //    pool.buffs.combo 是 list[dict]，每个 dict 的 key 分流：
-    //      - atk / matk / def / mdef → 写入"常量 buff"对象（由 side 决定哪些 key 有效）
-    //      - spd / power / combo      → 独立字段；威力/连击仅攻击方
-    const buffPicked = _pickFromPool(pool?.buffs);
-    const buff = side === 'attacker'
-      ? { atk: 0, matk: 0 }
-      : { def: 0, mdef: 0 };
-    let spd = 0, power = 0, combo = 0;
-    if (buffPicked) {
-      for (const b of buffPicked) {
-        // 独立字段
-        if (b.spd   != null) spd = b.spd;
-        if (side === 'attacker') {
-          if (b.power != null) power = b.power;
-          if (b.combo != null) combo = b.combo;
-        }
-        // 常量 buff：从 b 复制一份去掉 spd/power/combo 的版本写入
-        const { spd: _s, power: _p, combo: _c, ...rest } = b;
-        Object.assign(buff, rest);
+  }
+  // 2. buff / spd / power / combo（来自 pool.buffs；未命中则全 0）
+  //    pool.buffs.combo 是 list[dict]，每个 dict 的 key 分流：
+  //      - atk / matk / def / mdef → 写入"常量 buff"对象（由 side 决定哪些 key 有效）
+  //      - spd / power / combo      → 独立字段；威力/连击仅攻击方
+  const buffPicked = _pickFromPool(pool?.buffs);
+  const buff = side === 'attacker'
+    ? { atk: 0, matk: 0 }
+    : { def: 0, mdef: 0 };
+  let spd = 0, power = 0, combo = 0;
+  if (buffPicked) {
+    for (const b of buffPicked) {
+      // 独立字段
+      if (b.spd   != null) spd = b.spd;
+      if (side === 'attacker') {
+        if (b.power != null) power = b.power;
+        if (b.combo != null) combo = b.combo;
       }
+      // 常量 buff：从 b 复制一份去掉 spd/power/combo 的版本写入
+      const { spd: _s, power: _p, combo: _c, ...rest } = b;
+      Object.assign(buff, rest);
     }
-    return { nature, ivs, buff, speed: spd, power, combo };
-  };
+  }
+  return { nature, ivs, buff, speed: spd, power, combo };
 }
 
 // 技能选择工厂：返回 (spirit) => 技能 id
@@ -3984,19 +3988,14 @@ function buildStatsRng(side) {
 //   因为题目池模式下（新精灵 != state.[side]）如果用 state，pool/opts
 //   兜底会从旧精灵的数据里挑，导致选出来的 id 在新精灵里查不到，
 //   applyQuestion 触发 opts[0] 兜底——看起来"必然选第一个技能"。
-// 兜底路径（"固定"分支用户技能找不到时 / "随机"分支）共享：
-//   spirit 池 → 加权随机（CHALLENGE_SKILL_WEIGHTS）
-// 攻击方：
-//   randomSkill=false (固定)：优先 state.attackSkill.id；该 id 不在新精灵可用列表
-//                            中时走兜底
-//   randomSkill=true  (随机)：直接走兜底
-// 防御方：
-//   randomSkill=false (固定)：优先 state.defenseSkill.id；找不到时按 reduction
-//                            四舍五入容差匹配；都失败走兜底
-//   randomSkill=true  (随机)：直接走兜底
+// 记忆配置分支（useMemorySkill=true）：
+//   优先从 loadSpiritConfig 加载已记忆技能 id；该 id 不在新精灵可用列表
+//   中时走兜底
+// 随机分支（useMemorySkill=false）：
+//   直接走兜底：spirit 池 → 加权随机（CHALLENGE_SKILL_WEIGHTS）
 function buildSkillRng(side) {
-  const isRandom = state.challenge.randomSkill[side];
-  // 4 个分支共享的兜底：先看 spirit 池；未命中/不合法走加权随机
+  const useMemory = state.challenge.useMemorySkill[side];
+  // 兜底：先看 spirit 池；未命中/不合法走加权随机
   const fallback = (spirit, opts, noneId) => {
     const pool = _getRandomPool(side, spirit?.id);
     const picked = _pickFromPool(pool?.skills);
@@ -4006,11 +4005,12 @@ function buildSkillRng(side) {
   };
 
   if (side === 'attacker') {
-    if (!isRandom) {
-      // 固定：先尝试用户的技能；不匹配走兜底
-      const userId = state.attackSkill?.id;
+    if (useMemory) {
+      // 记忆配置：优先从 localStorage 加载已记忆技能；不匹配走兜底
       return (attacker) => {
         const opts = getAttackSkillOptions(attacker);
+        const saved = loadSpiritConfig(attacker.id, side);
+        const userId = saved?.skillId;
         if (userId && opts.some(s => s.id === userId)) return userId;
         return fallback(attacker, opts, YUANLI_SKILLS[0].id);
       };
@@ -4022,24 +4022,18 @@ function buildSkillRng(side) {
     };
   }
   // 防御方
-  if (!isRandom) {
-    const userId = state.defenseSkill?.id;
-    const userReduction = state.defenseSkill?.reduction;
+  if (useMemory) {
+    // 记忆配置：优先从 localStorage 加载已记忆技能
     return (defender) => {
       const opts = getDefenseSkillOptions(defender);
+      const saved = loadSpiritConfig(defender.id, side);
+      const userId = saved?.skillId;
       // 1. 优先：完全相同 id
       if (userId) {
         const hit = opts.find(s => s.id === userId);
         if (hit) return hit.id;
       }
-      // 2. reduction 四舍五入容差匹配（容差=整数百分比相等）
-      if (userReduction != null) {
-        const userPct = Math.round(userReduction * 100);
-        const hit = opts.find(s => s.reduction != null
-          && Math.round(s.reduction * 100) === userPct);
-        if (hit) return hit.id;
-      }
-      // 3. 兜底：与"随机"分支共享
+      // 2. 兜底
       return fallback(defender, opts, '__none__');
     };
   }
@@ -4836,26 +4830,24 @@ function _toggleChip(chip) {
 }
 
 // 挑战模式预设配置表。
-//   easy    : 双方精灵常见 / 双方属性、技能均非随机 / 5 题
-//   standard: 双方精灵常见 / 防御方属性与技能随机 / 10 题
-//   hard    : 攻击方精灵常见 + 防御方精灵全部 / 防御方属性与技能随机 / 20 题
+//   所有预设默认不使用记忆（属性/技能均随机）。
 const CHALLENGE_PRESETS = {
   easy: {
     pool:        { attacker: 'common', defender: 'common' },
-    randomStats: { attacker: true,     defender: true     },
-    randomSkill: { attacker: true,     defender: true     },
+    useMemoryStats: { attacker: false,    defender: false    },
+    useMemorySkill: { attacker: false,    defender: false    },
     count: 5,
   },
   standard: {
     pool:        { attacker: 'common', defender: 'all'    },
-    randomStats: { attacker: true,     defender: true     },
-    randomSkill: { attacker: true,     defender: true     },
+    useMemoryStats: { attacker: false,    defender: false    },
+    useMemorySkill: { attacker: false,    defender: false    },
     count: 10,
   },
   hard: {
     pool:        { attacker: 'all',    defender: 'all'    },
-    randomStats: { attacker: true,     defender: true     },
-    randomSkill: { attacker: true,     defender: true     },
+    useMemoryStats: { attacker: false,    defender: false    },
+    useMemorySkill: { attacker: false,    defender: false    },
     count: 20,
   },
 };
@@ -4881,14 +4873,14 @@ function _syncPoolChip(side, value) {
   state.challenge.pool[side] = value;
 }
 
-// 同步单侧 random chip 视觉 + state
-function _syncRandomChip(kind, side, value) {
+// 同步单侧 memory chip 视觉 + state
+function _syncMemoryChip(kind, side, value) {
   const chip = document.querySelector(`.label-chip-group[data-kind="${kind}"][data-side="${side}"] .label-chip`);
   if (chip) {
     chip.classList.toggle('active', !!value);
     chip.setAttribute('aria-pressed', value ? 'true' : 'false');
   }
-  const key = kind === 'random-stats' ? 'randomStats' : 'randomSkill';
+  const key = kind === 'memory-stats' ? 'useMemoryStats' : 'useMemorySkill';
   state.challenge[key][side] = !!value;
 }
 
@@ -4906,8 +4898,8 @@ function _applyChallengePreset(presetName) {
   if (!cfg) return;
   for (const side of ['attacker', 'defender']) {
     _syncPoolChip(side, cfg.pool[side]);
-    _syncRandomChip('random-stats', side, cfg.randomStats[side]);
-    _syncRandomChip('random-skill', side, cfg.randomSkill[side]);
+    _syncMemoryChip('memory-stats', side, cfg.useMemoryStats[side]);
+    _syncMemoryChip('memory-skill', side, cfg.useMemorySkill[side]);
   }
   _syncCountChip(cfg.count);
 }
@@ -4967,16 +4959,16 @@ function initChallengeMode() {
     });
   });
 
-  // 侧栏 random-stats / random-skill chip（开关）
-  document.querySelectorAll('.label-chip-group[data-kind="random-stats"], .label-chip-group[data-kind="random-skill"]').forEach(group => {
+  // 侧栏 memory-stats / memory-skill chip（开关）
+  document.querySelectorAll('.label-chip-group[data-kind="memory-stats"], .label-chip-group[data-kind="memory-skill"]').forEach(group => {
     const side = group.dataset.side;        // 'attacker' | 'defender'
-    const kind = group.dataset.kind;        // 'random-stats' | 'random-skill'
+    const kind = group.dataset.kind;        // 'memory-stats' | 'memory-skill'
     const chip = group.querySelector('.label-chip');
     if (!chip) return;
     _attachLabelChipPressEffect(chip);
 
     // 初始同步
-    const key = kind === 'random-stats' ? 'randomStats' : 'randomSkill';
+    const key = kind === 'memory-stats' ? 'useMemoryStats' : 'useMemorySkill';
     chip.classList.toggle('active', state.challenge[key][side]);
     chip.setAttribute('aria-pressed', state.challenge[key][side] ? 'true' : 'false');
 
