@@ -128,23 +128,108 @@ const DEFAULT_IVS = {
 };
 
 // ============================================================
-// 按精灵 × side 维度的性格 / 个体值自动保存（localStorage）。无 UI：
-// 每次修改后写入独立的 localStorage key；下次选中同一只精灵
-// 同一侧时优先加载；若无存档则回退到该侧默认值。同一只精灵
-// 在攻击方 / 防御方各存一份独立配置，互不干扰。
+// 按精灵 × side 维度的全部可调配置自动保存（localStorage）。无 UI：
+// 每次修改任一字段（性格 / 个体 / buff / 技能）后写入一条
+// localStorage 记录；下次选中同一只精灵同一侧时整体回放。
+// 同一只精灵在攻击方 / 防御方各存一份独立配置，互不干扰。
+//
 // 存储键格式 `spirit-config:v1:<id>:<side>`：每条 entry 一个 key，
-// 读写都是 O(1)，不需要 parse / stringify 整个 store。
+// 读写都是 O(1)，不需要 parse 整个 store。
+//
+// 整条 entry 用 JSON 存：
+//   {
+//     nature:  { up: statKey|null, down: statKey|null },
+//     ivs:     [statKey, ...],
+//     buff:    { atk, matk, spd, power, combo }    // attacker
+//            | { def, mdef, spd }                  // defender
+//     skillId: string                              // 攻击 / 防御技能 id
+//   }
+// JSON 表达清晰、**自然兼容旧版"只存 nature+ivs"的格式**：
+// 解析时缺 buff / skillId 字段会自动用该侧默认值（buff 全 0、
+// skillId=""）兜底。任何字段非法 → 整条视为无效，调用方走硬重置。
 // ============================================================
 const SPIRIT_CONFIG_KEY_PREFIX = 'roco-star-dmg:spirit-config:v1:';
 const VALID_SIDES = new Set(['attacker', 'defender']);
 const VALID_STAT_KEYS = new Set(['hp', 'atk', 'matk', 'def', 'mdef', 'spd']);
 
+// power / combo 算作攻击方的"buff"（用户口径：和 atk/matk/spd 一起存）。
+// 防御方只有物防 / 魔防 / 速度。返回新对象避免共享引用。
+function _defaultBuff(side) {
+  if (side === 'attacker') {
+    return { atk: 0, matk: 0, spd: 0, power: 0, combo: 0 };
+  }
+  return { def: 0, mdef: 0, spd: 0 };
+}
+
 function _spiritConfigKey(id, side) {
   return SPIRIT_CONFIG_KEY_PREFIX + id + ':' + side;
 }
 
-// 返回 { nature: {up, down}, ivs: [statKey,...] }；无存档或数据
-// 不合法时返回 null。
+// 序列化：entry = { nature, ivs, buff, skillId }
+function _serializeSpiritConfig(entry) {
+  // side 决定 buff 字段集合。entry.buff 缺字段时由 _defaultBuff 补全。
+  // 这里拿不到 side —— 调用方 _saveSpiritConfig(id, side, entry) 已知 side，
+  // 但 _serializeSpiritConfig 是纯函数；约定 entry.buff 已经按 side 构造好。
+  return JSON.stringify({
+    nature:  entry.nature || { up: null, down: null },
+    ivs:     Array.isArray(entry.ivs) ? entry.ivs : [],
+    buff:    entry.buff || {},
+    skillId: typeof entry.skillId === 'string' ? entry.skillId : '',
+  });
+}
+
+// 反序列化：任意字段非法 → 整条 null。
+// 向后兼容：旧数据只有 {nature, ivs} —— 缺 buff → 用 _defaultBuff(side)
+// 补全；缺 skillId → ''。加载时会把旧存档"自然升档"为新格式。
+function _parseSpiritConfig(raw, side) {
+  let entry;
+  try {
+    entry = JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+  if (!entry || typeof entry !== 'object') return null;
+
+  // nature
+  const natureRaw = entry.nature;
+  if (!natureRaw || typeof natureRaw !== 'object') return null;
+  const up   = VALID_STAT_KEYS.has(natureRaw.up)   ? natureRaw.up   : null;
+  const down = VALID_STAT_KEYS.has(natureRaw.down) ? natureRaw.down : null;
+  if (up && up === down) return null;
+
+  // ivs
+  const ivsRaw = Array.isArray(entry.ivs) ? entry.ivs : null;
+  if (!ivsRaw) return null;
+  const ivs = [];
+  for (const k of ivsRaw) {
+    if (VALID_STAT_KEYS.has(k) && ivs.length < MAX_IV && !ivs.includes(k)) {
+      ivs.push(k);
+    }
+  }
+
+  // buff —— 旧数据无此字段 → 用该侧默认全 0 补全
+  const buff = _defaultBuff(side);
+  if (entry.buff && typeof entry.buff === 'object') {
+    for (const k of Object.keys(buff)) {
+      const v = entry.buff[k];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        buff[k] = v;
+      }
+    }
+  }
+
+  // skillId —— 旧数据无此字段 → 空串
+  const skillId = typeof entry.skillId === 'string' ? entry.skillId : '';
+
+  return {
+    nature: { up, down },
+    ivs,
+    buff,
+    skillId
+  };
+}
+
+// 返回完整 entry（含 nature/ivs/buff/skillId）；无存档或数据不合法时返回 null。
 function loadSpiritConfig(id, side) {
   if (!id || !VALID_SIDES.has(side)) return null;
   let raw;
@@ -154,39 +239,47 @@ function loadSpiritConfig(id, side) {
     return null;
   }
   if (!raw) return null;
-  let entry;
-  try {
-    entry = JSON.parse(raw);
-  } catch (_) {
-    return null;
-  }
-  if (!entry || typeof entry !== 'object') return null;
-  const natureRaw = entry.nature;
-  if (!natureRaw || typeof natureRaw !== 'object') return null;
-  const up   = VALID_STAT_KEYS.has(natureRaw.up)   ? natureRaw.up   : null;
-  const down = VALID_STAT_KEYS.has(natureRaw.down) ? natureRaw.down : null;
-  // 合法性格要求 up ≠ down（两者都可为 null 表示"未设置"）。
-  if (up && up === down) return null;
-  const ivsRaw = Array.isArray(entry.ivs) ? entry.ivs : null;
-  if (!ivsRaw) return null;
-  const ivs = [];
-  for (const k of ivsRaw) {
-    if (VALID_STAT_KEYS.has(k) && ivs.length < MAX_IV && !ivs.includes(k)) {
-      ivs.push(k);
-    }
-  }
-  return { nature: { up, down }, ivs };
+  return _parseSpiritConfig(raw, side);
 }
 
-function saveSpiritConfig(id, side, nature, ivs) {
+function _saveSpiritConfig(id, side, entry) {
   if (!id || !VALID_SIDES.has(side)) return;
-  const entry = {
-    nature: { up: nature.up ?? null, down: nature.down ?? null },
-    ivs: ivs.slice()
-  };
   try {
-    localStorage.setItem(_spiritConfigKey(id, side), JSON.stringify(entry));
+    localStorage.setItem(_spiritConfigKey(id, side), _serializeSpiritConfig(entry));
   } catch (_) { /* 配额超限 / 存储被禁用 —— 静默忽略 */ }
+}
+
+// 把 state 当前 side 的全部可调配置打包写入 localStorage。
+// 未选精灵时为 no-op。所有改 chip / 改技能 / 改性格 / 改个体
+// 的入口都走这里，确保一条 entry 永远包含"该侧全部状态"。
+function saveSpiritConfig(side) {
+  const id = state[side] && state[side].id;
+  if (!id) return;
+  if (side === 'attacker') {
+    _saveSpiritConfig(id, 'attacker', {
+      nature:  { up: state.attackerNature.up, down: state.attackerNature.down },
+      ivs:     state.attackerIVs.slice(),
+      buff:    {
+        atk:   state.attackerBuff.atk,
+        matk:  state.attackerBuff.matk,
+        spd:   state.attackerSpeed,
+        power: state.attackerPowerBoost,
+        combo: state.attackerCombo,
+      },
+      skillId: state.attackSkill ? state.attackSkill.id : '',
+    });
+  } else {
+    _saveSpiritConfig(id, 'defender', {
+      nature:  { up: state.defenderNature.up, down: state.defenderNature.down },
+      ivs:     state.defenderIVs.slice(),
+      buff:    {
+        def:   state.defenderBuff.def,
+        mdef:  state.defenderBuff.mdef,
+        spd:   state.defenderSpeed,
+      },
+      skillId: state.defenseSkill ? state.defenseSkill.id : '',
+    });
+  }
 }
 
 let state = {
@@ -1441,54 +1534,83 @@ function selectSpirit(side, id) {
   const spirit = { id, ...s };
   if (side === 'attacker') {
     state.attacker = spirit;
+    // 加载该精灵攻击方侧的全部可调配置（性格/个体/buff/skill）。
+    // 命中存档则整体回放；未命中则走默认（性格默认 + 个体默认 +
+    // buff 全 0 + 第一个技能）。每条 entry 包含该侧所有可调字段，
+    // 保证"读到的就是该精灵在此侧的全部设置"。
     const opts = getAttackSkillOptions(spirit);
-    state.attackSkill = opts[0] || null;
-    state.attackSkillIdx = state.attackSkill ? 0 : -1;
-    // 应用攻击方的性格 / 个体值（若该精灵在该侧有本地存档则优先加载）
     const savedA = loadSpiritConfig(id, 'attacker');
     if (savedA) {
       state.attackerNature = { up: savedA.nature.up, down: savedA.nature.down };
       state.attackerIVs    = savedA.ivs.slice();
+      state.attackerBuff   = { atk: savedA.buff.atk || 0, matk: savedA.buff.matk || 0 };
+      state.attackerSpeed  = savedA.buff.spd   || 0;
+      state.attackerPowerBoost = savedA.buff.power || 0;
+      state.attackerCombo  = savedA.buff.combo || 0;
+      // 技能 id 可能因精灵 / 数据更新失效，找不到对应 idx 就回退到第一个
+      const restoredIdx = savedA.skillId
+        ? opts.findIndex(sk => sk.id === savedA.skillId)
+        : -1;
+      if (restoredIdx >= 0) {
+        state.attackSkill    = opts[restoredIdx];
+        state.attackSkillIdx = restoredIdx;
+      } else {
+        state.attackSkill    = opts[0] || null;
+        state.attackSkillIdx = state.attackSkill ? 0 : -1;
+      }
     } else {
-      state.attackerNature = { ...DEFAULT_NATURE.attacker };
-      state.attackerIVs    = DEFAULT_IVS.attacker.slice();
+      state.attackerNature     = { ...DEFAULT_NATURE.attacker };
+      state.attackerIVs        = DEFAULT_IVS.attacker.slice();
+      state.attackerBuff       = { atk: 0, matk: 0 };
+      state.attackerSpeed      = 0;
+      state.attackerPowerBoost = 0;
+      state.attackerCombo      = 0;
+      state.attackSkill        = opts[0] || null;
+      state.attackSkillIdx     = state.attackSkill ? 0 : -1;
     }
-    // Reset attacker buffs on spirit change
-    state.attackerBuff   = { atk: 0, matk: 0 };
-    // Reset 威力 chip value
-    state.attackerPowerBoost = 0;
-    // Reset 连击数 chip value
-    state.attackerCombo = 0;
-    // Reset 速度 chip values on both sides
-    state.attackerSpeed = 0;
-    state.defenderSpeed = 0;
     state.spiritPicking.attacker = false;
     renderSpiritArea('attacker');
-    // 速度 chip is always shown on both sides, so re-render the
-    // defender's chips too (the displayed value is unchanged, but
-    // the click handlers were rebuilt when the chip was cleared).
+    // 攻击方精灵换 → 重新渲 attack skill 列表（active 高亮 / 状态）
+    renderSkills('attacker');
+    // 重新渲 power / combo chip（新值）
+    renderPowerBoostChip();
+    // 速度 chip 总是双方显示，攻击方换了也要把 defender chip 重建
+    // （chip 元素的 click handler 跟着重建，defender 自己的值不受影响）。
     renderBuffChips('defender');
   } else if (side === 'defender') {
     state.defender = spirit;
+    // 加载该精灵防御方侧的全部可调配置（性格/个体/buff/skill）。
     const opts = getDefenseSkillOptions(spirit);
-    state.defenseSkill = opts[0]; // "无"
-    state.defenseSkillIdx = 0;
-    // 应用防御方的性格 / 个体值（若该精灵在该侧有本地存档则优先加载）
     const savedD = loadSpiritConfig(id, 'defender');
     if (savedD) {
       state.defenderNature = { up: savedD.nature.up, down: savedD.nature.down };
       state.defenderIVs    = savedD.ivs.slice();
+      state.defenderBuff   = { def: savedD.buff.def || 0, mdef: savedD.buff.mdef || 0 };
+      state.defenderSpeed  = savedD.buff.spd   || 0;
+      // 防御方第一项是 "无"（id='__none__'），不传 skillId 时默认 0
+      const restoredIdx = savedD.skillId
+        ? opts.findIndex(sk => sk.id === savedD.skillId)
+        : -1;
+      if (restoredIdx >= 0) {
+        state.defenseSkill    = opts[restoredIdx];
+        state.defenseSkillIdx = restoredIdx;
+      } else {
+        state.defenseSkill    = opts[0]; // "无"
+        state.defenseSkillIdx = 0;
+      }
     } else {
       state.defenderNature = { ...DEFAULT_NATURE.defender };
       state.defenderIVs    = DEFAULT_IVS.defender.slice();
+      state.defenderBuff   = { def: 0, mdef: 0 };
+      state.defenderSpeed  = 0;
+      state.defenseSkill    = opts[0]; // "无"
+      state.defenseSkillIdx = 0;
     }
-    // Reset defender buffs on spirit change
-    state.defenderBuff   = { def: 0, mdef: 0 };
-    // Reset defender 速度 chip value (should not carry over to a new pet).
-    state.defenderSpeed = 0;
     state.spiritPicking.defender = false;
     renderSpiritArea('defender');
-    // Defender changed → attacker's power-badge colors need to refresh
+    // 重新渲 defender 的 skill 列表（active 高亮 / 状态）
+    renderSkills('defender');
+    // 防御方精灵换 → 攻击方 power-badge 颜色依赖防御方减伤率，需刷新
     if (state.attacker) renderSkills('attacker');
   }
   calculateDamage();
@@ -1581,9 +1703,8 @@ function onNatureSlotClick(side, statKey, ev) {
     }
   }
   setNature(side, nature);
-  // 写入该精灵该侧的性格 / 个体值存档（未选精灵时为 no-op）。
-  const id = state[side] && state[side].id;
-  if (id) saveSpiritConfig(id, side, getNature(side), getIVs(side));
+  // 持久化整个 side 的可调配置（性格 / 个体 / buff / 技能）。
+  saveSpiritConfig(side);
   renderStatsConfig(side);
   calculateDamage();
 }
@@ -1600,9 +1721,8 @@ function onIVSlotClick(side, statKey, ev) {
     ivs.push(statKey);
   }
   setIVs(side, ivs);
-  // 写入该精灵该侧的性格 / 个体值存档（未选精灵时为 no-op）。
-  const id = state[side] && state[side].id;
-  if (id) saveSpiritConfig(id, side, getNature(side), getIVs(side));
+  // 持久化整个 side 的可调配置（性格 / 个体 / buff / 技能）。
+  saveSpiritConfig(side);
   renderStatsConfig(side);
   calculateDamage();
 }
@@ -1619,6 +1739,17 @@ function onIVSlotClick(side, statKey, ev) {
 // Two callers in this file:
 //   - BUFF CHIP:        continuous pct, range [-990, 990], step 10
 //   - POWER-BOOST CHIP: discrete-level step (40 or 20), range [0, 990]
+//
+// Lifecycle hooks (called in this order during a press-drag-release):
+//   onChange  : each onMove + onWheel + onDbl — runs on every value
+//               change during the gesture; used for live re-render /
+//               damage recalc. NEVER for persistence (too noisy during
+//               drag — could fire dozens of times per second).
+//   onCommit  : once on onUp + onWheel + onDbl — runs once per
+//               "completed user operation" (gesture end / discrete
+//               wheel tick / reset). Used for localStorage writes.
+//               onMove deliberately does NOT call onCommit, so a long
+//               drag only triggers one save at pointerup.
 // ============================================================
 function attachChipDrag(chip, opts) {
   const {
@@ -1630,7 +1761,8 @@ function attachChipDrag(chip, opts) {
     dragValue,         // (dx, startVal, startExtra) => newVal | null
     wheelValue,        // (curVal, dirMult) => newVal | null
     reset,             // () => void  (writes 0, full re-render)
-    onChange,          // () => void  (e.g. calculateDamage)
+    onChange,          // () => void  (e.g. calculateDamage, fires on every step)
+    onCommit,          // () => void  (e.g. localStorage write, fires on gesture end)
   } = opts;
   let drag = null;
 
@@ -1657,13 +1789,17 @@ function attachChipDrag(chip, opts) {
     if (newVal == null || newVal === getVal()) return;
     setVal(newVal);
     applyLive(newVal);
+    // 拖动中：仅实时算伤害，**不**触发持久化（避免高频 localStorage 写入）。
     onChange && onChange();
   }
   function onUp(e) {
     if (!drag || e.pointerId !== drag.pointerId) return;
     try { chip.releasePointerCapture(e.pointerId); } catch (_) {}
     chip.classList.remove('dragging');
+    const wasDragging = drag;
     drag = null;
+    // 拖动结束：仅在这次手势期间值发生过变化时才提交，避免无意义的空写。
+    if (wasDragging && onCommit) onCommit();
   }
   function onWheel(e) {
     e.preventDefault();
@@ -1672,7 +1808,9 @@ function attachChipDrag(chip, opts) {
     if (newVal == null || newVal === getVal()) return;
     setVal(newVal);
     applyLive(newVal);
+    // 滚轮是离散、一步一格的输入：每次都立即算 + 立即保存。
     onChange && onChange();
+    onCommit && onCommit();
   }
   function onDbl(e) {
     e.stopPropagation();
@@ -1680,6 +1818,8 @@ function attachChipDrag(chip, opts) {
     if (getVal() === 0) return;
     reset();
     onChange && onChange();
+    // 双击重置：算 + 保存。
+    onCommit && onCommit();
   }
 
   chip.addEventListener('pointerdown',   onDown);
@@ -1748,6 +1888,7 @@ function renderBuffChips(side) {
       },
       reset: () => { setSpeed(side, 0); renderBuffChips(side); },
       onChange: calculateDamage,
+      onCommit: () => saveSpiritConfig(side),
     });
   }
 
@@ -1768,6 +1909,7 @@ function renderBuffChips(side) {
       },
       reset: () => { setBuff(side, c.key, 0); renderBuffChips(side); },
       onChange: calculateDamage,
+      onCommit: () => saveSpiritConfig(side),
     });
   }
 }
@@ -1863,6 +2005,7 @@ function renderPowerBoostChip() {
       },
       reset: () => { state.attackerCombo = 0; renderPowerBoostChip(); },
       onChange: calculateDamage,
+      onCommit: () => saveSpiritConfig('attacker'),
     });
   }
 
@@ -1882,6 +2025,7 @@ function renderPowerBoostChip() {
       },
       reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
       onChange: calculateDamage,
+      onCommit: () => saveSpiritConfig('attacker'),
     });
   }
 }
@@ -2065,6 +2209,8 @@ function selectAttackSkill(idx) {
   state.attackSkillIdx = idx;
   state.attackSkill = opts[idx];
   _setActiveSkill('attacker', prevIdx, idx);
+  // 持久化整个 attacker 侧的可调配置（含新选的技能 id）。
+  saveSpiritConfig('attacker');
   calculateDamage();
 }
 function selectDefenseSkill(idx) {
@@ -2076,6 +2222,8 @@ function selectDefenseSkill(idx) {
   state.defenseSkillIdx = idx;
   state.defenseSkill = opts[idx];
   _setActiveSkill('defender', prevIdx, idx);
+  // 持久化整个 defender 侧的可调配置（含新选的技能 id）。
+  saveSpiritConfig('defender');
   calculateDamage();
 }
 
@@ -3119,6 +3267,12 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>buff / 技能自动保存 <span class="modal-date">· 2026-07-22</span></h3>
+      <ul>
+        <li>现在为每只精灵的 buff（双攻 / 双防 / 速度 / 威力 / 连击）和所选技能启用与性格 / 个体一致的自动保存：每次调整后写入 localStorage，下次选择同一只精灵时整体回放。</li>
+        <li>切换精灵时，buff 和技能会从该精灵的存档中恢复；调整 / 切换后无需再"从零开始"。</li>
+      </ul>
+      <hr>
       <h3>挑战模式 <span class="modal-date">· 2026-07-21</span></h3>
       <ul>
         <li>挑战模式上线：这是一个考验你对星陨斩杀线的把握，辅助记忆斩杀线的小游戏。</li>
