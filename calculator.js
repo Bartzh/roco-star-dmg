@@ -3009,9 +3009,10 @@ function updateMobileResultBar(data) {
   const fill = document.getElementById('mobile-result-bar-fill');
   const pctEl = document.getElementById('mobile-result-pct');
   const dmgEl = document.getElementById('mobile-result-dmg');
-  const infoEl = document.getElementById('mobile-result-info-mob');
+  const chipsEl = document.getElementById('mobile-result-chips-mob');
+  const lineEl = document.getElementById('mobile-result-line-mob');
 
-  if (!fill || !pctEl || !dmgEl || !infoEl) return;
+  if (!fill || !pctEl || !dmgEl || !chipsEl || !lineEl) return;
 
   if (data === null) {
     // waiting 态：清空
@@ -3021,7 +3022,8 @@ function updateMobileResultBar(data) {
     pctEl.textContent = '—';
     pctEl.style.textShadow = 'none';
     dmgEl.textContent = '—';
-    infoEl.innerHTML = '<span class="result-waiting-mini">选择双方精灵开始计算</span>';
+    chipsEl.innerHTML = '';
+    lineEl.innerHTML = '<span class="mobile-result-waiting">选择双方精灵开始计算</span>';
     return;
   }
 
@@ -3033,7 +3035,8 @@ function updateMobileResultBar(data) {
     pctEl.textContent = '—';
     pctEl.style.textShadow = 'none';
     dmgEl.textContent = '—';
-    infoEl.innerHTML = `<span class="result-waiting-mini">${data._waitingMsg}</span>`;
+    chipsEl.innerHTML = '';
+    lineEl.innerHTML = `<span class="mobile-result-waiting">${data._waitingMsg}</span>`;
     return;
   }
 
@@ -3052,7 +3055,7 @@ function updateMobileResultBar(data) {
   pctEl.style.textShadow = `0 0 12px ${barColor}`;
   dmgEl.textContent = data.finalDamage.toLocaleString();
 
-  // info 行：克制/抵抗 chip + 技能/星陨伤害
+  // chips 行：克制/抵抗（始终占位，防止抖动）
   let chipsHTML = '';
   const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
   if (data.skillEff > 1) {
@@ -3071,8 +3074,10 @@ function updateMobileResultBar(data) {
   if (data.isKill) {
     chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
   }
-  const dmgLine = `<span class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></span>`;
-  infoEl.innerHTML = chipsHTML + dmgLine;
+  chipsEl.innerHTML = chipsHTML;
+
+  // 伤害明细行
+  lineEl.innerHTML = `技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong>`;
 }
 
 function renderBreakdownList(breakdownList, data) {

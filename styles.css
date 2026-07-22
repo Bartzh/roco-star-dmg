@@ -900,6 +900,20 @@ body {
 .mobile-result-bar {
   display: none;   /* 桌面端隐藏，移动端 media query 中覆盖 */
 }
+.mobile-result-chips {
+  min-height: 24px;   /* 始终占位，防止芯片行出现/消失导致抖动 */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+.mobile-result-line {
+  min-height: 18px;   /* 始终占位，防止伤害行出现/消失导致抖动 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* ============ Result Ring (lower half, mirrors the seal ring) ============ */
 .result-label {
@@ -1673,6 +1687,8 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
+    /* 防止等待态→计算态切换时高度抖动 */
+    min-height: 80px;
   }
   .mobile-result-bar-track {
     width: 100%;
@@ -1711,16 +1727,11 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     letter-spacing: 0.5px;
   }
   .mobile-result-info {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    text-align: center;
-    letter-spacing: 0.5px;
-    min-height: 20px;
+    width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
   }
   .mobile-result-info .result-chip {
     padding: 1px 7px;
@@ -1748,20 +1759,21 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     border-color: rgba(255,59,59,0.4);
     color: var(--accent-red);
   }
-  .mobile-result-info .result-dmg-line {
+  .mobile-result-line {
     font-size: 0.65rem;
     font-family: var(--font-mono);
-    white-space: nowrap;
+    color: var(--text-secondary);
     letter-spacing: 0.2px;
+    white-space: nowrap;
   }
-  .mobile-result-info .result-dmg-line strong {
+  .mobile-result-line strong {
     color: var(--text-primary);
     font-weight: 700;
   }
-  .mobile-result-info .result-dmg-line .star-val {
+  .mobile-result-line .star-val {
     color: var(--accent-gold);
   }
-  .mobile-result-info .result-waiting-mini {
+  .mobile-result-waiting {
     color: var(--text-secondary);
     font-size: 0.7rem;
     letter-spacing: 0.5px;
@@ -1772,37 +1784,48 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .battle-area {
     display: block;   /* 覆盖桌面端 grid，由 carousel 接管布局 */
     gap: 0;
-    margin-bottom: 16px;
+    margin: 0 -16px 16px;     /* 负 margin 抵消 .container 的 padding，让 carousel 贴边屏幕 */
+    width: calc(100% + 32px);
   }
   .battle-carousel {
     display: flex;
     overflow-x: auto;
+    overflow-y: clip;          /* clip 不创建滚动区域，避免 iOS Safari 裁剪 fixed 背景 */
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;          /* Firefox 隐藏滚动条 */
+    scrollbar-width: none;     /* Firefox 隐藏滚动条 */
     gap: 0;
-    /* 左右各留出一点 padding 让 snap 后的面板不贴边 */
-    /* padding: 0 8px; */
+    /* 上下留 50px 给星陨发光效果（box-shadow + particle canvas）延伸空间 */
+    padding: 50px 0;
+    /* 左右留 16px 让 snap 后面板内容不贴屏幕边缘 */
+    padding-left: 16px;
+    padding-right: 16px;
+    scroll-padding: 0 16px;   /* snap 吸附点对齐到 padding 内边缘 */
   }
   .battle-carousel::-webkit-scrollbar { display: none; }
 
   .battle-carousel > * {
-    flex: 0 0 100%;
+    flex: 0 0 calc(100% - 32px);   /* 减去左右 scroll-padding，每个面板恰好占满可视区 */
     min-width: 0;
     scroll-snap-align: start;
   }
 
-  /* carousel 内的 seal-container：宽度撑满、居中 */
+  /* carousel 内的 seal-container：宽度撑满、内容垂直居中 */
   .seal-container {
     width: 100%;
     min-width: 0;
     height: auto;
-    justify-self: auto;   /* 不再是 grid 子项，无需 justify-self */
+    justify-self: auto;          /* 不再是 grid 子项，无需 justify-self */
+    justify-content: center;     /* 星陨圆环 + 滑块在容器中垂直居中 */
   }
   .seal-top, .result-bottom {
     flex: 0 0 auto;
     min-height: 0;
     padding: 4px 0;
+  }
+  /* 移动端：桌面端圆形伤害环隐藏，由顶部横向进度条替代 */
+  .result-bottom {
+    display: none !important;    /* !important 覆盖 challenge-running 的 display:flex */
   }
   .seal-label { margin-bottom: 16px; }
   .seal-middle { padding: 14px 0 4px 0; }
@@ -1869,10 +1892,6 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .challenge-start-btn { font-size: 0.78rem; padding: 8px 22px; }
   body.challenge-mode .seal-container {
     min-height: 400px;
-  }
-  /* 挑战模式（设置阶段）：移动端结果条隐藏 */
-  body.challenge-mode .mobile-result-bar {
-    display: none;
   }
 }
 
