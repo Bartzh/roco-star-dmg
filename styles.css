@@ -781,9 +781,6 @@ body {
   -webkit-user-select: none;
   border-radius: 50%;
   transition: filter 0.3s ease;
-  /* 移动端 carousel 中，防止星陨拖拽被横向滑动拦截。
-     如需允许 carousel 滑动与星陨拖拽共存，可移除此行实测。 */
-  touch-action: none;
 }
 .seal-wrapper canvas {
   position: absolute;
@@ -1802,8 +1799,11 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     margin-right: 0;               /* 最后一项不需要右侧间距（::after 补足） */
   }
 
-  /* carousel 内的 seal-container：内容垂直居中 */
+  /* carousel 内的 seal-container：让 flex stretch 生效并内容垂直居中 */
   .seal-container {
+    width: auto;                 /* 覆盖 base 的 width:240px，由 flex-basis 接管 */
+    min-width: 0;                /* 覆盖 base 的 min-width:240px */
+    height: auto;                /* 覆盖 base 的 height:100%，允许 flex stretch 撑高 */
     justify-content: center;     /* 星陨圆环 + 滑块在容器中垂直居中 */
   }
   .seal-top, .result-bottom {
