@@ -1657,19 +1657,17 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  /* --- 移动端结果条：横向进度条替代圆形伤害环，置于页面顶部 --- */
+  /* --- 移动端结果条：横向进度条替代圆形伤害环，置于伤害计算明细上方 ---
+     无背景面板：进度条 + 数字 + 克制/抵抗信息直接浮在页面上。 */
   .mobile-result-bar {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    padding: 8px 0 0;
+    margin: 16px 0 0;
+    background: none;
+    border: none;
     /* 防止等待态→计算态切换时高度抖动 */
     min-height: 80px;
   }

@@ -101,19 +101,8 @@
     <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled aria-hidden="true">提交答案</button>
   </section>
 
-  <!-- 移动端伤害结果条：桌面端隐藏，移动端置于页面顶部。
+  <!-- 移动端伤害结果条：桌面端隐藏，移动端置于伤害计算明细上方（去掉背景面板）。
        用横向进度条替代圆形伤害环，显示百分比 + 伤害数值 + 克制/抵抗信息。 -->
-  <div class="mobile-result-bar" id="mobile-result-bar" aria-hidden="true">
-    <div class="mobile-result-bar-track">
-      <div class="mobile-result-bar-fill" id="mobile-result-bar-fill"></div>
-    </div>
-    <div class="mobile-result-bar-stats">
-      <span class="mobile-result-pct" id="mobile-result-pct">—</span>
-      <span class="mobile-result-dmg" id="mobile-result-dmg">—</span>
-    </div>
-    <div class="mobile-result-info" id="mobile-result-info-mob"></div>
-  </div>
-
   <section class="battle-area" aria-label="对战配置区">
     <div class="battle-carousel">
     <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方">
@@ -274,6 +263,18 @@
     </section>
     </div><!-- .battle-carousel -->
   </section>
+
+  <!-- 移动端伤害结果条：桌面端隐藏，移动端置于伤害计算明细上方（去掉背景面板）。 -->
+  <div class="mobile-result-bar" id="mobile-result-bar" aria-hidden="true">
+    <div class="mobile-result-bar-track">
+      <div class="mobile-result-bar-fill" id="mobile-result-bar-fill"></div>
+    </div>
+    <div class="mobile-result-bar-stats">
+      <span class="mobile-result-pct" id="mobile-result-pct">—</span>
+      <span class="mobile-result-dmg" id="mobile-result-dmg">—</span>
+    </div>
+    <div class="mobile-result-info" id="mobile-result-info-mob"></div>
+  </div>
 
   <section class="breakdown-section" id="breakdown-section" style="display:none" aria-label="伤害计算明细">
     <button class="breakdown-toggle" id="breakdown-toggle" type="button" onclick="toggleBreakdown()" aria-expanded="false" aria-controls="breakdown-content">
