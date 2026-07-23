@@ -984,7 +984,13 @@ function initSealInteraction() {
   let isDragging = false;
   let startX = 0;
   let startLayer = 0;
+
+  // 挑战模式下星陨圆盘被 .challenge-locked 遮罩覆盖；
+  // 由于伪元素事件会冒泡到宿主元素，必须显式检查锁定状态，避免拖拽/滚轮/双击仍生效。
+  const isLocked = () => wrapper && wrapper.classList.contains('challenge-locked');
+
   wrapper.addEventListener('mousedown', (e) => {
+    if (isLocked()) return;
     isDragging = true;
     startX = e.clientX;
     startLayer = state.starLayer;
@@ -992,7 +998,7 @@ function initSealInteraction() {
     e.preventDefault();
   });
   document.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
+    if (!isDragging || isLocked()) return;
     const dx = e.clientX - startX;
     const newLayer = Math.max(0, Math.min(99, startLayer + Math.round(dx / 4)));
     setStarLayer(newLayer);
@@ -1002,27 +1008,33 @@ function initSealInteraction() {
     document.body.style.cursor = '';
   });
   wrapper.addEventListener('touchstart', (e) => {
+    if (isLocked()) return;
     isDragging = true;
     startX = e.touches[0].clientX;
     startLayer = state.starLayer;
     e.preventDefault();
   }, { passive: false });
   document.addEventListener('touchmove', (e) => {
-    if (!isDragging) return;
+    if (!isDragging || isLocked()) return;
     const dx = e.touches[0].clientX - startX;
     const newLayer = Math.max(0, Math.min(99, startLayer + Math.round(dx / 4)));
     setStarLayer(newLayer);
   }, { passive: false });
   document.addEventListener('touchend', () => { isDragging = false; });
   wrapper.addEventListener('wheel', (e) => {
+    if (isLocked()) return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -1 : 1;
     setStarLayer(Math.max(0, Math.min(99, state.starLayer + delta)));
   }, { passive: false });
   slider.addEventListener('input', (e) => {
+    if (isLocked()) return;
     setStarLayer(parseInt(e.target.value));
   });
-  wrapper.addEventListener('dblclick', () => { setStarLayer(0); });
+  wrapper.addEventListener('dblclick', () => {
+    if (isLocked()) return;
+    setStarLayer(0);
+  });
 }
 
 function setStarLayer(value) {
