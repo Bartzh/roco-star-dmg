@@ -1684,8 +1684,6 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     margin: 16px 0 0;
     background: none;
     border: none;
-    /* 防止等待态→计算态切换时高度抖动 */
-    min-height: 80px;
   }
   .mobile-result-bar-track {
     width: 100%;
@@ -1845,7 +1843,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .seal-number { font-size: 2.2rem; }
   .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
   .container { padding: 20px 16px 40px; }
-  .breakdown-section { margin: 16px 0 0; }
+  .breakdown-section { margin: 0; }
   /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills
      移动端滚动条是 overlay（不占空间），桌面端 `margin-right: -8px` + `scrollbar-gutter: stable`
      的抵消关系在移动端失效（gutter 实际为 0），会让 grid 右边缘比 spirit-card / stats-grid /
