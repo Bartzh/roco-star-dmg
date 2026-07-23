@@ -1833,7 +1833,12 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     display: none !important;    /* !important 覆盖 challenge-running 的 display:flex */
   }
   .seal-label { margin-bottom: 16px; }
-  .seal-middle { padding: 14px 0 4px 0; }
+  .seal-middle { padding: 38px 0 4px 0; }
+  .challenge-answer-result {
+    padding: 24px 0 4px 0;
+  }
+  /* 移动端：防止宽度不够装不下。 */
+  .challenge-progress-info { font-size: 0.6rem; letter-spacing: 0px; }
   .spirit-panel { min-height: auto; }
   .result-ring-wrap { width: 160px; height: 160px; }
   .result-pct { font-size: 1.5rem; }
