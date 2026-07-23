@@ -1832,7 +1832,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .result-bottom {
     display: none !important;    /* !important 覆盖 challenge-running 的 display:flex */
   }
-  .seal-label { margin-bottom: 16px; }
+  .seal-label { margin-bottom: 36px; }
   .seal-middle { padding: 38px 0 4px 0; }
   .challenge-answer-result {
     padding: 24px 0 4px 0;
