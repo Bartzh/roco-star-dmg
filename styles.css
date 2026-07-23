@@ -1680,10 +1680,15 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   }
   .mobile-result-bar-fill {
     height: 100%;
-    width: 0%;
+    width: 100%;                                /* 占满轨道，实际显示宽度由 transform 控制 */
     background: var(--hp-bar-color, var(--accent-green));
     border-radius: 4px;
-    transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform: scaleX(0);                       /* GPU 加速的宽度变化，避免 iOS Safari width 过渡残留色块 */
+    transform-origin: left center;
+    will-change: transform;                     /* 提示浏览器保持单独合成层 */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 background 0.5s ease;
     filter: drop-shadow(0 0 6px var(--hp-bar-color, var(--accent-green)));
   }

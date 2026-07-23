@@ -3015,7 +3015,7 @@ function updateMobileResultBar(data) {
 
   if (data === null) {
     // waiting 态：清空
-    fill.style.width = '0%';
+    fill.style.transform = 'scaleX(0)';
     fill.style.background = 'rgba(255,255,255,0.1)';
     fill.style.filter = 'none';
     pctEl.textContent = '—';
@@ -3027,7 +3027,7 @@ function updateMobileResultBar(data) {
 
   if (data._waitingMsg) {
     // renderWaiting 带自定义文案（如"提交答案后计算结果"）
-    fill.style.width = '0%';
+    fill.style.transform = 'scaleX(0)';
     fill.style.background = 'rgba(255,255,255,0.1)';
     fill.style.filter = 'none';
     pctEl.textContent = '—';
@@ -3040,9 +3040,9 @@ function updateMobileResultBar(data) {
   const barColor = ringBarColor(data);
   document.documentElement.style.setProperty('--hp-bar-color', barColor);
 
-  // 进度条宽度
+  // 进度条宽度（使用 transform: scaleX 做 GPU 加速动画，避免 iOS Safari 残留色块）
   const damageRatio = Math.min(data.hpPercent, 100) / 100;
-  fill.style.width = (damageRatio * 100) + '%';
+  fill.style.transform = `scaleX(${damageRatio})`;
   fill.style.background = barColor;
   fill.style.filter = `drop-shadow(0 0 6px ${barColor})`;
 
