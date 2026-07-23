@@ -3366,9 +3366,17 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>移动端布局优化 <span class="modal-date">· 2026-07-23</span></h3>
+      <ul>
+        <li>优化了移动端的布局，现在可以通过左右滑动来在攻击方、星陨层数、防御方之间切换，而非之前的竖向布局。</li>
+        <li>伤害结果从圆环改为横向进度条，避免占据过多空间，且始终在底部显示。</li>
+        <li>移动端下的各种细节优化和修复。</li>
+      </ul>
+      <hr>
       <h3>buff / 技能自动记忆 <span class="modal-date">· 2026-07-22</span></h3>
       <ul>
         <li>作为之前性格个体自动记忆的补充：现在为每只精灵的 buff 和所选技能自动记忆，下次选择同一只精灵时会自动使用记忆配置。</li>
+        <li>以及其它各种视觉效果优化和修复。</li>
       </ul>
       <hr>
       <h3>挑战模式 <span class="modal-date">· 2026-07-21</span></h3>
