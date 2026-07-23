@@ -246,18 +246,17 @@ body {
    右边框能精确贴齐 toolbar 的右边框。滚动条本身仍画在内层的右内边缘
    （即外层右内边缘缩进 7px 处），宽度未变，视觉上只是位置向右挪了 7px。
    做法与 .skill-list / .skill-list-inner 一致（2026-07-21）。
-   注意：外层必须用显式 `height: 447px`（不能只写 min/max-height），否则
-   内层 `height: 100%` 拿不到确定的父级高度，会按自身内容撑到几千像素高度
-   （CSS 百分比高度的父级高度必须是显式的，不能由 min/max-height 间接确定）。 */
+   与 skill-list 不同的是：本列表原本就使用 min/max-height 控制高度（而非
+   外层定高 + 内层 height:100%），所以内层直接保留 min/max-height 并负责
+   滚动，外层仅处理宽度对齐，避免百分比高度在 flex 父级中解析异常。 */
 .spirit-picker-grid {
-  height: 447px;
   margin-right: -7px;   /* 抵消 .spirit-picker-grid-inner 的滚动条 6px + padding-right 1px */
   position: relative;
-  overflow: hidden;     /* 防止内层任何意外溢出 */
 }
 .spirit-picker-grid-inner {
-  height: 100%;
   display: grid;
+  min-height: 447px;
+  max-height: 447px;
   /* minmax(0, 1fr) 显式将列最小宽度设为 0，
      避免 `1fr` 默认的 `minmax(auto, 1fr)` 在子项内容坍缩时被 auto 拉成 0，
      进而让整列塌陷、卡片叠成一团。 */
@@ -1897,11 +1896,12 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
      会让 grid 右边缘比 toolbar 多出 6px。这里只保留 `margin-right: -1px`
      抵消 padding-right: 1px。做法与 .skill-list 移动端一致。 */
   .spirit-picker-grid {
-    /* 在我的电脑上442不抖，在我的手机上446不抖 */
-    height: 446px;       /* 显式 height 而非 min/max，让 .spirit-picker-grid-inner 的 height: 100% 能正确解析（见桌面端注释） */
     margin-right: -1px;  /* 覆盖桌面端 -7px：移动端 overlay 滚动条 gutter=0，只抵消 padding-right: 1px */
   }
   .spirit-picker-grid-inner {
+    /* 在我的电脑上442不抖，在我的手机上446不抖 */
+    min-height: 446px;
+    max-height: 446px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     /* 移动端：同样始终为滚动条预留 gutter，避免列表抖动 */
     scrollbar-gutter: stable;
