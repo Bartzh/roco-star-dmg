@@ -1830,10 +1830,14 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
   .container { padding: 20px 16px 40px; }
   .breakdown-section { margin: 16px 0 0; }
-  /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills */
+  /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills
+     移动端滚动条是 overlay（不占空间），桌面端 `margin-right: -8px` + `scrollbar-gutter: stable`
+     的抵消关系在移动端失效（gutter 实际为 0），会让 grid 右边缘比 spirit-card / stats-grid /
+     buff-chip 多出 6px。这里只保留 `margin-right: -2px` 抵消 padding-right: 2px，
+     并把 scrollbar-gutter 还原为 auto（overlay 滚动条不需预留）。 */
   .skill-list {
     height: 125px;       /* 显式 height 而非 min/max，让 .skill-list-inner 的 height: 100% 能正确解析（见桌面端注释） */
-    margin-right: -8px;  /* 与桌面端一致：抵消 .skill-list-inner 的滚动条 + padding */
+    margin-right: -2px;  /* 覆盖桌面端 -8px：移动端 overlay 滚动条 gutter=0，只抵消 padding-right: 2px */
   }
   .skill-list-inner {
     grid-template-columns: repeat(2, 1fr);
