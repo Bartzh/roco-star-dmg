@@ -1410,7 +1410,7 @@ function renderSpiritPicker(side, opts) {
         ${cancelBtn}
       </div>
       ${toolbarHTML}
-      <div class="spirit-picker-grid" id="${side}-picker-grid">${optionsHTML}</div>
+      <div class="spirit-picker-grid" id="${side}-picker-grid"><div class="spirit-picker-grid-inner">${optionsHTML}</div></div>
     </div>
   `;
   // 立即算一次列数（避免 MutationObserver 异步触发导致的视觉跳动）
@@ -1419,12 +1419,16 @@ function renderSpiritPicker(side, opts) {
 }
 
 // 增量更新 grid（仅在搜索/筛选输入变化时调用，避免重渲 toolbar 失去焦点）。
+// 注意：滚动 + grid 在内层 .spirit-picker-grid-inner 上（外层只负责高度/对齐，
+// 见 styles.css 注释），innerHTML 设到内层，外层 id 仅作查询锚点。
 function refreshPickerGrid(side) {
   const grid = document.getElementById(`${side}-picker-grid`);
   if (!grid) return;
+  const inner = grid.querySelector('.spirit-picker-grid-inner');
+  if (!inner) return;
   const filter = state.spiritPickerFilter[side];
   const filtered = filterSpirits(side, filter);
-  grid.innerHTML = _renderPickerOptionsHTML(side, filtered);
+  inner.innerHTML = _renderPickerOptionsHTML(side, filtered);
 }
 
 // 增量更新 toolbar 中各 chip 的 active 状态（不重建 DOM，因此 spirit-picker
@@ -1534,20 +1538,21 @@ function renderSpiritCard(side, opts) {
 }
 
 // 进入/退出“选择中”状态
+// 滚动位置读写都走内层 .spirit-picker-grid-inner（外层不滚动，见 styles.css 注释）。
 function enterSpiritPicker(side) {
   state.spiritPicking[side] = true;
   // 保留上次筛选状态与滚动位置
   const savedScroll = state._pickerScrollTop[side] || 0;
   renderSpiritArea(side);
   if (savedScroll > 0) {
-    const grid = document.getElementById(`${side}-picker-grid`);
-    if (grid) grid.scrollTop = savedScroll;
+    const inner = document.querySelector(`#${side}-picker-grid > .spirit-picker-grid-inner`);
+    if (inner) inner.scrollTop = savedScroll;
   }
 }
 function exitSpiritPicker(side) {
   // 保存当前滚动位置，下次打开时恢复
-  const grid = document.getElementById(`${side}-picker-grid`);
-  state._pickerScrollTop[side] = grid ? grid.scrollTop : 0;
+  const inner = document.querySelector(`#${side}-picker-grid > .spirit-picker-grid-inner`);
+  state._pickerScrollTop[side] = inner ? inner.scrollTop : 0;
   state.spiritPicking[side] = false;
   renderSpiritArea(side);
 }
@@ -1596,7 +1601,7 @@ function selectSpirit(side, id) {
     }
     state.spiritPicking.attacker = false;
     // 保存滚动位置以便下次打开时恢复
-    { const g = document.getElementById('attacker-picker-grid'); state._pickerScrollTop.attacker = g ? g.scrollTop : 0; }
+    { const g = document.querySelector('#attacker-picker-grid > .spirit-picker-grid-inner'); state._pickerScrollTop.attacker = g ? g.scrollTop : 0; }
     renderSpiritArea('attacker');
     _scrollSkillListToSelected('attacker');
   } else if (side === 'defender') {
@@ -1630,7 +1635,7 @@ function selectSpirit(side, id) {
     }
     state.spiritPicking.defender = false;
     // 保存滚动位置以便下次打开时恢复
-    { const g = document.getElementById('defender-picker-grid'); state._pickerScrollTop.defender = g ? g.scrollTop : 0; }
+    { const g = document.querySelector('#defender-picker-grid > .spirit-picker-grid-inner'); state._pickerScrollTop.defender = g ? g.scrollTop : 0; }
     renderSpiritArea('defender');
     _scrollSkillListToSelected('defender');
     // 防御方精灵换 → 攻击方 power-badge 颜色依赖防御方减伤率，需刷新

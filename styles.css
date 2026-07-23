@@ -237,15 +237,32 @@ body {
   color: var(--text-primary);
   border-color: rgba(255,255,255,0.22);
 }
+/* 结构（2026-07-23）：外层 .spirit-picker-grid 仅负责高度 + 宽度对齐
+   （含 margin-right: -7px 把滚动条让出的空间补回 toolbar / spirit-card 右边缘），
+   实际滚动 + grid 全部交给内层 .spirit-picker-grid-inner。原因是滚动条
+   (scrollbar-gutter: stable ~6px) + padding-right: 1px 共 7px 会把
+   最右一列 picker-option 推得比 .spirit-picker-toolbar 短一截；把滚动条
+   关进 .spirit-picker-grid-inner 后，外层向右多占 7px，内层 grid 右列
+   右边框能精确贴齐 toolbar 的右边框。滚动条本身仍画在内层的右内边缘
+   （即外层右内边缘缩进 7px 处），宽度未变，视觉上只是位置向右挪了 7px。
+   做法与 .skill-list / .skill-list-inner 一致（2026-07-21）。
+   注意：外层必须用显式 `height: 447px`（不能只写 min/max-height），否则
+   内层 `height: 100%` 拿不到确定的父级高度，会按自身内容撑到几千像素高度
+   （CSS 百分比高度的父级高度必须是显式的，不能由 min/max-height 间接确定）。 */
 .spirit-picker-grid {
+  height: 447px;
+  margin-right: -7px;   /* 抵消 .spirit-picker-grid-inner 的滚动条 6px + padding-right 1px */
+  position: relative;
+  overflow: hidden;     /* 防止内层任何意外溢出 */
+}
+.spirit-picker-grid-inner {
+  height: 100%;
   display: grid;
   /* minmax(0, 1fr) 显式将列最小宽度设为 0，
      避免 `1fr` 默认的 `minmax(auto, 1fr)` 在子项内容坍缩时被 auto 拉成 0，
      进而让整列塌陷、卡片叠成一团。 */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  min-height: 447px;
-  max-height: 447px;
   overflow-y: auto;
   /* 始终为滚动条预留 gutter，避免精灵数量少时滚动条消失导致列宽变化 */
   scrollbar-gutter: stable;
@@ -1874,12 +1891,20 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     gap: 4px;
   }
   .iv-slot { min-width: 38px; font-size: 0.6rem; }
-  /* Spirit picker: 2 columns on mobile, taller scroll area. */
+  /* Spirit picker: 2 columns on mobile, taller scroll area.
+     移动端滚动条是 overlay（不占空间），桌面端 `margin-right: -7px` +
+     `scrollbar-gutter: stable` 的抵消关系在移动端失效（gutter 实际为 0），
+     会让 grid 右边缘比 toolbar 多出 6px。这里只保留 `margin-right: -1px`
+     抵消 padding-right: 1px。做法与 .skill-list 移动端一致。 */
   .spirit-picker-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     /* 在我的电脑上442不抖，在我的手机上446不抖 */
-    min-height: 446px;
-    max-height: 446px;
+    height: 446px;       /* 显式 height 而非 min/max，让 .spirit-picker-grid-inner 的 height: 100% 能正确解析（见桌面端注释） */
+    margin-right: -1px;  /* 覆盖桌面端 -7px：移动端 overlay 滚动条 gutter=0，只抵消 padding-right: 1px */
+  }
+  .spirit-picker-grid-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* 移动端：同样始终为滚动条预留 gutter，避免列表抖动 */
+    scrollbar-gutter: stable;
   }
   .spirit-picker-option { min-height: 110px; padding: 6px; }
   .spirit-picker-option .picker-name { font-size: 0.72rem; }
