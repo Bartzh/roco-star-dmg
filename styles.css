@@ -1870,7 +1870,9 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   /* Spirit picker: 2 columns on mobile, taller scroll area. */
   .spirit-picker-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: 404px;
+    /* 在我的电脑上442不抖，在我的手机上446不抖 */
+    min-height: 446px;
+    max-height: 446px;
   }
   .spirit-picker-option { min-height: 110px; padding: 6px; }
   .spirit-picker-option .picker-name { font-size: 0.72rem; }
