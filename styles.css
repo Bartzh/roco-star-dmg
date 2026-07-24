@@ -491,17 +491,17 @@ body {
   color: var(--text-primary);
   box-shadow: 0 0 0 1px var(--accent-primary), 0 0 10px color-mix(in srgb, var(--accent-primary) 25%, transparent);
 }
-/* chip 内的图标按格子尺寸的 56% 缩放，保持视觉一致 */
+/* chip 内的图标按格子尺寸的 64% 缩放，保持视觉一致 */
 .spirit-picker-chip .chip-icon {
-  width: 56%;
-  height: 56%;
+  width: 64%;
+  height: 64%;
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 0 1px rgba(0,0,0,0.4));
 }
 .spirit-picker-chip .chip-emoji {
-  width: 56%;
-  height: 56%;
+  width: 64%;
+  height: 64%;
   display: flex;
   align-items: center;
   justify-content: center;
