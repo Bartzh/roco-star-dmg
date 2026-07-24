@@ -69,7 +69,6 @@ COMMON_ATTACKERS: list[str] = [
     '龙鱼',
     '权杖-V',
     '音速犬',
-    '月牙雪熊',
 ]
 COMMON_DEFENDERS: list[str] = [
     '贝古斯',
