@@ -1447,9 +1447,9 @@ body.challenge-mode .seal-container {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 2px;
-  color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-cyan) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 40%, transparent);
   border-radius: 20px;
   cursor: pointer;
   user-select: none;
@@ -1477,9 +1477,9 @@ body.challenge-mode .seal-container {
               visibility 0s linear 0s;
 }
 .challenge-submit-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  background: color-mix(in srgb, var(--accent-cyan) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent-cyan) 60%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-cyan) 25%, transparent);
 }
 .challenge-submit-btn:active:not(:disabled) { transform: scale(0.97); }
 .challenge-submit-btn:disabled {
@@ -1548,8 +1548,8 @@ body.challenge-running .result-bottom {
 .challenge-answer-result-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--accent-primary);
-  text-shadow: 0 0 10px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent-cyan) 35%, transparent);
   transition: color 0.3s ease, text-shadow 0.3s ease;
   /* 关键：固定宽度 + 右对齐，让"分/层"单位始终在固定位置。
   - 固定 width: 1.8em（容纳 3 位数字 "100"，配合 tabular-nums），
