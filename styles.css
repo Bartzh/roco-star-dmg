@@ -7,6 +7,7 @@
   --glass-blur: 16px;
   --text-primary: #e8e8f0;
   --text-secondary: #8888aa;
+  --accent-primary: #00e5ff;
   --accent-cyan: #00e5ff;
   --accent-gold: #ffd700;
   --accent-red: #ff3b3b;
@@ -76,7 +77,7 @@ body {
   font-weight: 300;
   letter-spacing: 4px;
   color: var(--text-primary);
-  text-shadow: 0 0 24px rgba(0,229,255,0.18);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 .header .subtitle {
   font-size: 0.85rem;
@@ -85,16 +86,16 @@ body {
   letter-spacing: 1px;
 }
 .header .subtitle a {
-  color: #7be0ff;
+  color: color-mix(in srgb, var(--accent-primary) 70%, #fff);
   text-decoration: none;
-  border-bottom: 1px solid rgba(123,224,255,0.4);
+  border-bottom: 1px solid color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 40%, transparent);
   padding-bottom: 1px;
   transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
 .header .subtitle a:hover {
-  color: #b8f0ff;
-  border-bottom-color: #b8f0ff;
-  text-shadow: 0 0 8px rgba(123,224,255,0.6);
+  color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
+  border-bottom-color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
+  text-shadow: 0 0 8px color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 60%, transparent);
 }
 
 /* ============ Battle Area ============ */
@@ -189,9 +190,9 @@ body {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   padding: 6px;
-  background: rgba(0,229,255,0.1);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   font-size: 0.7rem;
-  color: var(--accent-cyan);
+  color: var(--accent-primary);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -299,20 +300,20 @@ body {
 }
 .spirit-picker-option:hover {
   background: rgba(255,255,255,0.08);
-  border-color: var(--accent-cyan);
+  border-color: var(--accent-primary);
   transform: translateY(-1px);
 }
 .spirit-picker-option.current {
-  border-color: var(--accent-cyan);
-  background: rgba(0,229,255,0.1);
-  box-shadow: 0 0 0 1px var(--accent-cyan);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  box-shadow: 0 0 0 1px var(--accent-primary);
 }
 .spirit-picker-option.current::after {
   content: '✓';
   position: absolute;
   top: 4px;
   right: 6px;
-  color: var(--accent-cyan);
+  color: var(--accent-primary);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -442,8 +443,8 @@ body {
   background: rgba(255,255,255,0.08);
 }
 .spirit-picker-search input:focus {
-  border-color: var(--accent-cyan);
-  background: rgba(0,229,255,0.06);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
 }
 .spirit-picker-search .search-icon {
   position: absolute;
@@ -482,10 +483,10 @@ body {
   border-color: rgba(255,255,255,0.22);
 }
 .spirit-picker-chip.active {
-  background: rgba(0,229,255,0.18);
-  border-color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  border-color: var(--accent-primary);
   color: var(--text-primary);
-  box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.25);
+  box-shadow: 0 0 0 1px var(--accent-primary), 0 0 10px color-mix(in srgb, var(--accent-primary) 25%, transparent);
 }
 /* chip 内的图标按格子尺寸的 56% 缩放，保持视觉一致 */
 .spirit-picker-chip .chip-icon {
@@ -517,7 +518,7 @@ body {
   margin: 8px auto 0;
   background: none;
   border: 1px solid var(--glass-border);
-  color: var(--accent-cyan);
+  color: var(--accent-primary);
   font-size: 0.72rem;
   cursor: pointer;
   font-family: inherit;
@@ -526,8 +527,8 @@ body {
   transition: all 0.15s ease;
 }
 .spirit-picker-empty button:hover {
-  background: rgba(0,229,255,0.1);
-  border-color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  border-color: var(--accent-primary);
 }
 
 /* Element colors */
@@ -638,9 +639,9 @@ body {
   /*transform: translateY(-1px);*/
 }
 .skill-btn.active {
-  background: rgba(0,229,255,0.1);
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 12px rgba(0,229,255,0.15), inset 3px 0 0 var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-primary) 15%, transparent), inset 3px 0 0 var(--accent-primary);
 }
 
 /* Skill icon (48px square, fills card height) */
@@ -872,21 +873,21 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent-cyan);
+  background: var(--accent-primary);
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(0,229,255,0.5);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 50%, transparent);
   transition: all 0.2s;
 }
 .seal-slider::-webkit-slider-thumb:hover {
   transform: scale(1.3);
-  box-shadow: 0 0 16px rgba(0,229,255,0.8);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent-primary) 80%, transparent);
 }
 .seal-slider::-moz-range-thumb {
   width: 16px; height: 16px;
   border-radius: 50%; border: none;
-  background: var(--accent-cyan);
+  background: var(--accent-primary);
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(0,229,255,0.5);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 50%, transparent);
 }
 .slider-labels {
   display: flex;
@@ -1148,7 +1149,7 @@ body {
   margin: 6px 0;
 }
 .breakdown-list .final-line .value {
-  color: var(--accent-cyan);
+  color: var(--accent-primary);
 }
 
 /* ============ Element Effectiveness Badge ============ */
@@ -1374,19 +1375,19 @@ body {
   font-weight: 700;
   letter-spacing: 4px;
   color: var(--bg-primary);
-  background: linear-gradient(135deg, var(--accent-cyan), #4dd0e1);
-  border: 1px solid var(--accent-cyan);
+  background: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 75%, #000));
+  border: 1px solid var(--accent-primary);
   border-radius: 22px;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
-  box-shadow: 0 0 14px rgba(0,229,255,0.25);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-primary) 25%, transparent);
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 .challenge-start-btn:hover:not(:disabled) {
   filter: brightness(1.08);
-  box-shadow: 0 0 22px rgba(0,229,255,0.4);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 .challenge-start-btn:active:not(:disabled) {
   transform: scale(0.97);
@@ -1443,9 +1444,9 @@ body.challenge-mode .seal-container {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 2px;
-  color: var(--accent-cyan, #00e5ff);
-  background: rgba(0, 229, 255, 0.08);
-  border: 1px solid rgba(0, 229, 255, 0.4);
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent);
   border-radius: 20px;
   cursor: pointer;
   user-select: none;
@@ -1473,9 +1474,9 @@ body.challenge-mode .seal-container {
               visibility 0s linear 0s;
 }
 .challenge-submit-btn:hover:not(:disabled) {
-  background: rgba(0, 229, 255, 0.15);
-  border-color: rgba(0, 229, 255, 0.6);
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent-primary) 25%, transparent);
 }
 .challenge-submit-btn:active:not(:disabled) { transform: scale(0.97); }
 .challenge-submit-btn:disabled {
@@ -1544,8 +1545,8 @@ body.challenge-running .result-bottom {
 .challenge-answer-result-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--accent-cyan);
-  text-shadow: 0 0 10px rgba(0,229,255,0.35);
+  color: var(--accent-primary);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent-primary) 35%, transparent);
   transition: color 0.3s ease, text-shadow 0.3s ease;
   /* 关键：固定宽度 + 右对齐，让"分/层"单位始终在固定位置。
   - 固定 width: 1.8em（容纳 3 位数字 "100"，配合 tabular-nums），
@@ -1633,14 +1634,14 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 }
 /* 选中态：与 .buff-chip.active 视觉一致（1px 蓝环 + 蓝色背景 + 蓝色 glow） */
 .label-chip.active {
-  color: var(--accent-cyan);
-  background: rgba(0,229,255,0.15);
-  border-color: rgba(0,229,255,0.45);
-  box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 10px rgba(0,229,255,0.2);
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, transparent);
+  box-shadow: 0 0 0 1px var(--accent-primary), 0 0 10px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 /* drag chip 的按压特效（pointerdown 期间 JS 加 .pressing 类） */
 .label-chip.pressing {
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px color-mix(in srgb, var(--accent-primary) 45%, transparent);
 }
 
 /* label-chip-group：在 panel-label / section-title 内是 inline-flex 容器 */
@@ -2054,7 +2055,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 .buff-chip.dragging {
   /* Keep the underlying state color (.positive / .negative / .neutral).
      Active feedback is a bright white ring + cyan glow that sits on top. */
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px rgba(0,229,255,0.45);
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 12px color-mix(in srgb, var(--accent-primary) 45%, transparent);
 }
 .buff-chip .buff-val {
   font-weight: 600;
@@ -2187,7 +2188,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 /* ============ Accessibility: focus rings ============ */
 :focus:not(:focus-visible) { outline: none; }
 :focus-visible {
-  outline: 2px solid var(--accent-cyan);
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -2199,7 +2200,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 .iv-slot:focus-visible,
 .breakdown-toggle:focus-visible,
 .picker-btn:focus-visible {
-  box-shadow: 0 0 0 4px rgba(0,229,255,0.15);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 15%, transparent);
 }
 .buff-chip:focus-visible { outline-offset: 3px; }
 
@@ -2231,10 +2232,10 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
    使用说明 / 更新公告 以 <button> 形式写在副标题里，外观与 GitHub / BWIKI
    链接完全一致（仅在行为上是按钮：不会跳转、不会改 URL）。 */
 .header .subtitle .nav-link {
-  color: #7be0ff;
+  color: color-mix(in srgb, var(--accent-primary) 70%, #fff);
   background: none;
   border: none;
-  border-bottom: 1px solid rgba(123,224,255,0.4);
+  border-bottom: 1px solid color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 40%, transparent);
   padding-bottom: 1px;
   letter-spacing: inherit;
   cursor: pointer;
@@ -2243,9 +2244,9 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
 .header .subtitle .nav-link:hover {
-  color: #b8f0ff;
-  border-bottom-color: #b8f0ff;
-  text-shadow: 0 0 8px rgba(123,224,255,0.6);
+  color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
+  border-bottom-color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
+  text-shadow: 0 0 8px color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 60%, transparent);
 }
 
 /* ============ Info Modal (公告 / 使用说明) ============
@@ -2376,15 +2377,15 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   font-family: var(--font-mono);
 }
 .modal-body a {
-  color: #7be0ff;
+  color: color-mix(in srgb, var(--accent-primary) 70%, #fff);
   text-decoration: none;
-  border-bottom: 1px solid rgba(123,224,255,0.4);
+  border-bottom: 1px solid color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 40%, transparent);
   transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
 .modal-body a:hover {
-  color: #b8f0ff;
-  border-bottom-color: #b8f0ff;
-  text-shadow: 0 0 8px rgba(123,224,255,0.6);
+  color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
+  border-bottom-color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
+  text-shadow: 0 0 8px color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 60%, transparent);
 }
 .modal-body hr {
   border: none;
