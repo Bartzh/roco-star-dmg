@@ -309,14 +309,14 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='atk', down='matk'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=10
+                    weight=19
                 ),
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='hp', down='matk'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=3
+                    weight=6
                 )
             ]
         ),
@@ -330,12 +330,32 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
         skills=SkillsPool(
-            default_weight=70,
+            default_weight=1,
             combos=[
                 WeightedSkillCombo(
                     combo='先发制人',
-                    weight=30
-                )
+                    weight=10
+                ),
+                WeightedSkillCombo(
+                    combo='极限撕裂',
+                    weight=8
+                ),
+                WeightedSkillCombo(
+                    combo='火云车',
+                    weight=8
+                ),
+                WeightedSkillCombo(
+                    combo='蝙蝠',
+                    weight=1
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_冰__',
+                    weight=2
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_武__',
+                    weight=2
+                ),
             ]
         )
     ),
@@ -348,28 +368,28 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 )
             ]
         ),
         skills=SkillsPool(
-            default_weight=10,
+            default_weight=1,
             combos=[
                 WeightedSkillCombo(
                     combo='翼击',
-                    weight=65
+                    weight=70
                 ),
                 WeightedSkillCombo(
                     combo='追打',
-                    weight=10
+                    weight=11
                 ),
                 WeightedSkillCombo(
                     combo='倾泻',
-                    weight=10
+                    weight=4
                 ),
                 WeightedSkillCombo(
                     combo='先发制人',
-                    weight=5
+                    weight=14
                 )
             ]
         )
@@ -383,7 +403,7 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 )
             ]
         ),
@@ -427,7 +447,7 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 )
             ]
         ),
@@ -449,11 +469,11 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='多维击打',
-                    weight=8
+                    weight=16
                 ),
                 WeightedSkillCombo(
                     combo='流火',
-                    weight=1
+                    weight=2
                 ),
             ]
         )
@@ -467,14 +487,14 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='matk'),
                         ivs=['hp', 'atk', 'spd']
                     ),
-                    weight=6
+                    weight=12
                 ),
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='atk', down='matk'),
                         ivs=['hp', 'atk', 'spd']
                     ),
-                    weight=4
+                    weight=8
                 ),
             ]
         ),
@@ -548,7 +568,7 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
         skills=SkillsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedSkillCombo(
                     combo='潮涌',
@@ -578,7 +598,7 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -587,23 +607,23 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='多维击打',
-                    weight=5
+                    weight=8
                 ),
                 WeightedSkillCombo(
                     combo='四维降解',
-                    weight=5
+                    weight=6
                 ),
                 WeightedSkillCombo(
                     combo='天体吸积',
-                    weight=1
+                    weight=5
                 ),
                 WeightedSkillCombo(
                     combo='热砂',
-                    weight=3
+                    weight=2
                 ),
                 WeightedSkillCombo(
                     combo='陨石',
-                    weight=3
+                    weight=2
                 ),
             ]
         )
@@ -617,21 +637,21 @@ attacker_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='atk'),
                         ivs=['hp', 'def', 'mdef']
                     ),
-                    weight=7
+                    weight=14
                 ),
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='hp', down='spd'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=3
+                    weight=6
                 ),
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='hp', down='spd'),
                         ivs=['hp', 'matk', 'def']
                     ),
-                    weight=1
+                    weight=2
                 ),
             ]
         ),
@@ -651,7 +671,7 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
         skills=SkillsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedSkillCombo(
                     combo='先发制人',
@@ -674,7 +694,7 @@ attacker_random_pools: dict[str, RandomPool] = {
     ),
     '圣羽翼王': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -721,7 +741,7 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
         skills=SkillsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedSkillCombo(
                     combo='水刃',
@@ -756,7 +776,7 @@ attacker_random_pools: dict[str, RandomPool] = {
     ),
     '翼龙': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -772,14 +792,14 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='龙爪',
-                    weight=8
+                    weight=15
                 ),
             ]
         ),
     ),
     '噼啪鸟': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -798,7 +818,7 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
         skills=SkillsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedSkillCombo(
                     combo='翼击',
@@ -813,7 +833,7 @@ attacker_random_pools: dict[str, RandomPool] = {
     ),
     '龙鱼': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -829,14 +849,14 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='翼击',
-                    weight=6
+                    weight=15
                 ),
             ]
         ),
     ),
     '离心舞者': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -873,11 +893,11 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='多维击打',
-                    weight=8
+                    weight=15
                 ),
                 WeightedSkillCombo(
                     combo='离子震荡',
-                    weight=1
+                    weight=3
                 ),
             ]
         ),
@@ -889,7 +909,7 @@ attacker_random_pools = {k: asdict(v) for k, v in attacker_random_pools.items()}
 defender_random_pools: dict[str, RandomPool] = {
     '音速犬': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -937,7 +957,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '嘟嘟锅': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -964,7 +984,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '兽花蕾': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -998,7 +1018,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '恶魔狼王': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1025,7 +1045,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '尖嘴狐仙': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1070,7 +1090,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=7
+                    weight=16
                 ),
             ]
         ),
@@ -1090,7 +1110,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '迷迷箱怪': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1157,7 +1177,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='matk'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1177,7 +1197,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '冰钻布鲁斯': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1222,7 +1242,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='atk', down='matk'),
                         ivs=['hp', 'atk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1249,7 +1269,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1280,7 +1300,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='matk'),
                         ivs=['hp', 'atk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1294,7 +1314,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='matk'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=9
+                    weight=14
                 ),
             ]
         ),
@@ -1334,7 +1354,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='matk'),
                         ivs=['hp', 'def', 'mdef']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1362,7 +1382,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '利灯鱼': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1403,7 +1423,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='matk'),
                         ivs=['hp', 'atk', 'def']
                     ),
-                    weight=9
+                    weight=16
                 ),
             ]
         ),
@@ -1461,7 +1481,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '贝古斯': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.75,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1506,7 +1526,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='atk'),
                         ivs=['hp', 'def', 'mdef']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1537,7 +1557,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1564,7 +1584,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='matk'),
                         ivs=['hp', 'def', 'mdef']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1592,7 +1612,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '爆焰喷喷': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1630,7 +1650,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '音碟吼': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1675,7 +1695,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='matk'),
                         ivs=['hp', 'atk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1712,7 +1732,7 @@ defender_random_pools: dict[str, RandomPool] = {
     ),
     '巨鼓象': RandomPool(
         stats=StatsPool(
-            default_weight=1,
+            default_weight=0.5,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
@@ -1727,6 +1747,13 @@ defender_random_pools: dict[str, RandomPool] = {
                         ivs=['hp', 'atk', 'def']
                     ),
                     weight=4
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'mdef']
+                    ),
+                    weight=1
                 ),
             ]
         ),
@@ -1774,7 +1801,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='atk'),
                         ivs=['hp', 'def', 'mdef']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
@@ -1805,7 +1832,7 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=9
+                    weight=19
                 ),
             ]
         ),
