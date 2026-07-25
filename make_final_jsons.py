@@ -356,6 +356,10 @@ attacker_random_pools: dict[str, RandomPool] = {
                     combo='__yuanli_武__',
                     weight=2
                 ),
+                WeightedSkillCombo(
+                    combo='龙卷风',
+                    weight=1
+                )
             ]
         )
     ),
