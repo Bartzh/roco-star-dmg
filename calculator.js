@@ -4383,10 +4383,22 @@ function _randomStatsFallback(spirit, side) {
 function buildSkillRng(side) {
   const useMemory = state.challenge.useMemorySkill[side];
   // 兜底：先看 spirit 池；未命中/不合法走加权随机
+  //   池外技能处理：若 picked 不在该精灵的 opts 里，但在 SKILLS 中且
+  //   category 匹配（用户为该精灵特别配置的"池外技能"），仍然返回 picked
+  //   ——applyQuestion 会把它当作自定义技能加载（customSkillInput = skill.name，
+  //   resolved = skill，skillIdx = CUSTOM_SKILL_IDX）。这样随机池可以包含
+  //   该精灵正常无法学习、但游戏中可通过特殊办法使用的技能。
   const fallback = (spirit, opts, noneId) => {
     const pool = _getRandomPool(side, spirit?.id);
     const picked = _pickFromPool(pool?.skills);
-    if (picked && opts.some(s => s.id === picked)) return picked;
+    if (picked) {
+      // 1. 在精灵技能池里 → 直接返回
+      if (opts.some(s => s.id === picked)) return picked;
+      // 2. 池外但在 SKILLS 中（category 匹配）→ 作为自定义技能返回
+      const expectedCategory = side === 'attacker' ? '攻击' : '防御';
+      if (SKILLS[picked] && SKILLS[picked].category === expectedCategory) return picked;
+    }
+    // 3. 兜底：加权随机
     const weighted = _pickWeightedSkill(opts, side);
     return weighted ? weighted.id : noneId;
   };
