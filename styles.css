@@ -753,6 +753,55 @@ body {
 }
 .skill-badge.reduction { color: #00e676; }
 
+/* ============ Custom skill slot (固定附加在技能列表末尾) ============
+ * .custom-skill-slot 是 .skill-btn 的变体：<div> 而非 <button>（因为
+ * 内嵌 <input> 不能放进 <button>）。继承 .skill-btn 的 grid / padding /
+ * border / min-height 等所有样式，只追加输入框专属样式 + 未解析态视觉。
+ * 结构见 calculator.js _buildCustomSkillSlotHTML 注释。
+ */
+.custom-skill-input {
+  width: 100%;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-align: right;
+  letter-spacing: 0.3px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+  outline: none;
+  padding: 0 0 1px 0;
+  font-family: inherit;
+  /* .skill-btn 设置了 user-select: none / -webkit-user-select: none（iOS 触控
+   * 防护），输入框必须覆盖回 text 才能让用户选中 / 修改文本。 */
+  user-select: text;
+  -webkit-user-select: text;
+}
+.custom-skill-input:focus {
+  border-bottom-color: var(--accent-primary);
+}
+.custom-skill-input::placeholder {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.custom-skill-input:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+/* 未解析态：虚线边框 + icon 半透明，提示"这个槽还没绑定技能" */
+.custom-skill-slot:not(.resolvable) {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+/* 自定义槽的问号占位 icon（与 .skill-icon .placeholder 同级） */
+.custom-skill-slot .custom-skill-placeholder {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
 /* ============ Star Seal (Center) ============ */
 .seal-container {
   display: flex;

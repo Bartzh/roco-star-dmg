@@ -23,6 +23,11 @@ const ELEMENTS = {
 };
 const FALLBACK_EL = { name: '无', emoji: '❔', color: '#666666' };
 
+// 自定义技能槽 sentinel index：表示"自定义技能槽"被选中。
+// renderSkills 把自定义槽渲染为 data-idx="custom" 的最后一项；
+// selectSpirit / applyQuestion 在 skillIdx 中用 -2 标记此槽。
+const CUSTOM_SKILL_IDX = -2;
+
 // elOf 的预计算查找表：把 rawName 直接映射到元素对象。
 // 预填：每个 ELEMENTS key 的 "X" 和 "X系" 两种写法 + 3 个会回落到 FALLBACK_EL 的特殊输入。
 // 存的是对象引用，augmentElementsWithTypes 后续追加的 iconUrl 也能透出。
@@ -289,6 +294,13 @@ let state = {
   attackSkillIdx: -1,
   defenseSkill: null,    // full skill object (SKILLS[id]) or null = "无"
   defenseSkillIdx: 0,    // 0 = "无"
+  // 自定义技能槽状态：每侧独立的输入文本 + 已解析的技能对象（或 null）。
+  //   customSkillInput[side]   : 用户在自定义槽输入框里的原文（不 trim）
+  //   customSkillResolved[side]: 输入匹配到 SKILLS 中的技能时为该技能对象，否则 null。
+  //                              匹配条件：name（trim 后）=== SKILLS[id].name 且 category 符合该侧。
+  // 当 Resolved 非空时，点击自定义槽或自动选中都会让 skillIdx = CUSTOM_SKILL_IDX。
+  customSkillInput:    { attacker: '', defender: '' },
+  customSkillResolved: { attacker: null, defender: null },
   starLayer: 0,
   // 精灵面板是否处于“选择中”状态（true 时渲染内嵌选择器而非卡片）
   spiritPicking: { attacker: false, defender: false },
@@ -437,6 +449,20 @@ function getAttackSkillOptions(attacker) {
   // Append fixed 愿力冲击 skills (one per element) at the end.
   out.push(...YUANLI_SKILLS);
   return out;
+}
+
+// 自定义技能槽的名称查找：在 SKILLS 里按 name 精确匹配（trim 后），
+// 且 category 必须符合该侧（attacker → '攻击'，defender → '防御'）。
+// 攻击 / 防御两类技能 id === name（已通过数据校验），所以 SKILLS[trimmed]
+// 直接命中即为查找结果，O(1)。未命中返回 null。
+function findSkillByName(name, category) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
+  const s = SKILLS[trimmed];
+  if (s && s.category === category) {
+    return { id: trimmed, ...s };
+  }
+  return null;
 }
 
 // ============================================================
@@ -1597,9 +1623,20 @@ function selectSpirit(side, id) {
       if (restoredIdx >= 0) {
         state.attackSkill    = opts[restoredIdx];
         state.attackSkillIdx = restoredIdx;
+        state.customSkillResolved.attacker = null;
+        state.customSkillInput.attacker    = '';
+      } else if (savedA.skillId && SKILLS[savedA.skillId] && SKILLS[savedA.skillId].category === '攻击') {
+        // 自定义技能：保存的 id 在 SKILLS 中但不在该精灵技能池里
+        const customSk = SKILLS[savedA.skillId];
+        state.attackSkill    = { id: savedA.skillId, ...customSk };
+        state.attackSkillIdx = CUSTOM_SKILL_IDX;
+        state.customSkillResolved.attacker = state.attackSkill;
+        state.customSkillInput.attacker    = customSk.name;
       } else {
         state.attackSkill    = opts[0] || null;
         state.attackSkillIdx = state.attackSkill ? 0 : -1;
+        state.customSkillResolved.attacker = null;
+        state.customSkillInput.attacker    = '';
       }
     } else {
       state.attackerNature     = { ...DEFAULT_NATURE.attacker };
@@ -1610,6 +1647,8 @@ function selectSpirit(side, id) {
       state.attackerCombo      = 0;
       state.attackSkill        = opts[0] || null;
       state.attackSkillIdx     = state.attackSkill ? 0 : -1;
+      state.customSkillResolved.attacker = null;
+      state.customSkillInput.attacker    = '';
     }
     state.spiritPicking.attacker = false;
     // 保存滚动位置以便下次打开时恢复
@@ -1633,9 +1672,20 @@ function selectSpirit(side, id) {
       if (restoredIdx >= 0) {
         state.defenseSkill    = opts[restoredIdx];
         state.defenseSkillIdx = restoredIdx;
+        state.customSkillResolved.defender = null;
+        state.customSkillInput.defender    = '';
+      } else if (savedD.skillId && SKILLS[savedD.skillId] && SKILLS[savedD.skillId].category === '防御') {
+        // 自定义技能：保存的 id 在 SKILLS 中但不在该精灵技能池里
+        const customSk = SKILLS[savedD.skillId];
+        state.defenseSkill    = { id: savedD.skillId, ...customSk };
+        state.defenseSkillIdx = CUSTOM_SKILL_IDX;
+        state.customSkillResolved.defender = state.defenseSkill;
+        state.customSkillInput.defender    = customSk.name;
       } else {
         state.defenseSkill    = opts[0]; // "无"
         state.defenseSkillIdx = 0;
+        state.customSkillResolved.defender = null;
+        state.customSkillInput.defender    = '';
       }
     } else {
       state.defenderNature = { ...DEFAULT_NATURE.defender };
@@ -1644,6 +1694,8 @@ function selectSpirit(side, id) {
       state.defenderSpeed  = 0;
       state.defenseSkill    = opts[0]; // "无"
       state.defenseSkillIdx = 0;
+      state.customSkillResolved.defender = null;
+      state.customSkillInput.defender    = '';
     }
     state.spiritPicking.defender = false;
     // 保存滚动位置以便下次打开时恢复
@@ -2211,7 +2263,7 @@ function renderSkills(side) {
           </div>
         </button>
       `;
-    }).join('');
+    }).join('') + _buildCustomSkillSlotHTML('attacker');
   } else {
     const list = document.getElementById('defender-skill-list');
     const inner = _inner(list);
@@ -2233,7 +2285,132 @@ function renderSkills(side) {
           </div>
         </button>
       `;
-    }).join('');
+    }).join('') + _buildCustomSkillSlotHTML('defender');
+  }
+}
+
+// ----------------------------------------------------------------
+// 自定义技能槽：固定附加在攻击 / 防御技能列表末尾的"自定义技能"入口。
+//   - 默认（未解析）：仅显示一个输入框，点击任意部分聚焦输入框，不可选中。
+//   - 输入匹配 SKILLS（按 name + category）：槽位"变成"该技能（显示 icon /
+//     badges），并自动触发选中（skillIdx = CUSTOM_SKILL_IDX）。输入框依然
+//     可用，用户可继续修改。
+//   - 输入不再匹配：槽位回到未解析态；若此前选中的是自定义槽，回退到列表
+//     第一项（attacker: 第一个攻击技能；defender: "无"）。
+//   - 记忆：saveSpiritConfig 存的是 resolved skill 的真实 id。加载时若该 id
+//     在 SKILLS 中但不在精灵技能池里，selectSpirit / applyQuestion 会把它
+//     当作自定义技能恢复（customSkillInput = skill.name, resolved = skill）。
+//
+// 槽位结构（与 .skill-btn 同级 grid item，但用 <div> 而非 <button>，因为
+// <input> 不能嵌套在 <button> 里）：
+//   <div class="skill-btn custom-skill-slot [resolvable] [active]" data-idx="custom">
+//     <div class="skill-icon">...</div>
+//     <div class="skill-content">
+//       <input class="custom-skill-input" ...>
+//       <div class="skill-badges-row">...</div>
+//     </div>
+//   </div>
+// ----------------------------------------------------------------
+
+// 构造自定义槽的完整 HTML（用于 renderSkills 全量重渲）。
+// 挑战答题阶段（c.running）下输入框 disabled，避免用户修改。
+function _buildCustomSkillSlotHTML(side) {
+  const resolved = state.customSkillResolved[side];
+  const idxField = side === 'attacker' ? 'attackSkillIdx' : 'defenseSkillIdx';
+  const isActive = state[idxField] === CUSTOM_SKILL_IDX;
+  const inputText = state.customSkillInput[side] || '';
+  // 转义输入文本，防止 " / < / > / & 破坏属性
+  const escapedInput = String(inputText)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // icon: resolved → 真实技能 icon；未解析 → 问号占位
+  let iconHTML;
+  if (resolved) {
+    const el = elOf(resolved.element);
+    iconHTML = renderSkillIconHTML(resolved, el);
+  } else {
+    iconHTML = `<div class="placeholder custom-skill-placeholder" style="--el-color:#666">?</div>`;
+  }
+
+  // badges: resolved → 与普通技能一致的 badge（attacker 含 powerClass）
+  let badgesHTML = '';
+  if (resolved) {
+    let powerClass = '';
+    if (side === 'attacker') {
+      const defenderTypes = state.defender ? (state.defender.types || []) : [];
+      const eff = effectiveness(resolved.element, defenderTypes);
+      if (eff === 3)        powerClass = 'super-effective double';
+      else if (eff === 2)   powerClass = 'super-effective';
+      else if (eff === 0.5) powerClass = 'not-effective';
+      else if (eff === 0.25) powerClass = 'not-effective double';
+    }
+    badgesHTML = renderInlineBadge(resolved, powerClass);
+  }
+
+  const titleAttr = resolved && resolved.desc ? ` title="${resolved.desc}"` : '';
+  const disabledAttr = state.challenge.running ? ' disabled' : '';
+
+  return `
+    <div class="skill-btn custom-skill-slot ${resolved ? 'resolvable' : ''} ${isActive ? 'active' : ''}"
+         data-idx="custom"
+         onclick="onCustomSlotClick('${side}', event)">
+      <div class="skill-icon"${titleAttr}>${iconHTML}</div>
+      <div class="skill-content">
+        <input class="custom-skill-input"
+               type="text"
+               value="${escapedInput}"
+               placeholder="自定义技能"
+               ${disabledAttr}
+               onclick="event.stopPropagation()"
+               oninput="onCustomSkillInput('${side}', this.value)">
+        <div class="skill-badges-row">${badgesHTML}</div>
+      </div>
+    </div>
+  `;
+}
+
+// 增量更新自定义槽（不替换 input 元素，避免输入时丢焦点）。
+// 用于 onCustomSkillInput：用户每打一个字都调用一次，只更新 icon / badges /
+// active / resolvable class，input 本身保持不动（其 value 由浏览器维护）。
+function _renderCustomSkillSlot(side) {
+  const list = document.getElementById(side + '-skill-list');
+  if (!list) return;
+  const scope = list.querySelector('.skill-list-inner') || list;
+  const slot = scope.querySelector('.skill-btn[data-idx="custom"]');
+  if (!slot) return;
+  const resolved = state.customSkillResolved[side];
+  const idxField = side === 'attacker' ? 'attackSkillIdx' : 'defenseSkillIdx';
+  const isActive = state[idxField] === CUSTOM_SKILL_IDX;
+  // class 切换
+  slot.classList.toggle('resolvable', !!resolved);
+  slot.classList.toggle('active', isActive && !!resolved);
+  // icon
+  const iconEl = slot.querySelector('.skill-icon');
+  if (iconEl) {
+    if (resolved) {
+      const el = elOf(resolved.element);
+      iconEl.innerHTML = renderSkillIconHTML(resolved, el);
+      if (resolved.desc) iconEl.setAttribute('title', resolved.desc);
+      else iconEl.removeAttribute('title');
+    } else {
+      iconEl.innerHTML = `<div class="placeholder custom-skill-placeholder" style="--el-color:#666">?</div>`;
+      iconEl.removeAttribute('title');
+    }
+  }
+  // badges
+  const badgesEl = slot.querySelector('.skill-badges-row');
+  if (badgesEl) {
+    let powerClass = '';
+    if (resolved && side === 'attacker') {
+      const defenderTypes = state.defender ? (state.defender.types || []) : [];
+      const eff = effectiveness(resolved.element, defenderTypes);
+      if (eff === 3)        powerClass = 'super-effective double';
+      else if (eff === 2)   powerClass = 'super-effective';
+      else if (eff === 0.5) powerClass = 'not-effective';
+      else if (eff === 0.25) powerClass = 'not-effective double';
+    }
+    badgesEl.innerHTML = resolved ? renderInlineBadge(resolved, powerClass) : '';
   }
 }
 
@@ -2267,20 +2444,129 @@ function selectDefenseSkill(idx) {
   calculateDamage();
 }
 
+// ----------------------------------------------------------------
+// 自定义技能槽交互
+// ----------------------------------------------------------------
+
+// 点击自定义槽（非 input 区域）：
+//   - 已解析 → 选中该技能（与 selectAttackSkill / selectDefenseSkill 对等）
+//   - 未解析 → 聚焦输入框（让用户直接打字）
+// input 上的 onclick stopPropagation，所以点击 input 本身不会进到这里。
+function onCustomSlotClick(side, event) {
+  if (event && event.target && event.target.tagName === 'INPUT') return;
+  const resolved = state.customSkillResolved[side];
+  if (resolved) {
+    selectCustomSkill(side);
+  } else {
+    const list = document.getElementById(side + '-skill-list');
+    const input = list && list.querySelector('.custom-skill-input');
+    if (input) input.focus();
+  }
+}
+
+// 选中自定义槽的技能（仅当 resolved 非空时有效）。
+// 与 selectAttackSkill / selectDefenseSkill 对等：切 active、持久化、重算。
+function selectCustomSkill(side) {
+  const resolved = state.customSkillResolved[side];
+  if (!resolved) return;
+  if (side === 'attacker') {
+    const prevIdx = state.attackSkillIdx;
+    if (prevIdx === CUSTOM_SKILL_IDX) {
+      // 已选中自定义槽，但 resolved 可能换了一个技能 → 同步 attackSkill
+      if (state.attackSkill && state.attackSkill.id === resolved.id) return;
+      state.attackSkill = resolved;
+      calculateDamage();
+      return;
+    }
+    state.attackSkillIdx = CUSTOM_SKILL_IDX;
+    state.attackSkill = resolved;
+    _setActiveSkill('attacker', prevIdx, CUSTOM_SKILL_IDX);
+    saveSpiritConfig('attacker');
+    calculateDamage();
+  } else {
+    const prevIdx = state.defenseSkillIdx;
+    if (prevIdx === CUSTOM_SKILL_IDX) {
+      if (state.defenseSkill && state.defenseSkill.id === resolved.id) return;
+      state.defenseSkill = resolved;
+      calculateDamage();
+      return;
+    }
+    state.defenseSkillIdx = CUSTOM_SKILL_IDX;
+    state.defenseSkill = resolved;
+    _setActiveSkill('defender', prevIdx, CUSTOM_SKILL_IDX);
+    saveSpiritConfig('defender');
+    calculateDamage();
+  }
+}
+
+// 自定义槽输入框 oninput：
+//   1. 更新 customSkillInput[side]
+//   2. findSkillByName 查 SKILLS（按 name + category）
+//   3. 命中 → customSkillResolved[side] = skill；若该技能与当前已选中不同，
+//      自动选中自定义槽（trigger click logic）；增量重渲槽位 icon/badges
+//   4. 未命中 → customSkillResolved[side] = null；若此前选中的是自定义槽，
+//      回退到列表第一项（attacker: opts[0]；defender: opts[0] = "无"）
+//   5. 持久化 + 重算（只在选中状态变化时）
+function onCustomSkillInput(side, value) {
+  state.customSkillInput[side] = value;
+  const category = side === 'attacker' ? '攻击' : '防御';
+  const resolved = findSkillByName(value, category);
+  const prevResolved = state.customSkillResolved[side];
+  state.customSkillResolved[side] = resolved;
+
+  // 增量更新槽位外观（不替换 input，保住焦点）
+  _renderCustomSkillSlot(side);
+
+  if (resolved) {
+    // 命中：若与当前已选中的自定义技能不同，自动选中
+    const idxField = side === 'attacker' ? 'attackSkillIdx' : 'defenseSkillIdx';
+    const skillField = side === 'attacker' ? 'attackSkill' : 'defenseSkill';
+    const alreadySelected = state[idxField] === CUSTOM_SKILL_IDX
+      && state[skillField] && state[skillField].id === resolved.id;
+    if (!alreadySelected) {
+      // selectCustomSkill 内部会做 prevIdx / active / save / calculate
+      selectCustomSkill(side);
+    }
+  } else {
+    // 未命中：若此前选中的是自定义槽，回退到列表第一项
+    const idxField = side === 'attacker' ? 'attackSkillIdx' : 'defenseSkillIdx';
+    if (state[idxField] === CUSTOM_SKILL_IDX) {
+      const opts = side === 'attacker'
+        ? getAttackSkillOptions(state.attacker)
+        : getDefenseSkillOptions(state.defender);
+      const fallbackIdx = 0;
+      const fallbackSkill = opts[fallbackIdx] || null;
+      const prevIdx = state[idxField];
+      state[idxField] = fallbackIdx;
+      if (side === 'attacker') state.attackSkill = fallbackSkill;
+      else                     state.defenseSkill = fallbackSkill;
+      _setActiveSkill(side, prevIdx, fallbackIdx);
+      saveSpiritConfig(side);
+      calculateDamage();
+    }
+  }
+}
+
 // 切换 .skill-btn 的 active class；list 元素必须是当前已渲染的子集
 // （prevIdx / newIdx 在 list 范围内）。找不到对应按钮时静默失败。
 // 注意：.skill-btn 现在挂在 .skill-list-inner 里（见 styles.css
 // .skill-list 结构注释），所以 querySelector 要走 inner。
+// CUSTOM_SKILL_IDX (-2) 对应 data-idx="custom" 的自定义槽。
 function _setActiveSkill(side, prevIdx, newIdx) {
   const list = document.getElementById(side + '-skill-list');
   if (!list) return;
   const scope = list.querySelector('.skill-list-inner') || list;
-  if (prevIdx >= 0) {
-    const prevBtn = scope.querySelector('.skill-btn[data-idx="' + prevIdx + '"]');
+  const idxSelector = (i) => i === CUSTOM_SKILL_IDX
+    ? '.skill-btn[data-idx="custom"]'
+    : '.skill-btn[data-idx="' + i + '"]';
+  if (prevIdx === CUSTOM_SKILL_IDX || prevIdx >= 0) {
+    const prevBtn = scope.querySelector(idxSelector(prevIdx));
     if (prevBtn) prevBtn.classList.remove('active');
   }
-  const newBtn = scope.querySelector('.skill-btn[data-idx="' + newIdx + '"]');
-  if (newBtn) newBtn.classList.add('active');
+  if (newIdx === CUSTOM_SKILL_IDX || newIdx >= 0) {
+    const newBtn = scope.querySelector(idxSelector(newIdx));
+    if (newBtn) newBtn.classList.add('active');
+  }
 }
 
 // ============================================================
@@ -4107,12 +4393,15 @@ function buildSkillRng(side) {
 
   if (side === 'attacker') {
     if (useMemory) {
-      // 记忆配置：优先从 localStorage 加载已记忆技能；不匹配走兜底
+      // 记忆配置：优先从 localStorage 加载已记忆技能；不匹配走兜底。
+      // 自定义技能：若 userId 在 SKILLS 中但不在精灵技能池里，仍然返回
+      // userId（applyQuestion 会把它当作自定义技能加载）。
       return (attacker) => {
         const opts = getAttackSkillOptions(attacker);
         const saved = loadSpiritConfig(attacker.id, side);
         const userId = saved?.skillId;
         if (userId && opts.some(s => s.id === userId)) return userId;
+        if (userId && SKILLS[userId] && SKILLS[userId].category === '攻击') return userId;
         return fallback(attacker, opts, YUANLI_SKILLS[0].id);
       };
     }
@@ -4134,7 +4423,9 @@ function buildSkillRng(side) {
         const hit = opts.find(s => s.id === userId);
         if (hit) return hit.id;
       }
-      // 2. 兜底
+      // 2. 自定义技能：在 SKILLS 中但不在精灵技能池里
+      if (userId && SKILLS[userId] && SKILLS[userId].category === '防御') return userId;
+      // 3. 兜底
       return fallback(defender, opts, '__none__');
     };
   }
@@ -4488,10 +4779,21 @@ function applyQuestion(index) {
   if (atkIdx >= 0) {
     state.attackSkillIdx = atkIdx;
     state.attackSkill = atkOpts[atkIdx];
+    state.customSkillResolved.attacker = null;
+    state.customSkillInput.attacker    = '';
+  } else if (q.attackSkillId && SKILLS[q.attackSkillId] && SKILLS[q.attackSkillId].category === '攻击') {
+    // 自定义技能：题目 id 在 SKILLS 中但不在该精灵技能池里
+    const customSk = SKILLS[q.attackSkillId];
+    state.attackSkill    = { id: q.attackSkillId, ...customSk };
+    state.attackSkillIdx = CUSTOM_SKILL_IDX;
+    state.customSkillResolved.attacker = state.attackSkill;
+    state.customSkillInput.attacker    = customSk.name;
   } else {
     // 题目的 id 在新精灵里不可用 → 用 opts[0] 兜底
     state.attackSkillIdx = 0;
     state.attackSkill = atkOpts[0] || null;
+    state.customSkillResolved.attacker = null;
+    state.customSkillInput.attacker    = '';
   }
   // 3. 防御技能
   const defOpts = getDefenseSkillOptions(state.defender);
@@ -4499,9 +4801,20 @@ function applyQuestion(index) {
   if (defIdx >= 0) {
     state.defenseSkillIdx = defIdx;
     state.defenseSkill = defOpts[defIdx];
+    state.customSkillResolved.defender = null;
+    state.customSkillInput.defender    = '';
+  } else if (q.defenseSkillId && SKILLS[q.defenseSkillId] && SKILLS[q.defenseSkillId].category === '防御') {
+    // 自定义技能：题目 id 在 SKILLS 中但不在该精灵技能池里
+    const customSk = SKILLS[q.defenseSkillId];
+    state.defenseSkill    = { id: q.defenseSkillId, ...customSk };
+    state.defenseSkillIdx = CUSTOM_SKILL_IDX;
+    state.customSkillResolved.defender = state.defenseSkill;
+    state.customSkillInput.defender    = customSk.name;
   } else {
     state.defenseSkillIdx = 0;
     state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', reduction: 1, _pseudo: true };
+    state.customSkillResolved.defender = null;
+    state.customSkillInput.defender    = '';
   }
   // 4. 重置星陨层数 + 题目元数据
   state.starLayer = 0;
