@@ -5139,6 +5139,27 @@ function initChallengeMode() {
   }
 }
 
+// 移动端 carousel 分页指示器：根据滚动位置高亮当前面板（攻击方 / 星陨与挑战设置 / 防御方）。
+function initMobileCarouselDots() {
+  const carousel = document.querySelector('.battle-carousel');
+  const dots = document.querySelectorAll('.mobile-carousel-dot');
+  if (!carousel || dots.length === 0) return;
+
+  function updateDots() {
+    const width = carousel.clientWidth;
+    if (!width) return;
+    // 每个面板约等于 carousel 宽度，取最近的面板索引
+    const index = Math.max(0, Math.min(2, Math.round(carousel.scrollLeft / width)));
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === index);
+    });
+  }
+
+  carousel.addEventListener('scroll', updateDots, { passive: true });
+  window.addEventListener('resize', updateDots, { passive: true });
+  updateDots();
+}
+
 function init() {
   initStarCanvas();
   generateSealSVG();
@@ -5155,6 +5176,8 @@ function init() {
   renderWaiting();
   // 挑战模式：仅挂事件、初始化 chip 状态，不主动进入
   initChallengeMode();
+  // 移动端 carousel 分页指示器
+  initMobileCarouselDots();
 }
 
 window.addEventListener('DOMContentLoaded', async () => {

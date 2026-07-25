@@ -918,6 +918,11 @@ body {
   display: none;   /* 桌面端隐藏，移动端 media query 中覆盖 */
 }
 
+/* 移动端 carousel 分页指示器：桌面端隐藏 */
+.mobile-carousel-dots {
+  display: none;
+}
+
 /* ============ Result Ring (lower half, mirrors the seal ring) ============ */
 .result-label {
   font-size: 0.75rem;
@@ -1684,8 +1689,8 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 8px 0 0;
-    margin: 16px 0 0;
+    padding: 0;   /* 顶部从 16px 减到 0px，抵消分页指示器占据的空间 */
+    margin: 0;    /* 顶部从 16px 减到 0px，抵消分页指示器占据的空间 */
     background: none;
     border: none;
   }
@@ -1790,9 +1795,31 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .battle-area {
     display: block;   /* 覆盖桌面端 grid，由 carousel 接管布局 */
     gap: 0;
-    margin: 0 -16px 16px;     /* 负 margin 抵消 .container 的 padding，让 carousel 贴边屏幕 */
+    margin: 0 -16px 0px;     /* 负 margin 抵消 .container 的 padding，让 carousel 贴边屏幕；底部从 16px 减到 0px，给分页指示器留空间 */
     width: calc(100% + 32px);
   }
+
+  /* carousel 分页指示器：三个小圆点，高度与结果进度条一致（8px），提示可左右滑动 */
+  .mobile-carousel-dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+  }
+  .mobile-carousel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.19);
+    transition: background 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease;
+  }
+  .mobile-carousel-dot.active {
+    background: var(--accent-primary);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 55%, transparent);
+    transform: scale(1.15);
+  }
+
   .battle-carousel {
     display: flex;
     overflow-x: auto;
