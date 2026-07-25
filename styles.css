@@ -778,8 +778,14 @@ body {
   user-select: text;
   -webkit-user-select: text;
 }
-.custom-skill-input:focus {
+.custom-skill-input:focus,
+.custom-skill-input:focus-visible {
+  /* 覆盖全局 :focus-visible 规则（特异性同为 0,1,0，但本规则书写更靠后
+   * 且针对 .custom-skill-input 显式声明，避免聚焦时出现蓝色圆角 outline
+   * 与底部虚线框并存）。仅保留底部虚线高亮作为聚焦反馈。 */
+  outline: none;
   border-bottom-color: var(--accent-primary);
+  border-radius: 0;
 }
 .custom-skill-input::placeholder {
   color: var(--text-secondary);
