@@ -1935,7 +1935,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
      buff-chip 多出 6px。这里只保留 `margin-right: -2px` 抵消 padding-right: 2px，
      并把 scrollbar-gutter 还原为 auto（overlay 滚动条不需预留）。 */
   .skill-list {
-    height: 125px;       /* 显式 height 而非 min/max，让 .skill-list-inner 的 height: 100% 能正确解析（见桌面端注释） */
+    height: 117px;       /* 显式 height 而非 min/max，让 .skill-list-inner 的 height: 100% 能正确解析（见桌面端注释） */
     margin-right: -2px;  /* 覆盖桌面端 -8px：移动端 overlay 滚动条 gutter=0，只抵消 padding-right: 2px */
   }
   .skill-list-inner {
@@ -1982,9 +1982,9 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     margin-right: -1px;  /* 覆盖桌面端 -7px：移动端 overlay 滚动条 gutter=0，只抵消 padding-right: 1px */
   }
   .spirit-picker-grid-inner {
-    /* 在我的电脑上442不抖，在我的手机上446不抖 */
-    min-height: 446px;
-    max-height: 446px;
+    /* 在我的电脑上434不抖，在我的手机上438不抖 */
+    min-height: 438px;
+    max-height: 438px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     /* 移动端：同样始终为滚动条预留 gutter，避免列表抖动 */
     scrollbar-gutter: stable;
