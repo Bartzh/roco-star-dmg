@@ -4812,9 +4812,6 @@ function applyQuestion(index) {
   // 1. 替换 state 全部相关字段（深拷贝避免污染快照）
   state.attacker = { ...q.attacker };
   state.defender = { ...q.defender };
-  // 清空两侧 customSkillPrevSkill（题目切换 = 新精灵，旧保存值不适用）
-  state.customSkillPrevSkill.attacker = null;
-  state.customSkillPrevSkill.defender = null;
   state.attackerNature = { ...q.attackerNature };
   state.defenderNature = { ...q.defenderNature };
   state.attackerIVs = q.attackerIVs.slice();
@@ -4829,6 +4826,9 @@ function applyQuestion(index) {
   state.spiritPicking.attacker = false;
   state.spiritPicking.defender = false;
   // 2. 攻击技能：在新精灵的可用列表中找对应 id
+  //    customSkillPrevSkill：题目应用普通技能时保存为该技能（供退出挑战后
+  //    用户在自定义槽输入不存在技能时回退）；题目应用自定义技能时不保存
+  //    （已经在自定义槽，无"之前的技能"可回退）。
   const atkOpts = getAttackSkillOptions(state.attacker);
   const atkIdx = atkOpts.findIndex(s => s.id === q.attackSkillId);
   if (atkIdx >= 0) {
@@ -4836,6 +4836,7 @@ function applyQuestion(index) {
     state.attackSkill = atkOpts[atkIdx];
     state.customSkillResolved.attacker = null;
     state.customSkillInput.attacker    = '';
+    state.customSkillPrevSkill.attacker = { idx: atkIdx, skill: state.attackSkill };
   } else if (q.attackSkillId && SKILLS[q.attackSkillId] && SKILLS[q.attackSkillId].category === '攻击') {
     // 自定义技能：题目 id 在 SKILLS 中但不在该精灵技能池里
     const customSk = SKILLS[q.attackSkillId];
@@ -4843,12 +4844,14 @@ function applyQuestion(index) {
     state.attackSkillIdx = CUSTOM_SKILL_IDX;
     state.customSkillResolved.attacker = state.attackSkill;
     state.customSkillInput.attacker    = customSk.name;
+    state.customSkillPrevSkill.attacker = null;
   } else {
     // 题目的 id 在新精灵里不可用 → 用 opts[0] 兜底
     state.attackSkillIdx = 0;
     state.attackSkill = atkOpts[0] || null;
     state.customSkillResolved.attacker = null;
     state.customSkillInput.attacker    = '';
+    state.customSkillPrevSkill.attacker = state.attackSkill ? { idx: 0, skill: state.attackSkill } : null;
   }
   // 3. 防御技能
   const defOpts = getDefenseSkillOptions(state.defender);
@@ -4858,6 +4861,7 @@ function applyQuestion(index) {
     state.defenseSkill = defOpts[defIdx];
     state.customSkillResolved.defender = null;
     state.customSkillInput.defender    = '';
+    state.customSkillPrevSkill.defender = { idx: defIdx, skill: state.defenseSkill };
   } else if (q.defenseSkillId && SKILLS[q.defenseSkillId] && SKILLS[q.defenseSkillId].category === '防御') {
     // 自定义技能：题目 id 在 SKILLS 中但不在该精灵技能池里
     const customSk = SKILLS[q.defenseSkillId];
@@ -4865,11 +4869,13 @@ function applyQuestion(index) {
     state.defenseSkillIdx = CUSTOM_SKILL_IDX;
     state.customSkillResolved.defender = state.defenseSkill;
     state.customSkillInput.defender    = customSk.name;
+    state.customSkillPrevSkill.defender = null;
   } else {
     state.defenseSkillIdx = 0;
     state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', reduction: 1, _pseudo: true };
     state.customSkillResolved.defender = null;
     state.customSkillInput.defender    = '';
+    state.customSkillPrevSkill.defender = { idx: 0, skill: state.defenseSkill };
   }
   // 4. 重置星陨层数 + 题目元数据
   state.starLayer = 0;
