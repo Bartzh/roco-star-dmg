@@ -1492,12 +1492,19 @@ defender_random_pools: dict[str, RandomPool] = {
                         nature=Nature(up='hp', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=7
+                    weight=5
                 ),
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='hp', down='atk'),
                         ivs=['hp', 'def', 'mdef']
+                    ),
+                    weight=5
+                ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'matk', 'def']
                     ),
                     weight=5
                 ),
