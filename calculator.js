@@ -301,6 +301,14 @@ let state = {
   // 当 Resolved 非空时，点击自定义槽或自动选中都会让 skillIdx = CUSTOM_SKILL_IDX。
   customSkillInput:    { attacker: '', defender: '' },
   customSkillResolved: { attacker: null, defender: null },
+  // 自定义槽"之前选中的技能"快照（{ idx, skill } 或 null）。
+  //   保存时机：selectCustomSkill 从普通技能切到自定义槽时（prevIdx !== CUSTOM_SKILL_IDX）
+  //   使用时机：onCustomSkillInput 未命中分支——若用户清空输入或输入了不存在的
+  //   技能名，自动回退到 customSkillPrevSkill 而不是列表第一项，方便用户在
+  //   反复输入试错时不会丢失之前的选中。
+  //   清空时机：切换精灵（selectSpirit）/ 应用题目（applyQuestion）——精灵换了，
+  //   保存的 idx 不再适用。
+  customSkillPrevSkill: { attacker: null, defender: null },
   starLayer: 0,
   // 精灵面板是否处于“选择中”状态（true 时渲染内嵌选择器而非卡片）
   spiritPicking: { attacker: false, defender: false },
@@ -1601,6 +1609,9 @@ function selectSpirit(side, id) {
   if (!s) return;
   // 给精灵对象附带 id 字段（便于在选择器中识别当前选中项）
   const spirit = { id, ...s };
+  // 切换精灵：清空该侧 customSkillPrevSkill（保存的 idx 是上一只精灵的，
+  // 新精灵技能池不同，idx 不再适用；onCustomSkillInput 未命中分支会 fallback 到 opts[0]）
+  state.customSkillPrevSkill[side] = null;
   if (side === 'attacker') {
     state.attacker = spirit;
     // 加载该精灵攻击方侧的全部可调配置（性格/个体/buff/skill）。
@@ -2478,6 +2489,9 @@ function selectCustomSkill(side) {
       calculateDamage();
       return;
     }
+    // 从普通技能切到自定义槽：保存"切之前选中的技能"，供 onCustomSkillInput
+    // 未命中分支回退（避免输入失效后丢失之前的选中）
+    state.customSkillPrevSkill.attacker = { idx: prevIdx, skill: state.attackSkill };
     state.attackSkillIdx = CUSTOM_SKILL_IDX;
     state.attackSkill = resolved;
     _setActiveSkill('attacker', prevIdx, CUSTOM_SKILL_IDX);
@@ -2491,6 +2505,7 @@ function selectCustomSkill(side) {
       calculateDamage();
       return;
     }
+    state.customSkillPrevSkill.defender = { idx: prevIdx, skill: state.defenseSkill };
     state.defenseSkillIdx = CUSTOM_SKILL_IDX;
     state.defenseSkill = resolved;
     _setActiveSkill('defender', prevIdx, CUSTOM_SKILL_IDX);
@@ -2528,14 +2543,33 @@ function onCustomSkillInput(side, value) {
       selectCustomSkill(side);
     }
   } else {
-    // 未命中：若此前选中的是自定义槽，回退到列表第一项
+    // 未命中：若此前选中的是自定义槽，回退到"切到自定义槽之前的技能"。
+    //   没有保存值（理论不应发生：selectCustomSkill 一定会先保存）才 fallback 到 opts[0]。
+    //   原因：用户可能临时输入试错（如打错字 / 想换一个）——回到列表第一项会
+    //   丢失之前选中的技能，体验割裂。回退到 prevSkill 可让用户随时再切回。
     const idxField = side === 'attacker' ? 'attackSkillIdx' : 'defenseSkillIdx';
     if (state[idxField] === CUSTOM_SKILL_IDX) {
       const opts = side === 'attacker'
         ? getAttackSkillOptions(state.attacker)
         : getDefenseSkillOptions(state.defender);
-      const fallbackIdx = 0;
-      const fallbackSkill = opts[fallbackIdx] || null;
+      const prev = state.customSkillPrevSkill[side];
+      let fallbackIdx, fallbackSkill;
+      if (prev && prev.idx != null && prev.idx >= 0
+          && prev.idx < opts.length
+          && prev.skill && opts[prev.idx] && opts[prev.idx].id === prev.skill.id) {
+        // 保存值仍有效 → 用它
+        fallbackIdx = prev.idx;
+        fallbackSkill = opts[prev.idx];
+      } else if (prev && prev.skill
+                 && opts.some(s => s.id === prev.skill.id)) {
+        // idx 失效但技能 id 仍在 opts 中 → 用 id 重新定位
+        fallbackIdx = opts.findIndex(s => s.id === prev.skill.id);
+        fallbackSkill = opts[fallbackIdx];
+      } else {
+        // 没有保存值或已失效 → 列表第一项
+        fallbackIdx = 0;
+        fallbackSkill = opts[fallbackIdx] || null;
+      }
       const prevIdx = state[idxField];
       state[idxField] = fallbackIdx;
       if (side === 'attacker') state.attackSkill = fallbackSkill;
@@ -4778,6 +4812,9 @@ function applyQuestion(index) {
   // 1. 替换 state 全部相关字段（深拷贝避免污染快照）
   state.attacker = { ...q.attacker };
   state.defender = { ...q.defender };
+  // 清空两侧 customSkillPrevSkill（题目切换 = 新精灵，旧保存值不适用）
+  state.customSkillPrevSkill.attacker = null;
+  state.customSkillPrevSkill.defender = null;
   state.attackerNature = { ...q.attackerNature };
   state.defenderNature = { ...q.defenderNature };
   state.attackerIVs = q.attackerIVs.slice();
