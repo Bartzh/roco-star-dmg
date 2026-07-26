@@ -872,24 +872,28 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
         buffs=BuffsPool(
-            default_weight=0,
+            default_weight=3,
             combos=[
                 WeightedBuffCombo(
-                    combo=[{'matk': 50, 'power': 20}],
-                    weight=10
+                    combo=[{'power': 20}],
+                    weight=22
                 ),
                 WeightedBuffCombo(
-                    combo=[{'matk': 50, 'power': 40}],
+                    combo=[{'power': 40}],
+                    weight=4
+                ),
+                WeightedBuffCombo(
+                    combo=[{'matk': 50, 'power': 20}],
                     weight=2
                 ),
                 WeightedBuffCombo(
-                    combo=[{'matk': 100, 'power': 20}],
+                    combo=[{'matk': 50, 'power': 40}],
                     weight=1
                 ),
                 WeightedBuffCombo(
-                    combo=[{'matk': 100, 'power': 40}],
-                    weight=0.5
-                ),
+                    combo=[{'matk': 50}],
+                    weight=0.75
+                )
             ]
         ),
         skills=SkillsPool(
@@ -897,7 +901,7 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='多维击打',
-                    weight=15
+                    weight=20
                 ),
                 WeightedSkillCombo(
                     combo='离子震荡',
