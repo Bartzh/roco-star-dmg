@@ -2609,7 +2609,7 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 //   {
 //     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
 //     ignoreResist?: boolean, elementOverride?: string,
-//     matkAdd?: number,
+//     matkAdd?: number, speedAdd?: number,
 //     notes?: string[],
 //   }.
 // ignoreResist: true ⇒ the defender's type resistance (effectiveness < 1)
@@ -2620,6 +2620,11 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 // matkAdd: flat percentage points added to the attacker's 魔攻 buff
 //   (additive with the user's chip buff). Only takes effect when the
 //   skill deals magic damage (isMagic === true).
+// speedAdd: flat speed points added to the attacker's (or defender's,
+//   depending on fromAttacker) effective speed. Applied in-place to
+//   ctx.attackerEffectiveSpeed / ctx.defenderEffectiveSpeed during the
+//   apply loop, so subsequent isFirstStrike checks (顺风, 疾风刺, etc.)
+//   see the updated speed.
 // The aggregator (computeSkillDynamicModifiers) merges them.
 //
 // The ctx object always carries:
@@ -2937,7 +2942,7 @@ const SKILL_MODS = {
       };
     }
   },
-  // 变形活画：敌方每有1层增益，本次技能威力+10%
+  // 变形活画：敌方每有1层增益，本次技能威力+10%，速度+5
   变形活画(ctx, fromAttacker) {
     if (!fromAttacker) return null;
     const speedLayers = Math.max(0, Math.floor(ctx.defenderSpeedBonus / 10));
@@ -2947,7 +2952,8 @@ const SKILL_MODS = {
     if (layers === 0) return null;
     return {
       powerMultAdd: layers * 0.1,
-      notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）`],
+      speedAdd: layers * 5,
+      notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）· 速度 +${layers * 5}（${layers} 层增益 ×5）`],
     };
   },
   // 急中生智：自己有减益时，本次技能威力 +40
@@ -3066,7 +3072,7 @@ function computeSkillDynamicModifiers(
     attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
   };
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, matkAdd: 0, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, matkAdd: 0, speedAdd: 0, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     // 优先用 modKey（用于把多个"同族"技能共享到同一条 SKILL_MODS），
@@ -3075,6 +3081,14 @@ function computeSkillDynamicModifiers(
     if (!fn) return;
     const mod = fn(ctx, fromAttacker);
     if (!mod) return;
+    // speedAdd 必须在其它依赖速度的修正（isFirstStrike）之前应用到 ctx：
+    // apply 顺序是 攻击方特性 → 攻击技能 → 防御方特性，所以攻击方特性的
+    // speedAdd 会先于攻击技能的 isFirstStrike 检查生效。
+    if (mod.speedAdd) {
+      result.speedAdd += mod.speedAdd;
+      if (fromAttacker) ctx.attackerEffectiveSpeed += mod.speedAdd;
+      else              ctx.defenderEffectiveSpeed += mod.speedAdd;
+    }
     if (mod.comboAdd)     result.comboAdd     += mod.comboAdd;
     if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
     if (mod.powerMultAdd) result.powerMultAdd += mod.powerMultAdd;
