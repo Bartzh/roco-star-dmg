@@ -3165,8 +3165,10 @@ function computeFinalDamage(ctx) {
   const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
   const atkAddPct  = isMagic ? (dyn.matkAdd || 0) : 0;
   const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
-  const atkStat = Math.max(0, Math.round((isMagic ? matkBaseNoBuff : atkBaseNoBuff) * (1 + (atkBuffPct + atkAddPct) / 100)));
-  const defStat = Math.max(0, Math.round(getFinalStat(def, defStatKey, defNature, defIVs) * (1 + defBuffPct / 100)));
+  const atkStatBase = isMagic ? matkBaseNoBuff : atkBaseNoBuff;
+  const defStatBase = getFinalStat(def, defStatKey, defNature, defIVs);
+  const atkStat = Math.max(0, Math.round(atkStatBase * (1 + (atkBuffPct + atkAddPct) / 100)));
+  const defStat = Math.max(0, Math.round(defStatBase * (1 + defBuffPct / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
   // 威力 chip — flat addition to base power (always shown).
@@ -3221,6 +3223,7 @@ function computeFinalDamage(ctx) {
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic, dyn,
+    atkStatBase, defStatBase,
     atkBuffPct, atkAddPct, defBuffPct,
     powerBoost, attackerCombo, hasCombo
   };
@@ -3535,20 +3538,29 @@ function renderBreakdownList(breakdownList, data) {
     : '';
   const atkStatLabel = data.isMagic ? '魔攻' : '物攻';
   const defStatLabel = data.isMagic ? '魔防' : '物防';
-  const buffBits = [];
-  if (data.atkBuffPct || data.atkAddPct) {
-    const parts = [];
-    if (data.atkBuffPct) parts.push(formatBuff(data.atkBuffPct));
-    if (data.atkAddPct) parts.push(`${formatBuff(data.atkAddPct)}（动态）`);
-    const total = (data.atkBuffPct || 0) + (data.atkAddPct || 0);
-    buffBits.push(parts.length > 1
-      ? `${atkStatLabel} ${parts.join(' + ')} = ${formatBuff(total)}`
-      : `${atkStatLabel} ${parts[0]}`);
-  }
-  if (data.defBuffPct) buffBits.push(`${defStatLabel} ${formatBuff(data.defBuffPct)}`);
-  const buffLineHTML = buffBits.length
-    ? `<div><span class="label">buff 调整:</span> <span class="multiplier">${buffBits.join(' · ')}</span></div>`
-    : '';
+  // Compose the 攻击/防御 stat line — shows base × buff breakdown = final,
+  // parallel to the 威力/连击 lines. Uses the multiplier form (not additive
+  // contributions) because Math.round(base × pct/100) summed across terms
+  // may not equal Math.round(base × (1 + sumPct/100)), which would make the
+  // equation not actually hold. Examples:
+  //   800                                       (no buff)
+  //   800 × 1.30 = 1040                         (single buff)
+  //   800 × (1 + 30% + 50%（动态）) = 1440       (chip + dynamic)
+  //   800 × (1 - 30% + 50%（动态）) = 960        (mixed signs)
+  const formatStatText = (base, buffPct, addPct, finalStat) => {
+    if (!buffPct && !addPct) return String(base);
+    const total = 1 + (buffPct + addPct) / 100;
+    const totalStr = total.toFixed(2);
+    const terms = [];
+    if (buffPct > 0) terms.push(`+ ${(buffPct / 100).toFixed(2)}`);
+    else if (buffPct < 0) terms.push(`- ${(Math.abs(buffPct) / 100).toFixed(2)}`);
+    if (addPct > 0) terms.push(`+ ${(addPct / 100).toFixed(2)}`);
+    else if (addPct < 0) terms.push(`- ${(Math.abs(addPct) / 100).toFixed(2)}`);
+    if (terms.length === 1) return `${base} × ${totalStr} = ${finalStat}`;
+    return `${base} × (1 ${terms.join(' ')}) = ${finalStat}`;
+  };
+  const atkStatText = formatStatText(data.atkStatBase, data.atkBuffPct, data.atkAddPct, data.atkStat);
+  const defStatText = formatStatText(data.defStatBase, data.defBuffPct, 0, data.defStat);
   const ignoredResist = (dynMods.ignoreResist || (data.dyn && data.dyn.ignoreResist))
     && (data.skillEffRaw ?? 1) < 1;
   const effExpr = ignoredResist
@@ -3558,9 +3570,8 @@ function renderBreakdownList(breakdownList, data) {
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
     <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
     <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span>${stabBadge}</div>
-    <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
-    <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
-    ${buffLineHTML}
+    <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
+    <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
     <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
     <div><span class="label">连击:</span> <span class="value">${comboText}</span></div>
     <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
@@ -3572,8 +3583,8 @@ function renderBreakdownList(breakdownList, data) {
     <div><span class="label">星陨 power:</span> <span class="value">${data.n}² + 24×${data.n} - 24 = ${data.starPower}</span></div>
     ${data.isSkillIllusion ? `<div><span class="label">触发:</span> <span class="value" style="color:#ff8c00">否 (技能为幻系)</span></div>`
       : (data.n > 0
-        ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${data.atkStat}</span></div>
-           <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${data.defStat}</span></div>
+        ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
+           <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
            <div><span class="label">克制(幻系):</span> <span class="multiplier">×${data.starEff}</span></div>
            <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
         : `<div><span class="label">触发:</span> <span class="value" style="color:var(--text-secondary)">否 (层数为 0)</span></div>`)}
