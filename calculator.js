@@ -2609,6 +2609,7 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 //   {
 //     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
 //     ignoreResist?: boolean, elementOverride?: string,
+//     matkAdd?: number,
 //     notes?: string[],
 //   }.
 // ignoreResist: true ⇒ the defender's type resistance (effectiveness < 1)
@@ -2616,6 +2617,9 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 // elementOverride: if set, replaces skill.element for STAB / effectiveness /
 //   幻-element checks during damage calculation (e.g. 展翅 changes
 //   普通系 → 翼系). The original skill.element is preserved.
+// matkAdd: flat percentage points added to the attacker's 魔攻 buff
+//   (additive with the user's chip buff). Only takes effect when the
+//   skill deals magic damage (isMagic === true).
 // The aggregator (computeSkillDynamicModifiers) merges them.
 //
 // The ctx object always carries:
@@ -3012,6 +3016,15 @@ const SKILL_MODS = {
       notes: [`威力 ×2.5（应对状态）`],
     };
   },
+  // 和弦共振：双方场上每有1种不同的印记，自己获得魔攻+50%。
+  和弦共振(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (!ctx.starLayer) return null;
+    return {
+      matkAdd: 50,
+      notes: [`魔攻 +50%（场上存在一种印记）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
@@ -3053,7 +3066,7 @@ function computeSkillDynamicModifiers(
     attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
   };
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, matkAdd: 0, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     // 优先用 modKey（用于把多个"同族"技能共享到同一条 SKILL_MODS），
@@ -3067,6 +3080,7 @@ function computeSkillDynamicModifiers(
     if (mod.powerMultAdd) result.powerMultAdd += mod.powerMultAdd;
     if (mod.powerMult)    result.powerMult    *= mod.powerMult;
     if (mod.comboMult)    result.comboMult    *= mod.comboMult;
+    if (mod.matkAdd)      result.matkAdd      += mod.matkAdd;
     if (mod.ignoreResist) result.ignoreResist  = true;
     if (mod.elementOverride != null) result.elementOverride = mod.elementOverride;
     for (const text of (mod.notes || [])) {
@@ -3138,17 +3152,23 @@ function computeFinalDamage(ctx) {
   }
   const atkStatKey = isMagic ? 'matk' : 'atk';
   const defStatKey = isMagic ? 'mdef' : 'def';
+
+  // Dynamic modifiers from special skills (power boost / extra hits / stat
+  // buffs tied to star layer, etc.). Computed before atkStat/defStat so that
+  // dynamic stat modifiers (e.g. 和弦共振's +50% 魔攻) can be added to the
+  // buff percentage below.
+  const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
+
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
-  // nonsensical negative stats from extreme debuffs.
+  // nonsensical negative stats from extreme debuffs. Dynamic stat modifiers
+  // (dyn.matkAdd) are additive with the chip buff.
   const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
+  const atkAddPct  = isMagic ? (dyn.matkAdd || 0) : 0;
   const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
-  const atkStat = Math.max(0, Math.round((isMagic ? matkBaseNoBuff : atkBaseNoBuff) * (1 + atkBuffPct / 100)));
+  const atkStat = Math.max(0, Math.round((isMagic ? matkBaseNoBuff : atkBaseNoBuff) * (1 + (atkBuffPct + atkAddPct) / 100)));
   const defStat = Math.max(0, Math.round(getFinalStat(def, defStatKey, defNature, defIVs) * (1 + defBuffPct / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
-
-  // Dynamic modifiers from special skills (power boost / extra hits tied to star layer, etc.)
-  const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
   // 威力 chip — flat addition to base power (always shown).
   const powerBoost = ctx.attackerPowerBoost || 0;
   // 连击数 chip — flat addition to base combo count (always shown).
@@ -3201,7 +3221,7 @@ function computeFinalDamage(ctx) {
     defHP, skill, defSkill, atk, def,
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic, dyn,
-    atkBuffPct, defBuffPct,
+    atkBuffPct, atkAddPct, defBuffPct,
     powerBoost, attackerCombo, hasCombo
   };
 }
@@ -3516,7 +3536,15 @@ function renderBreakdownList(breakdownList, data) {
   const atkStatLabel = data.isMagic ? '魔攻' : '物攻';
   const defStatLabel = data.isMagic ? '魔防' : '物防';
   const buffBits = [];
-  if (data.atkBuffPct) buffBits.push(`${atkStatLabel} ${formatBuff(data.atkBuffPct)}`);
+  if (data.atkBuffPct || data.atkAddPct) {
+    const parts = [];
+    if (data.atkBuffPct) parts.push(formatBuff(data.atkBuffPct));
+    if (data.atkAddPct) parts.push(`${formatBuff(data.atkAddPct)}（动态）`);
+    const total = (data.atkBuffPct || 0) + (data.atkAddPct || 0);
+    buffBits.push(parts.length > 1
+      ? `${atkStatLabel} ${parts.join(' + ')} = ${formatBuff(total)}`
+      : `${atkStatLabel} ${parts[0]}`);
+  }
   if (data.defBuffPct) buffBits.push(`${defStatLabel} ${formatBuff(data.defBuffPct)}`);
   const buffLineHTML = buffBits.length
     ? `<div><span class="label">buff 调整:</span> <span class="multiplier">${buffBits.join(' · ')}</span></div>`
