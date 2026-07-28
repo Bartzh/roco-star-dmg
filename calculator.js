@@ -287,6 +287,238 @@ function saveSpiritConfig(side) {
   }
 }
 
+// ============================================================
+// "常见"精灵列表的持久化收藏（localStorage）。
+// 用户可在精灵面板 label 右侧通过星标按钮为当前精灵添加 / 取消收藏，
+// 收藏列表即"常见"列表——同时影响 picker 的"常见"筛选与挑战模式的
+// "常见"精灵池。进入精灵选择器后，星标按钮过渡为"重置"按钮，可将
+// 列表重置为 datas/final/others.json 中预定义的默认列表。
+//
+// 存储键 `roco-star-dmg:favorites:v1:<side>`：每侧一条 JSON 数组，
+// 元素为精灵 id（即 SPRITES 的 key）。无存档或数据不合法时回退到
+// OTHERS.common_attackers / common_defenders 默认列表。
+// ============================================================
+const FAVORITES_KEY_PREFIX = 'roco-star-dmg:favorites:v1:';
+// 缓存：null = 尚未加载；string[] = 已加载（可能为空数组）
+let _favoritesCache = { attacker: null, defender: null };
+
+function _defaultCommonList(side) {
+  return (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
+}
+
+// 懒加载：首次访问时从 localStorage 读取，损坏 / 无存档时回退默认列表。
+// 过滤掉已不存在的精灵 id，避免数据更新后残留幽灵条目。
+function _loadFavorites(side) {
+  if (_favoritesCache[side] !== null) return _favoritesCache[side];
+  let list = null;
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY_PREFIX + side);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        list = arr.filter(id => SPRITES[id]);
+      }
+    }
+  } catch (_) { /* 数据损坏 → 走默认 */ }
+  _favoritesCache[side] = list || _defaultCommonList(side).slice();
+  return _favoritesCache[side];
+}
+
+function _saveFavorites(side) {
+  try {
+    localStorage.setItem(FAVORITES_KEY_PREFIX + side, JSON.stringify(_favoritesCache[side]));
+  } catch (_) { /* 配额超限 / 存储被禁用 —— 静默忽略 */ }
+}
+
+// 返回当前"常见"精灵 id 列表（读写统一入口）。filterSpirits 与
+// buildSpiritRng 都走这里，保证筛选与挑战池用同一份数据。
+function getCommonSpirits(side) {
+  return _loadFavorites(side);
+}
+
+function isFavorite(side, id) {
+  if (!id) return false;
+  return _loadFavorites(side).indexOf(id) >= 0;
+}
+
+// 切换当前选中精灵的收藏状态，刷新星标按钮外观。
+function toggleFavorite(side) {
+  const spirit = state[side];
+  if (!spirit) return;
+  const list = _loadFavorites(side);
+  const idx = list.indexOf(spirit.id);
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push(spirit.id);
+  _saveFavorites(side);
+  _refreshFavoriteBtn(side);
+}
+
+// 重置该侧"常见"列表为 others.json 中的预定义列表，刷新 picker grid。
+// 先弹确认窗，用户确认后才执行重置。
+function resetFavorites(side) {
+  const sideText = side === 'attacker' ? '攻击方' : '防御方';
+  showConfirmDialog(
+    '重置常见列表',
+    `<div style="line-height:1.7">确定要把${sideText}的「常见」列表重置为默认吗？<br>你自定义收藏的精灵会被替换为预定义列表。</div>`,
+    () => {
+      _favoritesCache[side] = _defaultCommonList(side).slice();
+      _saveFavorites(side);
+      refreshPickerGrid(side);
+      // 视觉反馈：重置按钮短暂脉动
+      const btn = document.querySelector(`.label-action.reset-btn[data-side="${side}"]`);
+      if (btn) {
+        btn.classList.remove('pulse');
+        void btn.offsetWidth;   // 强制 reflow 以重启动画
+        btn.classList.add('pulse');
+        setTimeout(() => btn.classList.remove('pulse'), 420);
+      }
+    }
+  );
+}
+
+// 通用确认弹窗：复用 #confirm-modal（结构与 #info-modal 一致，footer 有取消/确认）。
+//   title      : 弹窗标题
+//   bodyHTML   : modal-body 的 innerHTML
+//   onConfirm  : 点击"确认"按钮的回调
+// 点击取消 / ESC / 遮罩 = 不执行 onConfirm，仅关闭。
+function showConfirmDialog(title, bodyHTML, onConfirm) {
+  const overlay = document.getElementById('confirm-modal');
+  if (!overlay) return;
+  const titleEl = document.getElementById('confirm-modal-title');
+  const bodyEl  = document.getElementById('confirm-modal-body');
+  const closeBtn   = overlay.querySelector('.modal-close');
+  const cancelBtn  = overlay.querySelector('.modal-cancel');
+  const confirmBtn = overlay.querySelector('.modal-danger');
+  if (!titleEl || !bodyEl || !closeBtn || !cancelBtn || !confirmBtn) return;
+
+  titleEl.textContent = title;
+  bodyEl.innerHTML    = bodyHTML;
+
+  const lastFocus = document.activeElement;
+  const open = () => {
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => confirmBtn.focus(), 0);
+  };
+  const close = () => {
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    // 清理一次性事件监听
+    closeBtn.removeEventListener('click', onClose);
+    cancelBtn.removeEventListener('click', onClose);
+    confirmBtn.removeEventListener('click', onConfirmClick);
+    overlay.removeEventListener('click', onOverlayClick);
+    document.removeEventListener('keydown', onKeydown);
+    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+  };
+  const onClose = () => close();
+  const onConfirmClick = () => { close(); if (onConfirm) onConfirm(); };
+  const onOverlayClick = (e) => { if (e.target === overlay) close(); };
+  const onKeydown = (e) => {
+    if (overlay.classList.contains('is-open') && e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  };
+
+  closeBtn.addEventListener('click', onClose);
+  cancelBtn.addEventListener('click', onClose);
+  confirmBtn.addEventListener('click', onConfirmClick);
+  overlay.addEventListener('click', onOverlayClick);
+  document.addEventListener('keydown', onKeydown);
+  open();
+}
+
+// ---- 星标 / 重置按钮的图标与外观 ----
+// 复用筛选 chip 的星星图标。
+const _FAV_ICON_FILLED = '<svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"></path></svg>';
+const _FAV_ICON_OUTLINE = '<svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"></path></svg>'
+
+// 根据当前精灵的收藏状态刷新星标按钮（图标 + is-fav 类 + title）。
+function _refreshFavoriteBtn(side) {
+  const btn = document.querySelector(`.label-action.fav-btn[data-side="${side}"]`);
+  if (!btn) return;
+  const spirit = state[side];
+  const fav = spirit ? isFavorite(side, spirit.id) : false;
+  btn.classList.toggle('is-fav', fav);
+  btn.innerHTML = fav ? _FAV_ICON_FILLED : _FAV_ICON_OUTLINE;
+  btn.title = fav ? '取消收藏' : '收藏到常见列表';
+  btn.setAttribute('aria-pressed', fav ? 'true' : 'false');
+}
+
+// 瞬时（无动画）同步 label 右侧动作按钮的可见性。
+//   picker 模式（选择中或未选精灵）→ 显示重置按钮
+//   card 模式（已选精灵）             → 显示收藏按钮
+// 用于初始化、退出挑战等"非过渡"场景。
+function _syncLabelActionNoAnim(side) {
+  const favBtn = document.querySelector(`.label-action.fav-btn[data-side="${side}"]`);
+  const resetBtn = document.querySelector(`.label-action.reset-btn[data-side="${side}"]`);
+  if (!favBtn || !resetBtn) return;
+  const spirit = state[side];
+  const showReset = state.spiritPicking[side] || !spirit;
+  _cancelAnimations(favBtn);
+  _cancelAnimations(resetBtn);
+  favBtn.hidden = showReset;
+  resetBtn.hidden = !showReset;
+  favBtn.style.opacity = '';
+  favBtn.style.transform = '';
+  resetBtn.style.opacity = '';
+  resetBtn.style.transform = '';
+  if (!showReset) _refreshFavoriteBtn(side);
+}
+
+// 动画过渡：收藏按钮 ↔ 重置按钮（220ms 淡出 → 切换 → 220ms 淡入）。
+//   toReset = true  : fav → reset（进入选择器）
+//   toReset = false : reset → fav（退出选择器 / 选中精灵）
+// 与 _swapLabelVisibility 同风格（Web Animations API + EASING_STANDARD）。
+// 处理快速连点（中途打断）：先取消两个按钮上残留的 Web Animations，
+// 再根据"哪个按钮当前可见"决定淡出起点，确保最终态总是 targetVisible 可见。
+function _swapLabelAction(side, toReset) {
+  const favBtn = document.querySelector(`.label-action.fav-btn[data-side="${side}"]`);
+  const resetBtn = document.querySelector(`.label-action.reset-btn[data-side="${side}"]`);
+  if (!favBtn || !resetBtn) return;
+
+  const targetVisible = toReset ? resetBtn : favBtn;
+  const targetHidden  = toReset ? favBtn   : resetBtn;
+  // 已在目标态（目标按钮可见、另一按钮隐藏）→ 仅刷新 fav 图标后 no-op
+  if (!targetVisible.hidden && targetHidden.hidden) {
+    if (!toReset) _refreshFavoriteBtn(side);
+    return;
+  }
+  // 取消两个按钮上残留的 Web Animations（避免旧 fill 把元素钉在 opacity:0，
+  // 或旧 onfinish 在中途打断后仍触发、把 hidden 写成错误值）
+  _cancelAnimations(favBtn);
+  _cancelAnimations(resetBtn);
+  favBtn.style.opacity = '';
+  favBtn.style.transform = '';
+  resetBtn.style.opacity = '';
+  resetBtn.style.transform = '';
+  if (!toReset) _refreshFavoriteBtn(side);  // 切回 fav 前先刷新星标状态
+  // 找当前可见的按钮作为淡出起点（正常态只有一个可见；
+  // 中途打断时可能两个都 visible 或都 hidden，取可见的或回退到 targetHidden）
+  const fromBtn = !favBtn.hidden ? favBtn : (!resetBtn.hidden ? resetBtn : targetHidden);
+  const toBtn = fromBtn === favBtn ? resetBtn : favBtn;
+  // 强制起点可见、终点隐藏（覆盖中途打断的中间态）
+  fromBtn.hidden = false;
+  toBtn.hidden = true;
+  const a = fromBtn.animate(
+    [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-3px)' }],
+    { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+  );
+  a.onfinish = () => {
+    fromBtn.hidden = true;
+    fromBtn.style.opacity = '';
+    fromBtn.style.transform = '';
+    toBtn.hidden = false;
+    toBtn.animate(
+      [{ opacity: 0, transform: 'translateY(3px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
+    );
+  };
+}
+
 let state = {
   attacker: null,        // {id, ...SPRITES[id]}
   defender: null,
@@ -1210,7 +1442,7 @@ function filterSpirits(side, filter) {
   // 中的所有空格，避免用户误打/复制时多一个空格导致搜不到。
   const stripSpaces = str => (str || '').replace(/\s+/g, '');
   const text = stripSpaces(normParens((filter.text || '').trim())).toLowerCase();
-  const commonList = (side === 'attacker' ? OTHERS.common_attackers : OTHERS.common_defenders) || [];
+  const commonList = getCommonSpirits(side);
   const commonSet = new Set(commonList);
   const wantEls = filter.elements;   // Set<string>
   const all = SPRITES_ENTRIES;        // loadData 末尾预计算，避免每次按键重新分配
@@ -1594,6 +1826,8 @@ function enterSpiritPicker(side) {
     const inner = document.querySelector(`#${side}-picker-grid > .spirit-picker-grid-inner`);
     if (inner) inner.scrollTop = savedScroll;
   }
+  // 星标按钮 → 重置按钮（220ms 淡出 → 切换 → 220ms 淡入）
+  _swapLabelAction(side, true);
 }
 function exitSpiritPicker(side) {
   // 保存当前滚动位置，下次打开时恢复
@@ -1601,6 +1835,8 @@ function exitSpiritPicker(side) {
   state._pickerScrollTop[side] = inner ? inner.scrollTop : 0;
   state.spiritPicking[side] = false;
   renderSpiritArea(side);
+  // 重置按钮 → 星标按钮
+  _swapLabelAction(side, false);
 }
 
 // 选择一个精灵
@@ -1716,6 +1952,8 @@ function selectSpirit(side, id) {
     // 防御方精灵换 → 攻击方 power-badge 颜色依赖防御方减伤率，需刷新
     if (state.attacker) renderSkills('attacker');
   }
+  // 选择精灵 = 退出选择器：重置按钮 → 星标按钮（与 exitSpiritPicker 同款 220ms 过渡）
+  _swapLabelAction(side, false);
   calculateDamage();
 }
 
@@ -3756,6 +3994,13 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>常见精灵自定义 <span class="modal-date">· 2026-07-28</span></h3>
+      <ul>
+        <li>「常见」筛选不再是一份固定列表：现在可以点击攻击方/防御方标签右侧的星标按钮，把当前精灵加入或移出常见列表，列表会自动保存到浏览器。</li>
+        <li>打开精灵选择器时，星标按钮会变为重置按钮，点击可一键把常见列表还原为默认。</li>
+        <li>挑战模式中「常见」精灵池也会跟随你的自定义列表，方便针对自己常用的精灵进行练习。</li>
+      </ul>
+      <hr>
       <h3>自定义技能槽 <span class="modal-date">· 2026-07-25</span></h3>
       <ul>
         <li>现在可以通过技能列表底部的自定义技能槽让精灵使用自己无法学习的技能，模拟「借用 / 取念 / 过山车 / 奇异」等情况。</li>
@@ -4358,7 +4603,8 @@ function _pickWeightedSkill(opts, side) {
 
 // 精灵池工厂：返回 () => 精灵 id
 //   pool[side] = 'all'    : 从所有 SPRITES 中等概率采样
-//   pool[side] = 'common' : 从 OTHERS.common_attackers/defenders 中等概率采样
+//   pool[side] = 'common' : 从用户收藏列表（getCommonSpirits，回退 OTHERS.common_*）
+//                           中等概率采样——与筛选"常见"chip 同源
 //   pool[side] = 'custom' : 固定返回 state[side].id（固定必须已选好精灵）
 function buildSpiritRng(side) {
   const mode = state.challenge.pool[side];
@@ -4367,18 +4613,15 @@ function buildSpiritRng(side) {
     return () => _pickRandom(allIds);
   }
   if (mode === 'common') {
-    const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
-                                       : (OTHERS.common_defenders || []);
-    const ids = list.slice();
+    const ids = getCommonSpirits(side).slice();
     return () => _pickRandom(ids);
   }
   // 'custom' — 固定当前用户选的精灵
   const fixedId = (side === 'attacker') ? state.attacker?.id : state.defender?.id;
   if (!fixedId) {
     // 固定池但精灵未选：兜底用常见池（避免抛错）
-    const list = (side === 'attacker') ? (OTHERS.common_attackers || [])
-                                       : (OTHERS.common_defenders || []);
-    return () => _pickRandom(list);
+    const ids = getCommonSpirits(side).slice();
+    return () => _pickRandom(ids);
   }
   return () => fixedId;
 }
@@ -4937,6 +5180,10 @@ function applyQuestion(index) {
   // 5. 同步 UI
   renderSpiritArea('attacker');
   renderSpiritArea('defender');
+  // 5a. 题目应用后两侧均为"已选精灵"态：动画同步 label 动作按钮为星标按钮。
+  //     挑战期间面板交互被 .challenge-locked 锁定，按钮不可点；但视觉状态需正确，
+  _swapLabelAction('attacker', false);
+  _swapLabelAction('defender', false);
   renderSkills('attacker');
   renderSkills('defender');
   // 5b. 滚动技能列表到选中的技能（面板已锁定交互，必须 JS 代滚）
@@ -5253,6 +5500,10 @@ function exitChallenge() {
   // 走 inline style（见 renderSpiritCard/renderSpiritPicker），element 创建时即抑制动画。
   renderSpiritArea('attacker', { skipAnimation: true });
   renderSpiritArea('defender', { skipAnimation: true });
+  // 退出挑战时 state 已被 applyQuestion 改写为新精灵，瞬时同步两侧 label 动作按钮：
+  // 理论上不需要这一步，因为不可能出现选择器态。
+  _syncLabelActionNoAnim('attacker');
+  _syncLabelActionNoAnim('defender');
   renderSkills('attacker');
   renderSkills('defender');
   renderStatsConfig('attacker');
@@ -5598,6 +5849,9 @@ function init() {
   // 初始即渲染两侧的内嵌选择器（未选精灵时直接显示）
   renderSpiritArea('attacker');
   renderSpiritArea('defender');
+  // 初始未选精灵 → 选择器态：瞬时显示重置按钮（覆盖 HTML 默认的 fav-btn 可见）
+  _syncLabelActionNoAnim('attacker');
+  _syncLabelActionNoAnim('defender');
   // 威力 chip 占位（未选攻击方时也常驻显示）
   renderPowerBoostChip();
   renderWaiting();

@@ -113,6 +113,12 @@
           <button type="button" class="label-chip active" data-pool="common" aria-pressed="true">常见</button>
           <button type="button" class="label-chip" data-pool="all">全部</button>
         </span>
+        <button type="button" class="label-action fav-btn" data-side="attacker" title="收藏到常见列表" aria-label="收藏当前精灵到常见列表" hidden onclick="toggleFavorite('attacker')">
+          <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"></path></svg>
+        </button>
+        <button type="button" class="label-action reset-btn" data-side="attacker" title="重置常见列表" aria-label="重置常见列表为默认" onclick="resetFavorites('attacker')">
+          <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 6H3"></path><path d="M7 12H3"></path><path d="M7 18H3"></path><path d="M12 18a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L11 14"></path><path d="M11 10v4h4"></path></svg>
+        </button>
       </h2>
       <div id="attacker-select-area">
         <!-- 由 JS 渲染：未选时为内嵌选择器，选后为精灵卡 -->
@@ -237,6 +243,12 @@
           <button type="button" class="label-chip active" data-pool="common" aria-pressed="true">常见</button>
           <button type="button" class="label-chip" data-pool="all">全部</button>
         </span>
+        <button type="button" class="label-action fav-btn" data-side="defender" title="收藏到常见列表" aria-label="收藏当前精灵到常见列表" hidden onclick="toggleFavorite('defender')">
+          <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"></path></svg>
+        </button>
+        <button type="button" class="label-action reset-btn" data-side="defender" title="重置常见列表" aria-label="重置常见列表为默认" onclick="resetFavorites('defender')">
+          <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 6H3"></path><path d="M7 12H3"></path><path d="M7 18H3"></path><path d="M12 18a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L11 14"></path><path d="M11 10v4h4"></path></svg>
+        </button>
       </h2>
       <div id="defender-select-area">
         <!-- 由 JS 渲染：未选时为内嵌选择器，选后为精灵卡 -->
@@ -304,6 +316,21 @@
     <div class="modal-body" id="modal-body"></div>
     <footer class="modal-footer">
       <button type="button" class="modal-confirm">我知道了</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 确认弹窗：用于重置收藏等需要二次确认的操作（复用 info-modal 样式） -->
+<div class="modal-overlay" id="confirm-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <header class="modal-header">
+      <h2 class="modal-title" id="confirm-modal-title">确认操作</h2>
+      <button type="button" class="modal-close" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body" id="confirm-modal-body"></div>
+    <footer class="modal-footer">
+      <button type="button" class="modal-confirm modal-cancel">取消</button>
+      <button type="button" class="modal-confirm modal-danger">确认</button>
     </footer>
   </div>
 </div>

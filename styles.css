@@ -159,6 +159,61 @@ body {
   margin-left: 4px;
 }
 
+/* ============ Label Action Buttons (收藏 / 重置) ============
+   .panel-label 右侧的动作按钮：收藏（星标）与重置互为替换。
+   - 默认态（picker 关闭、已选精灵）：显示 fav-btn，星标描边
+   - 已收藏态：fav-btn 加 .is-fav，星标填充金色
+   - 选择器态（picker 打开或未选精灵）：显示 reset-btn
+   两者切换走 JS Web Animations API（_swapLabelAction），CSS 不参与过渡。
+   按钮容器靠 margin-left:auto 右对齐到 .panel-label 末端。 */
+.label-action {
+  margin-left: auto;             /* 推到 .panel-label 右端 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  font-family: inherit;
+}
+/* 必须显式声明 [hidden] 隐藏：上面的 display:inline-flex 会覆盖 HTML [hidden]
+   属性的默认 display:none，导致两个按钮同时可见、排版错乱。 */
+.label-action[hidden] { display: none; }
+.label-action:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.06);
+  border-color: var(--glass-border);
+}
+/* .label-action:active { transform: scale(0.92); } */
+.label-action:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.label-action .action-icon {
+  width: 17px;
+  height: 17px;
+  display: block;
+  pointer-events: none;
+}
+.label-action.fav-btn.is-fav {
+  color: var(--text-primary);
+}
+/* 重置按钮短暂脉动反馈（resetFavorites 触发） */
+@keyframes labelActionPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); color: var(--accent-primary); }
+  100% { transform: scale(1); }
+}
+.label-action.reset-btn.pulse {
+  animation: labelActionPulse 0.5s ease;
+}
+
 /* Spirit Card (selected) */
 .spirit-card {
   background: rgba(255,255,255,0.04);
@@ -2513,6 +2568,21 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 .modal-confirm:hover {
   background: rgba(255,255,255,0.14);
   border-color: rgba(255,255,255,0.25);
+}
+
+/* 确认弹窗的双按钮 footer（复用 .modal-overlay/.modal-card 样式） */
+.modal-footer .modal-cancel {
+  /* 次要按钮：与 .modal-confirm 一致，靠 margin-right 推开间距 */
+  margin-right: 8px;
+}
+.modal-footer .modal-danger {
+  background: color-mix(in srgb, var(--accent-red) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent-red) 45%, transparent);
+  color: var(--accent-red);
+}
+.modal-footer .modal-danger:hover {
+  background: color-mix(in srgb, var(--accent-red) 28%, transparent);
+  border-color: color-mix(in srgb, var(--accent-red) 65%, transparent);
 }
 
 /* 移动端：弹窗占满宽度的安全边距更小 */
