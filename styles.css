@@ -255,7 +255,7 @@ body {
    外层定高 + 内层 height:100%），所以内层直接保留 min/max-height 并负责
    滚动，外层仅处理宽度对齐，避免百分比高度在 flex 父级中解析异常。 */
 .spirit-picker-grid {
-  margin-right: -7px;   /* 抵消 .spirit-picker-grid-inner 的滚动条 6px + padding-right 1px */
+  margin-right: -8px;   /* 抵消 .spirit-picker-grid-inner 的滚动条 6px + padding-right 2px */
   margin-left: -1px;    /* 抵消 .spirit-picker-grid-inner 的 padding-left 1px */
   position: relative;
 }
@@ -276,7 +276,8 @@ body {
   /* 防止遮挡下边框 */
   padding-bottom: 1px;
   /* 右侧留 1px，避免遮挡最右侧卡片的选择框 */
-  padding-right: 1px;
+  /* 再加 1px，用于增加与滚动条之间的间隔 */
+  padding-right: 2px;
   /* 左侧留 1px，避免遮挡最左侧卡片的选择框 */
   padding-left: 1px;
   /* 行内卡片高度不一致时，让每张卡片都从顶部对齐，而不是被拉伸到同行最高那张。
@@ -2001,6 +2002,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     margin-right: -1px;  /* 覆盖桌面端 -7px：移动端 overlay 滚动条 gutter=0，只抵消 padding-right: 1px */
   }
   .spirit-picker-grid-inner {
+    padding-right: 1px;  /* 覆盖桌面端 2px，不考虑滚动条只需 1px */
     /* 在我的电脑上434不抖，在我的手机上438不抖 */
     min-height: 438px;
     max-height: 438px;
