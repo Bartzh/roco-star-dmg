@@ -448,6 +448,12 @@ function _refreshFavoriteBtn(side) {
   btn.setAttribute('aria-pressed', fav ? 'true' : 'false');
 }
 
+// 每侧 label action 的目标态（'fav' | 'reset'）+ 动画代际 token。
+// 状态在动画启动时同步更新（不等 onfinish），避免快速连点时 early-return 误判。
+// 代际 token 用于让被中断的旧 onfinish 回调失效（双保险）。
+const _labelActionState = { attacker: 'fav', defender: 'fav' };
+const _labelActionGen   = { attacker: 0, defender: 0 };
+
 // 瞬时（无动画）同步 label 右侧动作按钮的可见性。
 //   picker 模式（选择中或未选精灵）→ 显示重置按钮
 //   card 模式（已选精灵）             → 显示收藏按钮
@@ -467,52 +473,67 @@ function _syncLabelActionNoAnim(side) {
   resetBtn.style.opacity = '';
   resetBtn.style.transform = '';
   if (!showReset) _refreshFavoriteBtn(side);
+  // 同步状态变量 + 失效所有 pending onfinish
+  _labelActionState[side] = showReset ? 'reset' : 'fav';
+  _labelActionGen[side]++;
 }
 
 // 动画过渡：收藏按钮 ↔ 重置按钮（220ms 淡出 → 切换 → 220ms 淡入）。
 //   toReset = true  : fav → reset（进入选择器）
 //   toReset = false : reset → fav（退出选择器 / 选中精灵）
 // 与 _swapLabelVisibility 同风格（Web Animations API + EASING_STANDARD）。
-// 处理快速连点（中途打断）：先取消两个按钮上残留的 Web Animations，
-// 再根据"哪个按钮当前可见"决定淡出起点，确保最终态总是 targetVisible 可见。
+// 快速连点处理：用 _labelActionState 同步跟踪目标态 + _labelActionGen 代际 token
+// 让被中断的旧 onfinish 失效。中断时若目标按钮已可见则直接 snap（无过渡）。
 function _swapLabelAction(side, toReset) {
   const favBtn = document.querySelector(`.label-action.fav-btn[data-side="${side}"]`);
   const resetBtn = document.querySelector(`.label-action.reset-btn[data-side="${side}"]`);
   if (!favBtn || !resetBtn) return;
 
-  const targetVisible = toReset ? resetBtn : favBtn;
-  const targetHidden  = toReset ? favBtn   : resetBtn;
-  // 已在目标态（目标按钮可见、另一按钮隐藏）→ 仅刷新 fav 图标后 no-op
-  if (!targetVisible.hidden && targetHidden.hidden) {
+  const targetState = toReset ? 'reset' : 'fav';
+  // 已在目标态 → 仅刷新 fav 图标后 no-op
+  if (_labelActionState[side] === targetState) {
     if (!toReset) _refreshFavoriteBtn(side);
     return;
   }
-  // 取消两个按钮上残留的 Web Animations（避免旧 fill 把元素钉在 opacity:0，
-  // 或旧 onfinish 在中途打断后仍触发、把 hidden 写成错误值）
+  // 同步更新状态 + 递增代际（旧 onfinish 检查代际后会 no-op）
+  _labelActionState[side] = targetState;
+  const gen = ++_labelActionGen[side];
+
+  // 取消残留动画 + 清理 inline style（cancel 后元素回到 CSS 基态：opacity:1 或 display:none）
   _cancelAnimations(favBtn);
   _cancelAnimations(resetBtn);
   favBtn.style.opacity = '';
   favBtn.style.transform = '';
   resetBtn.style.opacity = '';
   resetBtn.style.transform = '';
-  if (!toReset) _refreshFavoriteBtn(side);  // 切回 fav 前先刷新星标状态
-  // 找当前可见的按钮作为淡出起点（正常态只有一个可见；
-  // 中途打断时可能两个都 visible 或都 hidden，取可见的或回退到 targetHidden）
-  const fromBtn = !favBtn.hidden ? favBtn : (!resetBtn.hidden ? resetBtn : targetHidden);
-  const toBtn = fromBtn === favBtn ? resetBtn : favBtn;
-  // 强制起点可见、终点隐藏（覆盖中途打断的中间态）
+  if (!toReset) _refreshFavoriteBtn(side);
+
+  // cancel 后 hidden 属性反映真实可见性
+  const targetBtn = toReset ? resetBtn : favBtn;
+  const otherBtn  = toReset ? favBtn   : resetBtn;
+
+  if (!targetBtn.hidden) {
+    // 目标按钮已可见（中断场景：之前在淡出另一个按钮，取消动画后目标仍在）
+    // 直接隐藏另一个即可，无需过渡
+    otherBtn.hidden = true;
+    return;
+  }
+
+  // 目标按钮不可见 → 从当前可见按钮过渡到目标按钮
+  const fromBtn = !favBtn.hidden ? favBtn : (!resetBtn.hidden ? resetBtn : favBtn);
   fromBtn.hidden = false;
-  toBtn.hidden = true;
+  targetBtn.hidden = true;
   const a = fromBtn.animate(
     [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-3px)' }],
     { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
   );
   a.onfinish = () => {
+    if (gen !== _labelActionGen[side]) return;  // 被新动画中断，丢弃
     fromBtn.hidden = true;
     fromBtn.style.opacity = '';
     fromBtn.style.transform = '';
-    toBtn.hidden = false;
-    toBtn.animate(
+    targetBtn.hidden = false;
+    targetBtn.animate(
       [{ opacity: 0, transform: 'translateY(3px)' }, { opacity: 1, transform: 'translateY(0)' }],
       { duration: CHALLENGE_LABEL_TRANSITION_MS, easing: EASING_STANDARD }
     );
@@ -5501,10 +5522,6 @@ function exitChallenge() {
   // 走 inline style（见 renderSpiritCard/renderSpiritPicker），element 创建时即抑制动画。
   renderSpiritArea('attacker', { skipAnimation: true });
   renderSpiritArea('defender', { skipAnimation: true });
-  // 退出挑战时 state 已被 applyQuestion 改写为新精灵，瞬时同步两侧 label 动作按钮：
-  // 理论上不需要这一步，因为不可能出现选择器态。
-  _syncLabelActionNoAnim('attacker');
-  _syncLabelActionNoAnim('defender');
   renderSkills('attacker');
   renderSkills('defender');
   renderStatsConfig('attacker');
