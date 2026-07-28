@@ -187,8 +187,8 @@ body {
 .label-action[hidden] { display: none; }
 .label-action:hover {
   color: var(--text-primary);
-  background: rgba(255,255,255,0.06);
-  border-color: var(--glass-border);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.2);
 }
 /* .label-action:active { transform: scale(0.92); } */
 .label-action:focus-visible {
