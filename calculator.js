@@ -358,8 +358,8 @@ function toggleFavorite(side) {
 function resetFavorites(side) {
   const sideText = side === 'attacker' ? '攻击方' : '防御方';
   showConfirmDialog(
-    '重置常见列表',
-    `<div style="line-height:1.7">确定要把${sideText}的「常见」列表重置为默认吗？<br>你自定义收藏的精灵会被替换为预定义列表。</div>`,
+    '重置收藏列表',
+    `<div style="line-height:1.7">确认要将 <strong>${sideText}</strong> 的收藏列表重置为默认吗？</div>`,
     () => {
       _favoritesCache[side] = _defaultCommonList(side).slice();
       _saveFavorites(side);
@@ -444,7 +444,7 @@ function _refreshFavoriteBtn(side) {
   const fav = spirit ? isFavorite(side, spirit.id) : false;
   btn.classList.toggle('is-fav', fav);
   btn.innerHTML = fav ? _FAV_ICON_FILLED : _FAV_ICON_OUTLINE;
-  btn.title = fav ? '取消收藏' : '收藏到常见列表';
+  btn.title = fav ? '取消收藏' : '加入收藏';
   btn.setAttribute('aria-pressed', fav ? 'true' : 'false');
 }
 
@@ -1512,7 +1512,7 @@ function renderPickerToolbar(side, filter) {
       <button type="button" class="spirit-picker-chip common${commonActive}"
               onclick="togglePickerCommon('${side}')"
               aria-pressed="${filter.common ? 'true' : 'false'}"
-              title="${filter.common ? '取消"常见"筛选' : '只显示常见精灵'}">
+              title="${filter.common ? '取消"收藏"筛选' : '只显示收藏精灵'}">
         <svg class="chip-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"></path></svg>
       </button>
       ${elementChips}
@@ -1722,8 +1722,8 @@ function refreshPickerToolbar(side) {
     commonChip.classList.toggle('active', filter.common);
     commonChip.setAttribute('aria-pressed', filter.common ? 'true' : 'false');
     commonChip.title = filter.common
-      ? '点击取消"常见"筛选'
-      : '点击只显示常见精灵';
+      ? '点击取消"收藏"筛选'
+      : '点击只显示收藏精灵';
   }
 
   // 系别 chip
@@ -3994,11 +3994,12 @@ const MODAL_CONTENT = {
   announcement: {
     title: '更新公告',
     html: `
-      <h3>常见精灵自定义 <span class="modal-date">· 2026-07-28</span></h3>
+      <h3>精灵收藏 <span class="modal-date">· 2026-07-28</span></h3>
       <ul>
-        <li>「常见」筛选不再是一份固定列表：现在可以点击攻击方/防御方标签右侧的星标按钮，把当前精灵加入或移出常见列表，列表会自动保存到浏览器。</li>
-        <li>打开精灵选择器时，星标按钮会变为重置按钮，点击可一键把常见列表还原为默认。</li>
-        <li>挑战模式中「常见」精灵池也会跟随你的自定义列表，方便针对自己常用的精灵进行练习。</li>
+        <li>「常见」改名「收藏」。</li>
+        <li>「收藏」筛选不再是一份固定列表：现在可以点击攻击方/防御方标签右侧的星标按钮，把当前精灵加入或移出收藏列表。</li>
+        <li>打开精灵选择器时，星标按钮会变为重置按钮，点击可将收藏列表还原为默认。</li>
+        <li>挑战模式中「收藏」精灵池也会跟随你的收藏列表，以此制定完全个性化的挑战题库。</li>
       </ul>
       <hr>
       <h3>自定义技能槽 <span class="modal-date">· 2026-07-25</span></h3>
@@ -5533,7 +5534,7 @@ function startChallenge() {
         if (modal && title && body) {
           title.textContent = '无法开始挑战';
           const whichSide = side === 'attacker' ? '攻击方' : '防御方';
-          body.innerHTML = `<div style="line-height:1.7">「固定」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 常见」池。</div>`;
+          body.innerHTML = `<div style="line-height:1.7">「固定」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 收藏」池。</div>`;
           modal.classList.add('is-open');
           modal.setAttribute('aria-hidden', 'false');
         }
