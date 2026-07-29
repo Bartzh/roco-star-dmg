@@ -2345,9 +2345,9 @@ function renderPowerBoostChip() {
   const comboVal = getComboBoost();
   const comboCls = _buffChipClass(comboVal);
   const comboHTML = `<div class="buff-chip ${comboCls}"
-                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，左右拖动或滚轮调整 / 双击重置）"
                             data-stat="combo"
-                            title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
+                            title="左右拖动或滚轮调整 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
 
   // 威力 chip.
   const powerVal = getPowerBoost();
