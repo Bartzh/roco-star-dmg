@@ -1718,11 +1718,7 @@ defender_random_pools: dict[str, RandomPool] = {
             default_weight=0,
             combos=[
                 WeightedBuffCombo(
-                    combo=[{'def': 75, 'mdef': 75, 'spd': 75}],
-                    weight=10
-                ),
-                WeightedBuffCombo(
-                    combo=[{'def': 60, 'mdef': 60, 'spd': 60}],
+                    combo=[{'def': 75, 'mdef': 75, 'spd': 115}],
                     weight=1
                 ),
             ]
