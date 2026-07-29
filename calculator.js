@@ -658,7 +658,9 @@ function getBuff(side, stat) {
   return obj[stat] || 0;
 }
 function setBuff(side, stat, val) {
-  const clamped = Math.max(-990, Math.min(990, Math.round(val / 10) * 10));
+  // 接受任意整数（不再强制 10 的倍数）：普通滚轮/拖拽仍以 10 为步长，
+  // shift+滚轮以 1 为步长精细调整。仅做范围 clamp + 取整。
+  const clamped = Math.max(-990, Math.min(990, Math.round(val)));
   if (side === 'attacker') state.attackerBuff[stat] = clamped;
   else                     state.defenderBuff[stat] = clamped;
 }
@@ -2115,13 +2117,12 @@ function onIVSlotClick(side, statKey, ev) {
 // ============================================================
 function attachChipDrag(chip, opts) {
   const {
-    shiftMultiplier,   // wheel: shift+wheel = ×N of one tick
     getVal,            // () => currentValue
     setVal,            // (newVal) => void  (writes to state)
     formatVal,         // (val) => string
     prepareDrag,       // () => startExtra object | null | false (false = abort)
     dragValue,         // (dx, startVal, startExtra) => newVal | null
-    wheelValue,        // (curVal, dirMult) => newVal | null
+    wheelValue,        // (curVal, dir, isShift) => newVal | null
     reset,             // () => void  (writes 0, full re-render)
     onChange,          // () => void  (e.g. calculateDamage, fires on every step)
     onCommit,          // () => void  (e.g. localStorage write, fires on gesture end)
@@ -2165,8 +2166,11 @@ function attachChipDrag(chip, opts) {
   }
   function onWheel(e) {
     e.preventDefault();
-    const dirMult = (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? shiftMultiplier : 1);
-    const newVal = wheelValue(getVal(), dirMult);
+    // dir = ±1（方向），isShift 由 wheelValue 自行决定步长语义：
+    //   普通 chip：isShift 时步长从 10 减为 1（精细调整）；
+    //   连击 chip：isShift 无效果，永远步长 1。
+    const dir = e.deltaY < 0 ? 1 : -1;
+    const newVal = wheelValue(getVal(), dir, e.shiftKey);
     if (newVal == null || newVal === getVal()) return;
     setVal(newVal);
     applyLive(newVal);
@@ -2219,17 +2223,17 @@ function renderBuffChips(side) {
   const val = getSpeed(side);
   const cls = _buffChipClass(val);
   const speedHTML = `<div class="buff-chip ${cls}"
-                          aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，拖动 / 滚轮 / 双击重置）"
+                          aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
                           data-side="${side}" data-stat="speed"
-                          title="拖动 · 滚轮 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
+                          title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
 
   const buffsHTML = configs.map(c => {
     const bv = getBuff(side, c.key);
     const bcls = _buffChipClass(bv);
     return `<div class="buff-chip ${bcls}"
-                 aria-label="${c.label} 调整（当前 ${formatBuff(bv)}，拖动 / 滚轮 / 双击重置）"
+                 aria-label="${c.label} 调整（当前 ${formatBuff(bv)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
                  data-side="${side}" data-stat="${c.key}"
-                 title="拖动 · 滚轮 · 双击重置">${c.label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
+                 title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${c.label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
   }).join('');
 
   container.innerHTML = speedHTML + buffsHTML;
@@ -2237,7 +2241,6 @@ function renderBuffChips(side) {
   const speedChip = container.querySelector(`.buff-chip[data-stat="speed"]`);
   if (speedChip) {
     attachChipDrag(speedChip, {
-      shiftMultiplier: 5,
       getVal: () => getSpeed(side),
       setVal: (v) => setSpeed(side, v),
       formatVal: formatSpeed,
@@ -2245,8 +2248,10 @@ function renderBuffChips(side) {
         const delta = Math.round(dx / SPEED_DRAG_PX_PER_STEP) * SPEED_STEP;
         return Math.max(SPEED_MIN, Math.min(SPEED_MAX, startVal + delta));
       },
-      wheelValue: (cur, dirMult) => {
-        return Math.max(SPEED_MIN, Math.min(SPEED_MAX, cur + dirMult * SPEED_STEP));
+      // shift+滚轮：步长从 10 减为 1（精细调整）。
+      wheelValue: (cur, dir, isShift) => {
+        const step = isShift ? 1 : SPEED_STEP;
+        return Math.max(SPEED_MIN, Math.min(SPEED_MAX, cur + dir * step));
       },
       reset: () => { setSpeed(side, 0); renderBuffChips(side); },
       onChange: calculateDamage,
@@ -2258,7 +2263,6 @@ function renderBuffChips(side) {
     const chip = container.querySelector(`.buff-chip[data-stat="${c.key}"]`);
     if (!chip) continue;
     attachChipDrag(chip, {
-      shiftMultiplier: 5,
       getVal: () => getBuff(side, c.key),
       setVal: (v) => setBuff(side, c.key, v),
       formatVal: formatBuff,
@@ -2266,8 +2270,10 @@ function renderBuffChips(side) {
         const delta = Math.round(dx / BUFF_DRAG_PX_PER_STEP) * BUFF_STEP_PCT;
         return Math.max(BUFF_MIN_PCT, Math.min(BUFF_MAX_PCT, startVal + delta));
       },
-      wheelValue: (cur, dirMult) => {
-        return Math.max(BUFF_MIN_PCT, Math.min(BUFF_MAX_PCT, cur + dirMult * BUFF_STEP_PCT));
+      // shift+滚轮：步长从 10 减为 1（精细调整）。
+      wheelValue: (cur, dir, isShift) => {
+        const step = isShift ? 1 : BUFF_STEP_PCT;
+        return Math.max(BUFF_MIN_PCT, Math.min(BUFF_MAX_PCT, cur + dir * step));
       },
       reset: () => { setBuff(side, c.key, 0); renderBuffChips(side); },
       onChange: calculateDamage,
@@ -2306,7 +2312,8 @@ const COMBO_DRAG_PX_PER_STEP = 8;
 
 function getPowerBoost() { return state.attackerPowerBoost; }
 function setPowerBoost(val) {
-  const clamped = Math.max(POWER_MIN, Math.min(POWER_MAX, Math.round(val / POWER_STEP) * POWER_STEP));
+  // 不再强制 10 的倍数：shift+滚轮以 1 为步长精细调整。
+  const clamped = Math.max(POWER_MIN, Math.min(POWER_MAX, Math.round(val)));
   state.attackerPowerBoost = clamped;
 }
 function formatPowerBoost(val) {
@@ -2317,7 +2324,8 @@ function formatPowerBoost(val) {
 
 function getComboBoost() { return state.attackerCombo; }
 function setComboBoost(val) {
-  const clamped = Math.max(COMBO_MIN, Math.min(COMBO_MAX, Math.round(val / COMBO_STEP) * COMBO_STEP));
+  // COMBO_STEP = 1，本就允许任意整数；统一写法。
+  const clamped = Math.max(COMBO_MIN, Math.min(COMBO_MAX, Math.round(val)));
   state.attackerCombo = clamped;
 }
 function formatComboBoost(val) {
@@ -2337,24 +2345,23 @@ function renderPowerBoostChip() {
   const comboVal = getComboBoost();
   const comboCls = _buffChipClass(comboVal);
   const comboHTML = `<div class="buff-chip ${comboCls}"
-                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，拖动 / 滚轮 / 双击重置）"
+                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
                             data-stat="combo"
-                            title="拖动 · 滚轮 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
+                            title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
 
   // 威力 chip.
   const powerVal = getPowerBoost();
   const powerCls = _buffChipClass(powerVal);
   const powerHTML = `<div class="buff-chip ${powerCls}"
-                            aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(powerVal)}，拖动 / 滚轮 / 双击重置）"
+                            aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(powerVal)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
                             data-stat="power"
-                            title="拖动 · 滚轮 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
+                            title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
 
   container.innerHTML = comboHTML + powerHTML;
 
   const comboChip = container.querySelector('.buff-chip[data-stat="combo"]');
   if (comboChip) {
     attachChipDrag(comboChip, {
-      shiftMultiplier: 5,
       getVal: getComboBoost,
       setVal: (v) => { state.attackerCombo = v; },
       formatVal: formatComboBoost,
@@ -2362,8 +2369,9 @@ function renderPowerBoostChip() {
         const delta = Math.round(dx / COMBO_DRAG_PX_PER_STEP) * COMBO_STEP;
         return Math.max(COMBO_MIN, Math.min(COMBO_MAX, startVal + delta));
       },
-      wheelValue: (cur, dirMult) => {
-        return Math.max(COMBO_MIN, Math.min(COMBO_MAX, cur + dirMult * COMBO_STEP));
+      // 连击数 step 本就为 1，shift 无效果（永远步长 1）。
+      wheelValue: (cur, dir) => {
+        return Math.max(COMBO_MIN, Math.min(COMBO_MAX, cur + dir * COMBO_STEP));
       },
       reset: () => { state.attackerCombo = 0; renderPowerBoostChip(); },
       onChange: calculateDamage,
@@ -2374,7 +2382,6 @@ function renderPowerBoostChip() {
   const powerChip = container.querySelector('.buff-chip[data-stat="power"]');
   if (powerChip) {
     attachChipDrag(powerChip, {
-      shiftMultiplier: 5,
       getVal: getPowerBoost,
       setVal: (v) => { state.attackerPowerBoost = v; },
       formatVal: formatPowerBoost,
@@ -2382,8 +2389,10 @@ function renderPowerBoostChip() {
         const delta = Math.round(dx / POWER_DRAG_PX_PER_STEP) * POWER_STEP;
         return Math.max(POWER_MIN, Math.min(POWER_MAX, startVal + delta));
       },
-      wheelValue: (cur, dirMult) => {
-        return Math.max(POWER_MIN, Math.min(POWER_MAX, cur + dirMult * POWER_STEP));
+      // shift+滚轮：步长从 10 减为 1（精细调整）。
+      wheelValue: (cur, dir, isShift) => {
+        const step = isShift ? 1 : POWER_STEP;
+        return Math.max(POWER_MIN, Math.min(POWER_MAX, cur + dir * step));
       },
       reset: () => { state.attackerPowerBoost = 0; renderPowerBoostChip(); },
       onChange: calculateDamage,
@@ -2409,7 +2418,8 @@ function getSpeed(side) {
   return side === 'attacker' ? state.attackerSpeed : state.defenderSpeed;
 }
 function setSpeed(side, val) {
-  const clamped = Math.max(SPEED_MIN, Math.min(SPEED_MAX, Math.round(val / SPEED_STEP) * SPEED_STEP));
+  // 不再强制 10 的倍数：shift+滚轮以 1 为步长精细调整。
+  const clamped = Math.max(SPEED_MIN, Math.min(SPEED_MAX, Math.round(val)));
   if (side === 'attacker') state.attackerSpeed = clamped;
   else                     state.defenderSpeed = clamped;
 }
