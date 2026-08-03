@@ -83,23 +83,29 @@ body {
   color: var(--text-primary);
   text-shadow: 0 0 24px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
-.header .subtitle {
+.subtitle {
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-top: 6px;
   letter-spacing: 1px;
 }
-.header .subtitle a {
+.subtitle a {
   color: color-mix(in srgb, var(--accent-primary) 70%, #fff);
   text-decoration: none;
   border-bottom: 1px solid color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 40%, transparent);
   padding-bottom: 1px;
   transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
-.header .subtitle a:hover {
+.subtitle a:hover {
   color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
   border-bottom-color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
   text-shadow: 0 0 8px color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 60%, transparent);
+}
+
+/* ============ Footer ============ */
+.footer {
+  text-align: center;
+  margin-top: 40px;
 }
 
 /* ============ Battle Area ============ */
@@ -2386,7 +2392,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 /* ============ Header Nav (info modal triggers, styled as links) ============
    使用说明 / 更新公告 以 <button> 形式写在副标题里，外观与 GitHub / BWIKI
    链接完全一致（仅在行为上是按钮：不会跳转、不会改 URL）。 */
-.header .subtitle .nav-link {
+.subtitle .nav-link {
   color: color-mix(in srgb, var(--accent-primary) 70%, #fff);
   background: none;
   border: none;
@@ -2398,7 +2404,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   font-size: inherit;
   transition: color 0.2s ease, border-color 0.2s ease, text-shadow 0.2s ease;
 }
-.header .subtitle .nav-link:hover {
+.subtitle .nav-link:hover {
   color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
   border-bottom-color: color-mix(in srgb, var(--accent-primary) 50%, #fff);
   text-shadow: 0 0 8px color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 60%, transparent);
