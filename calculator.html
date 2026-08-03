@@ -80,6 +80,7 @@
     <h1>星陨伤害计算器</h1>
     <p class="subtitle">
       <button type="button" class="nav-link" data-modal="guide">使用说明</button> |
+      <button type="button" class="nav-link" id="data-mgr-trigger">数据管理</button> |
       数据来自<a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>
     </p>
   </header>
@@ -336,6 +337,64 @@
     <footer class="modal-footer">
       <button type="button" class="modal-confirm modal-cancel">取消</button>
       <button type="button" class="modal-confirm modal-danger">确认</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 数据管理弹窗：自动记忆开关 / 删除记忆 / 删除收藏 / 导出 / 导入 -->
+<div class="modal-overlay" id="data-mgr-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="data-mgr-title">
+    <header class="modal-header">
+      <h2 class="modal-title" id="data-mgr-title">数据管理</h2>
+      <button type="button" class="modal-close" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body">
+      <div class="data-mgr-row">
+        <div class="data-mgr-row-label">
+          <div class="data-mgr-row-title">自动记忆</div>
+          <div class="data-mgr-row-desc">修改精灵配置时自动保存到本地，下次选择同一精灵时自动恢复</div>
+        </div>
+        <label class="data-mgr-switch" title="开启 / 关闭自动记忆">
+          <input type="checkbox" id="memory-toggle">
+          <span class="data-mgr-switch-track"></span>
+        </label>
+      </div>
+      <hr>
+      <div class="data-mgr-row">
+        <div class="data-mgr-row-label">
+          <div class="data-mgr-row-title">删除记忆</div>
+          <div class="data-mgr-row-desc">清除所有精灵的自动记忆配置，不影响当前已选精灵的显示</div>
+        </div>
+        <button type="button" class="data-mgr-btn data-mgr-btn-danger" id="clear-memory-btn">删除</button>
+      </div>
+      <hr>
+      <div class="data-mgr-row">
+        <div class="data-mgr-row-label">
+          <div class="data-mgr-row-title">删除收藏</div>
+          <div class="data-mgr-row-desc">清空两侧收藏列表，恢复为默认列表（与精灵面板的「重置收藏」等价）</div>
+        </div>
+        <button type="button" class="data-mgr-btn data-mgr-btn-danger" id="clear-favorites-btn">删除</button>
+      </div>
+      <hr>
+      <div class="data-mgr-row">
+        <div class="data-mgr-row-label">
+          <div class="data-mgr-row-title">导出数据</div>
+          <div class="data-mgr-row-desc">将所有记忆配置与收藏列表导出为 JSON 文件</div>
+        </div>
+        <button type="button" class="data-mgr-btn" id="export-btn">导出</button>
+      </div>
+      <hr>
+      <div class="data-mgr-row">
+        <div class="data-mgr-row-label">
+          <div class="data-mgr-row-title">导入数据</div>
+          <div class="data-mgr-row-desc">从 JSON 文件导入数据，将覆盖现有数据并刷新页面</div>
+        </div>
+        <button type="button" class="data-mgr-btn" id="import-btn">导入</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" class="modal-confirm">关闭</button>
     </footer>
   </div>
 </div>

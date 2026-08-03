@@ -257,7 +257,9 @@ function _saveSpiritConfig(id, side, entry) {
 // 把 state 当前 side 的全部可调配置打包写入 localStorage。
 // 未选精灵时为 no-op。所有改 chip / 改技能 / 改性格 / 改个体
 // 的入口都走这里，确保一条 entry 永远包含"该侧全部状态"。
+// 自动记忆开关关闭时为 no-op（见 isMemoryEnabled）。
 function saveSpiritConfig(side) {
+  if (!isMemoryEnabled()) return;
   const id = state[side] && state[side].id;
   if (!id) return;
   if (side === 'attacker') {
@@ -374,6 +376,226 @@ function resetFavorites(side) {
       }
     }
   );
+}
+
+// ============================================================
+// 用户设置（localStorage）：自动记忆开关。
+// 键 `roco-star-dmg:settings:v1`，存一个 JSON 对象。
+// 缺省（无存档或解析失败）时各开关回到默认值，保证首次访问行为不变。
+// ============================================================
+const SETTINGS_KEY = 'roco-star-dmg:settings:v1';
+const _DEFAULT_SETTINGS = { memoryEnabled: true };
+let _settingsCache = null;
+
+function _loadSettings() {
+  if (_settingsCache !== null) return _settingsCache;
+  let s = null;
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === 'object') s = obj;
+    }
+  } catch (_) { /* 损坏 → 走默认 */ }
+  _settingsCache = Object.assign({}, _DEFAULT_SETTINGS, s || {});
+  return _settingsCache;
+}
+
+function _saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settingsCache));
+  } catch (_) { /* 静默 */ }
+}
+
+function isMemoryEnabled() {
+  return _loadSettings().memoryEnabled === true;
+}
+
+function setMemoryEnabled(enabled) {
+  _loadSettings().memoryEnabled = !!enabled;
+  _saveSettings();
+}
+
+// ============================================================
+// 数据管理：导出 / 导入 / 删除（记忆 & 收藏）。
+// ------------------------------------------------------------
+// 导出：收集所有 `roco-star-dmg:` 前缀的 localStorage 数据，
+//   打包为结构化 JSON 文件下载。JSON 含 version / exportedAt 元信息，
+//   favorites 与 spiritConfigs 分组，便于版本兼容与人工阅读。
+// 导入：上传 JSON 文件 → 校验 → 覆盖写入 localStorage → 刷新页面。
+//   导入为"替换"语义：先清除现有记忆与收藏，再写入文件内容。
+// 删除记忆：清除所有 spirit-config 键。
+// 删除收藏：清除 favorites 键（与 resetFavorites 等价，但双侧同时清除）。
+// ============================================================
+
+// 收集 localStorage 中各类 roco-star-dmg: 键，分类返回。
+function _collectStorageKeys() {
+  const spiritConfigs = [];
+  const favorites = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith(SPIRIT_CONFIG_KEY_PREFIX)) spiritConfigs.push(key);
+      else if (key.startsWith(FAVORITES_KEY_PREFIX)) favorites.push(key);
+    }
+  } catch (_) { /* localStorage 被禁用 */ }
+  return { spiritConfigs, favorites };
+}
+
+// 清除所有记忆配置键。
+function _clearAllSpiritConfigs() {
+  for (const key of _collectStorageKeys().spiritConfigs) {
+    try { localStorage.removeItem(key); } catch (_) {}
+  }
+}
+
+// 清除两侧收藏键并重置缓存（回退默认列表）。
+function _clearAllFavorites() {
+  for (const side of VALID_SIDES) {
+    try { localStorage.removeItem(FAVORITES_KEY_PREFIX + side); } catch (_) {}
+    _favoritesCache[side] = null;   // 强制下次读取时回退默认
+  }
+}
+
+// 元素短暂脉动反馈（复用 resetFavorites 的 pulse 思路）。
+function _pulseElement(el) {
+  if (!el) return;
+  el.classList.remove('pulse');
+  void el.offsetWidth;
+  el.classList.add('pulse');
+  setTimeout(() => el.classList.remove('pulse'), 420);
+}
+
+// 导出全部数据为结构化 JSON 并触发下载。
+function exportData() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    favorites: {
+      attacker: _loadFavorites('attacker').slice(),
+      defender: _loadFavorites('defender').slice(),
+    },
+    spiritConfigs: {},
+  };
+  // 收集所有记忆配置（每条已存为 JSON 字符串，parse 后纳入）
+  for (const key of _collectStorageKeys().spiritConfigs) {
+    const suffix = key.slice(SPIRIT_CONFIG_KEY_PREFIX.length);
+    try {
+      data.spiritConfigs[suffix] = JSON.parse(localStorage.getItem(key));
+    } catch (_) { /* 跳过损坏数据 */ }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `roco-star-dmg-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 删除全部记忆配置（带二次确认）。
+function clearAllMemory() {
+  showConfirmDialog(
+    '删除记忆',
+    `<div style="line-height:1.7">确认删除 <strong>所有精灵的自动记忆配置</strong>吗？</div>
+     <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">删除后，下次选择精灵时将使用默认配置。当前已选精灵的显示不受影响。</div>`,
+    () => {
+      _clearAllSpiritConfigs();
+      _pulseElement(document.getElementById('clear-memory-btn'));
+    }
+  );
+}
+
+// 删除全部收藏（带二次确认；等价于双侧重置收藏）。
+function clearAllFavorites() {
+  showConfirmDialog(
+    '删除收藏',
+    `<div style="line-height:1.7">确认清空 <strong>攻击方与防御方的收藏列表</strong>吗？</div>
+     <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">此操作与精灵面板中的「重置收藏」等价，将恢复为默认列表。</div>`,
+    () => {
+      _clearAllFavorites();
+      refreshPickerGrid('attacker');
+      refreshPickerGrid('defender');
+      _refreshFavoriteBtn('attacker');
+      _refreshFavoriteBtn('defender');
+      _pulseElement(document.getElementById('clear-favorites-btn'));
+    }
+  );
+}
+
+// 导入 JSON 文件：校验 → 确认 → 覆盖写入 → 刷新页面。
+function importData(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch (_) {
+      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件不是有效的 JSON，请检查文件内容。</div>', null);
+      return;
+    }
+    if (!data || typeof data !== 'object' || data.version !== 1) {
+      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件格式不正确或版本不兼容。</div>', null);
+      return;
+    }
+    const hasFavorites = data.favorites && typeof data.favorites === 'object';
+    const hasConfigs = data.spiritConfigs && typeof data.spiritConfigs === 'object';
+    if (!hasFavorites && !hasConfigs) {
+      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件中未包含任何可导入的数据。</div>', null);
+      return;
+    }
+    const favCount = hasFavorites
+      ? (Array.isArray(data.favorites.attacker) ? data.favorites.attacker.length : 0)
+        + (Array.isArray(data.favorites.defender) ? data.favorites.defender.length : 0)
+      : 0;
+    const cfgCount = hasConfigs ? Object.keys(data.spiritConfigs).length : 0;
+    showConfirmDialog(
+      '确认导入',
+      `<div style="line-height:1.7">即将导入：<br>
+       ・收藏精灵 <strong>${favCount}</strong> 个<br>
+       ・记忆配置 <strong>${cfgCount}</strong> 条</div>
+       <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">导入将覆盖现有数据，页面将自动刷新。</div>`,
+      () => _applyImportedData(data, hasFavorites, hasConfigs)
+    );
+  };
+  reader.onerror = () => {
+    showConfirmDialog('导入失败', '<div style="line-height:1.7">读取文件失败，请重试。</div>', null);
+  };
+  reader.readAsText(file);
+}
+
+// 将校验通过的导入数据写入 localStorage，然后刷新页面。
+function _applyImportedData(data, importFav, importCfg) {
+  if (importFav) {
+    _clearAllFavorites();
+    for (const side of VALID_SIDES) {
+      const arr = data.favorites[side];
+      if (Array.isArray(arr)) {
+        _favoritesCache[side] = arr.filter(id => SPRITES[id]);
+        _saveFavorites(side);
+      }
+    }
+  }
+  if (importCfg) {
+    _clearAllSpiritConfigs();
+    for (const [suffix, entry] of Object.entries(data.spiritConfigs)) {
+      // suffix 格式 "<id>:<side>"，用 lastIndexOf 切分 side（精灵名不含冒号）
+      const lastColon = suffix.lastIndexOf(':');
+      if (lastColon < 0) continue;
+      const id = suffix.slice(0, lastColon);
+      const side = suffix.slice(lastColon + 1);
+      if (!VALID_SIDES.has(side) || !SPRITES[id]) continue;
+      try {
+        localStorage.setItem(SPIRIT_CONFIG_KEY_PREFIX + suffix, JSON.stringify(entry));
+      } catch (_) {}
+    }
+  }
+  // 刷新页面以应用所有变更（避免复杂的 UI 状态同步）
+  location.reload();
 }
 
 // 通用确认弹窗：复用 #confirm-modal（结构与 #info-modal 一致，footer 有取消/确认）。
@@ -4215,6 +4437,66 @@ function initInfoModal() {
   });
 }
 
+// 数据管理弹窗初始化：触发按钮、开关同步、各功能按钮事件。
+// 结构与 initInfoModal 一致（遮罩 / ESC / 关闭按钮均可关闭），但 body
+// 是静态 HTML，无需注入；打开时仅同步自动记忆开关状态。
+function initDataManagerModal() {
+  const overlay = document.getElementById('data-mgr-modal');
+  if (!overlay) return;
+  const trigger    = document.getElementById('data-mgr-trigger');
+  const closeBtn   = overlay.querySelector('.modal-close');
+  const confirmBtn = overlay.querySelector('.modal-confirm');
+  const toggle     = document.getElementById('memory-toggle');
+  const clearMemBtn  = document.getElementById('clear-memory-btn');
+  const clearFavBtn  = document.getElementById('clear-favorites-btn');
+  const exportBtn    = document.getElementById('export-btn');
+  const importBtn    = document.getElementById('import-btn');
+  const importFile   = document.getElementById('import-file');
+  if (!trigger || !closeBtn || !toggle) return;
+
+  let lastFocus = null;
+
+  const open = () => {
+    toggle.checked = isMemoryEnabled();
+    lastFocus = document.activeElement;
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => closeBtn.focus(), 0);
+  };
+  const close = () => {
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+  };
+
+  trigger.addEventListener('click', open);
+  closeBtn.addEventListener('click', close);
+  if (confirmBtn) confirmBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', (e) => {
+    if (overlay.classList.contains('is-open') && e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  });
+
+  toggle.addEventListener('change', () => setMemoryEnabled(toggle.checked));
+  if (clearMemBtn) clearMemBtn.addEventListener('click', clearAllMemory);
+  if (clearFavBtn) clearFavBtn.addEventListener('click', clearAllFavorites);
+  if (exportBtn) exportBtn.addEventListener('click', exportData);
+  if (importBtn && importFile) {
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', () => {
+      if (importFile.files && importFile.files[0]) {
+        importData(importFile.files[0]);
+        importFile.value = '';   // 允许重复选同一文件
+      }
+    });
+  }
+}
+
 // ============================================================
 // CHALLENGE MODE (UI 控件层)
 // ------------------------------------------------------------
@@ -5874,6 +6156,8 @@ function init() {
   updateSealGlow();
   // 信息弹窗：公告 / 使用说明
   initInfoModal();
+  // 数据管理弹窗：开关 / 删除 / 导出 / 导入
+  initDataManagerModal();
   // 初始即渲染两侧的内嵌选择器（未选精灵时直接显示）
   renderSpiritArea('attacker');
   renderSpiritArea('defender');
