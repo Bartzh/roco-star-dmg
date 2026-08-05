@@ -102,10 +102,43 @@ body {
   text-shadow: 0 0 8px color-mix(in srgb, color-mix(in srgb, var(--accent-primary) 70%, #fff) 60%, transparent);
 }
 
-/* ============ Footer ============ */
+/* ============ Footer ============
+   页脚独立样式：不复用 .subtitle（那是顶部副标题的样式，带主题色链接）。
+   页脚链接统一用 text-secondary，hover 时提亮到 text-primary，不加发光/下划线。
+   sticky footer：body + container 均为 flex 列，footer 用 margin-top:auto 下沉。 */
 .footer {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: auto;
+  padding-top: 16px;
   text-align: center;
-  margin-top: 40px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+.footer-links {
+  margin-bottom: 0;
+}
+.footer-meta {
+  margin: 0;
+}
+.footer a,
+.footer .nav-link {
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  text-decoration: none;
+  border-bottom: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  transition: color 0.2s ease;
+}
+.footer a:hover,
+.footer .nav-link:hover {
+  color: var(--text-primary);
+  text-shadow: none;
+  border-bottom-color: transparent;
 }
 
 /* ============ Battle Area ============ */
