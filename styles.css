@@ -73,7 +73,7 @@ body {
      container 作为 grid 列容器，min-height:100vh 让其至少占满一屏；
      grid-template-rows 末尾的 1fr 行占据剩余空间，把 footer 推到底部——
      内容不足一屏时 1fr 拉伸贴底，超过一屏时 1fr 塌缩为 0、footer 自然跟在内容后。
-     .breakdown-section 用 visibility:hidden 隐藏（而非 display:none），
+     .breakdown-section 用 opacity:0 隐藏（而非 display:none / visibility:hidden），
      保留折叠态布局占位，第 5 行高度稳定，显隐切换不影响 footer 位置
      （即"默认 breakdown 存在"的语义）。
      .mobile-result-bar 桌面端仍 display:none，第 4 行塌缩为 0（原设计，
@@ -1295,12 +1295,16 @@ body {
   position: relative;
   overflow: hidden;
 }
-/* 隐藏态用 visibility:hidden 而非 display:none：
-   保留布局占位（折叠态高度），让 grid 行高稳定，
-   breakdown 显隐切换不影响 footer 位置（即"默认其存在"的语义）。
+/* 隐藏态用 opacity:0 而非 display:none / visibility:hidden：
+   - display:none 不占位，grid 行高会塌缩，footer 抖动。
+   - visibility:hidden 在桌面端保留占位，但 iOS Safari 的 grid item 上可能不保留
+     布局占位（实测在移动端 Safari 上塌缩为 0，导致"突然多出空白"）。
+   - opacity:0 不影响布局计算，元素仍正常参与 grid 排列，iOS Safari 支持一致。
+   配合 pointer-events:none 防止隐藏态的 toggle 按钮被误触摸。
    显示时移除 is-hidden，折叠态高度相同，footer 不抖动。 */
 .breakdown-section.is-hidden {
-  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 .breakdown-toggle {
   display: flex;
