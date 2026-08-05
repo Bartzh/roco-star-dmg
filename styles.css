@@ -2554,7 +2554,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   margin: 14px 0;
 }
 .modal-footer {
-  padding: 12px 18px;
+  padding: 12px 22px;
   border-top: 1px solid rgba(255,255,255,0.08);
   display: flex;
   justify-content: flex-end;
@@ -2563,7 +2563,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 .modal-confirm {
   font-family: inherit;
   font-size: 0.82rem;
-  padding: 7px 18px;
+  padding: 7px 16px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.08);
@@ -2627,6 +2627,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   font-family: inherit;
   font-size: 0.82rem;
   padding: 7px 16px;
+  min-width: 60px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.08);
@@ -2651,11 +2652,13 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   animation: labelActionPulse 0.5s ease;
 }
 
-/* 开关：隐藏原生 checkbox，用 track + 伪元素做滑块 */
+/* 开关：隐藏原生 checkbox，用 track + 伪元素做滑块。
+   容器宽度与 .data-mgr-btn 的 min-width 对齐，track 在容器内居中，
+   保证自动记忆一行的右侧控件与其他行的按钮占用相同水平空间。 */
 .data-mgr-switch {
   position: relative;
   display: inline-block;
-  width: 40px;
+  width: 60px;
   height: 22px;
   flex-shrink: 0;
   cursor: pointer;
@@ -2668,7 +2671,10 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 }
 .data-mgr-switch-track {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
   background: rgba(255,255,255,0.18);
   border-radius: 22px;
   transition: background 0.2s ease;
@@ -2698,7 +2704,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 /* 移动端：弹窗占满宽度的安全边距更小 */
 @media (max-width: 480px) {
   .modal-overlay { padding: 12px; }
-  .modal-header, .modal-footer { padding: 12px 14px; }
+  .modal-header, .modal-footer { padding: 12px 22px; }
   .modal-body { padding: 14px 16px; }
   /* 窄屏下描述文字换行，按钮不挤占 */
   .data-mgr-row { gap: 12px; }

@@ -352,7 +352,7 @@
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
           <div class="data-mgr-row-title">自动记忆</div>
-          <div class="data-mgr-row-desc">修改精灵配置时自动保存到本地，下次选择同一精灵时自动恢复</div>
+          <div class="data-mgr-row-desc">修改精灵配置时自动保存到本地，下次选择同一精灵时自动恢复（关闭后只是暂停保存功能，不影响已保存数据恢复，若需完全清除数据请点击下方的「删除记忆」）</div>
         </div>
         <label class="data-mgr-switch" title="开启 / 关闭自动记忆">
           <input type="checkbox" id="memory-toggle">
@@ -387,7 +387,7 @@
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
           <div class="data-mgr-row-title">导入数据</div>
-          <div class="data-mgr-row-desc">从 JSON 文件导入数据，将覆盖现有数据并刷新页面</div>
+          <div class="data-mgr-row-desc">从 JSON 文件导入数据，将完全替换现有数据并刷新页面</div>
         </div>
         <button type="button" class="data-mgr-btn" id="import-btn">导入</button>
         <input type="file" id="import-file" accept="application/json,.json" hidden>
