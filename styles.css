@@ -2702,7 +2702,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 }
 
 /* 移动端：弹窗占满宽度的安全边距更小 */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .modal-overlay { padding: 12px; }
   .modal-header, .modal-footer { padding: 12px 22px; }
   .modal-body { padding: 14px 16px; }
