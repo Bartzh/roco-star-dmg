@@ -5824,8 +5824,6 @@ function exitChallenge() {
   setStarLayer(state.starLayer);
   // 7. 重新计算伤害（恢复实时显示）
   calculateDamage();
-  const breakdownSection = document.getElementById('breakdown-section');
-  if (breakdownSection) breakdownSection.classList.add('is-hidden');
 }
 
 // 开始挑战：生成题目池 + 启动第一题
