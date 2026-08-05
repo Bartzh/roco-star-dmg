@@ -131,9 +131,9 @@ body {
    sticky footer 由 .container 的 grid 布局 + 1fr 弹性行实现，
    footer 自身无需 margin-top:auto（grid 已显式钉到第 7 行）。 */
 .footer {
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(255,255,255,0.15);
   padding-top: 16px;
-  padding-bottom: 20px;   /* 底部留白从 .container 移入此处，让 sticky footer 紧贴视口底同时保留呼吸空间 */
+  padding-bottom: 16px;   /* 底部留白从 .container 移入此处，让 sticky footer 紧贴视口底同时保留呼吸空间 */
   text-align: center;
   font-size: 0.72rem;
   color: var(--text-secondary);
