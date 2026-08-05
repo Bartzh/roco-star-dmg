@@ -68,8 +68,31 @@ body {
   z-index: 2;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 30px 12px 60px;
+  padding: 30px 12px 0;   /* 底部 padding 移到 .footer 内部，避免 container min-height:100vh + 内容高度 + 60px padding 叠加导致页面超出一屏 */
+  /* sticky footer（grid 实现）：
+     container 作为 grid 列容器，min-height:100vh 让其至少占满一屏；
+     grid-template-rows 末尾的 1fr 行占据剩余空间，把 footer 推到底部——
+     内容不足一屏时 1fr 拉伸贴底，超过一屏时 1fr 塌缩为 0、footer 自然跟在内容后。
+     .breakdown-section 用 visibility:hidden 隐藏（而非 display:none），
+     保留折叠态布局占位，第 5 行高度稳定，显隐切换不影响 footer 位置
+     （即"默认 breakdown 存在"的语义）。
+     .mobile-result-bar 桌面端仍 display:none，第 4 行塌缩为 0（原设计，
+     桌面端隐藏移动端结果条）；不影响 footer，因为 footer 在第 7 行。
+     不用 flex 是因为 flex column 默认 align-items:stretch 会让
+     .breakdown-section 的 margin:auto + max-width 水平居中失效；
+     grid 中 margin:auto 仍然有效，居中布局得以保留。 */
+  display: grid;
+  grid-template-rows: auto auto auto auto auto 1fr auto;
+  min-height: 100vh;
 }
+/* 显式钉行：跳过第 6 行（1fr 弹性占位），footer 固定在第 7 行。
+   各行顺序对应 HTML 中 .container 的直接子元素出现顺序。 */
+.container > .header              { grid-row: 1; }
+.container > .challenge-bar       { grid-row: 2; }
+.container > .battle-area         { grid-row: 3; }
+.container > .mobile-result-bar   { grid-row: 4; }
+.container > .breakdown-section   { grid-row: 5; }
+.container > .footer              { grid-row: 7; }
 
 /* ============ Header ============ */
 .header {
@@ -105,11 +128,12 @@ body {
 /* ============ Footer ============
    页脚独立样式：不复用 .subtitle（那是顶部副标题的样式，带主题色链接）。
    页脚链接统一用 text-secondary，hover 时提亮到 text-primary，不加发光/下划线。
-   sticky footer：body + container 均为 flex 列，footer 用 margin-top:auto 下沉。 */
+   sticky footer 由 .container 的 grid 布局 + 1fr 弹性行实现，
+   footer 自身无需 margin-top:auto（grid 已显式钉到第 7 行）。 */
 .footer {
   border-top: 1px solid rgba(255,255,255,0.06);
-  margin-top: auto;
   padding-top: 16px;
+  padding-bottom: 20px;   /* 底部留白从 .container 移入此处，让 sticky footer 紧贴视口底同时保留呼吸空间 */
   text-align: center;
   font-size: 0.72rem;
   color: var(--text-secondary);
@@ -147,7 +171,11 @@ body {
   grid-template-columns: 1fr auto 1fr;
   gap: 24px;
   align-items: stretch;
-  margin-bottom: 24px;
+  /* 原有 margin-bottom: 24px 已移除：
+     container 改为 grid 后，grid item 间的 margin 不再合并，
+     battle-area 的 margin-bottom:24px 与 breakdown-section 的 margin-top:24px
+     会叠加成 48px，导致 breakdown 比原 block 布局下多下移 24px。
+     breakdown 自身的 margin-top:24px 已提供足够间距。 */
 }
 
 /* 桌面端：carousel 透明包裹层，不影响 grid 布局 */
@@ -1267,6 +1295,13 @@ body {
   position: relative;
   overflow: hidden;
 }
+/* 隐藏态用 visibility:hidden 而非 display:none：
+   保留布局占位（折叠态高度），让 grid 行高稳定，
+   breakdown 显隐切换不影响 footer 位置（即"默认其存在"的语义）。
+   显示时移除 is-hidden，折叠态高度相同，footer 不抖动。 */
+.breakdown-section.is-hidden {
+  visibility: hidden;
+}
 .breakdown-toggle {
   display: flex;
   align-items: center;
@@ -1958,8 +1993,12 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .battle-area {
     display: block;   /* 覆盖桌面端 grid，由 carousel 接管布局 */
     gap: 0;
-    margin: 0 -16px 0px;     /* 负 margin 抵消 .container 的 padding，让 carousel 贴边屏幕；底部从 16px 减到 0px，给分页指示器留空间 */
-    width: calc(100% + 32px);
+    margin: 0;
+    /* grid item 的 min-width 默认是 auto（不允许压缩到内容以下），
+       .battle-carousel 的 width: calc(100% + 32px) 会把 .battle-area 撑到 viewport 宽，
+       进而撑宽 container 导致整体右移。显式 min-width: 0 让 grid item 恢复 stretch
+       到 track 宽，.battle-carousel 的负 margin + width 在内部贴边 viewport，不撑宽父级。 */
+    min-width: 0;
   }
 
   /* carousel 分页指示器：三个小圆点，高度与结果进度条一致（8px），提示可左右滑动 */
@@ -1991,6 +2030,13 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;     /* Firefox 隐藏滚动条 */
     gap: 0;
+    /* 贴边负 margin 从 .battle-area 下移至此：.battle-carousel 是 .battle-area 内的 block
+       子元素，负 margin + width 行为正常；避免作为 grid item 的 .battle-area 用负 margin
+       + 显式 width 撑宽 container（曾导致移动端整体右移）。width 的 100% 基于
+       .battle-area content 宽（= grid track 宽 = container content 宽），+32px 抵消
+       container 两侧 padding 16px，实现贴边屏幕。 */
+    margin: 0 -16px;
+    width: calc(100% + 32px);
   }
   .battle-carousel::-webkit-scrollbar { display: none; }
 
@@ -2041,7 +2087,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   .seal { width: 160px; height: 160px; }
   .seal-number { font-size: 2.2rem; }
   .seal-wrapper canvas { width: 240px; height: 240px; top: -40px; left: -40px; }
-  .container { padding: 20px 16px 40px; }
+  .container { padding: 20px 16px 0; }   /* 底部留白由 .footer 内部 padding-bottom 提供，避免叠加 */
   .breakdown-section { margin: 0; }
   /* Skill list: keep 2-column grid even on narrow screens; allow vertical scroll for >4 skills
      移动端滚动条是 overlay（不占空间），桌面端 `margin-right: -8px` + `scrollbar-gutter: stable`

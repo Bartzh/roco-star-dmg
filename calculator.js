@@ -3850,7 +3850,7 @@ function renderResult(data) {
 
   // --- Show the breakdown section ---
   const breakdownSection = document.getElementById('breakdown-section');
-  if (breakdownSection) breakdownSection.style.display = 'block';
+  if (breakdownSection) breakdownSection.classList.remove('is-hidden');
 
   // --- Build the breakdown list (full math) ---
   // 折叠（max-height: 0）时不重写 innerHTML —— 拖动星层时折叠的 DOM 是不可见的，
@@ -4131,7 +4131,7 @@ function renderWaiting() {
     if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">提交答案后计算结果</div>`;
     // Hide breakdown
     const breakdownSection = document.getElementById('breakdown-section');
-    if (breakdownSection) breakdownSection.style.display = 'none';
+    if (breakdownSection) breakdownSection.classList.add('is-hidden');
     const breakdownContent = document.getElementById('breakdown-content');
     if (breakdownContent) breakdownContent.classList.remove('open');
     updateAtmosphere(0, false);
@@ -4166,7 +4166,7 @@ function renderWaiting() {
   if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">${msg}</div>`;
   // Hide breakdown
   const breakdownSection = document.getElementById('breakdown-section');
-  if (breakdownSection) breakdownSection.style.display = 'none';
+  if (breakdownSection) breakdownSection.classList.add('is-hidden');
   const breakdownContent = document.getElementById('breakdown-content');
   if (breakdownContent) breakdownContent.classList.remove('open');
   updateAtmosphere(0, false);
@@ -5825,7 +5825,7 @@ function exitChallenge() {
   // 7. 重新计算伤害（恢复实时显示）
   calculateDamage();
   const breakdownSection = document.getElementById('breakdown-section');
-  if (breakdownSection) breakdownSection.style.display = 'none';
+  if (breakdownSection) breakdownSection.classList.add('is-hidden');
 }
 
 // 开始挑战：生成题目池 + 启动第一题
