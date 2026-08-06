@@ -68,6 +68,7 @@ COMMON_ATTACKERS: list[str] = [
     '翼龙',
     '龙鱼',
     '音速犬',
+    '岚鸟（夏天的样子）',
 ]
 COMMON_DEFENDERS: list[str] = [
     '贝古斯',
@@ -837,15 +838,22 @@ attacker_random_pools: dict[str, RandomPool] = {
     ),
     '龙鱼': RandomPool(
         stats=StatsPool(
-            default_weight=0.75,
+            default_weight=1,
             combos=[
                 WeightedStatsCombo(
                     combo=StatsCombo(
                         nature=Nature(up='spd', down='atk'),
                         ivs=['hp', 'matk', 'spd']
                     ),
-                    weight=7
+                    weight=12
                 ),
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='matk', down='atk'),
+                        ivs=['hp', 'matk', 'spd']
+                    ),
+                    weight=7
+                )
             ]
         ),
         skills=SkillsPool(
@@ -853,7 +861,11 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='翼击',
-                    weight=15
+                    weight=16
+                ),
+                WeightedSkillCombo(
+                    combo='水炮',
+                    weight=2
                 ),
             ]
         ),
@@ -910,6 +922,46 @@ attacker_random_pools: dict[str, RandomPool] = {
             ]
         ),
     ),
+    '岚鸟（夏天的样子）': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='atk', down='matk'),
+                        ivs=['hp', 'atk', 'spd']
+                    ),
+                    weight=19
+                )
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=21,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'atk': 100}],
+                    weight=3
+                ),
+                WeightedBuffCombo(
+                    combo=[{'atk': 200}],
+                    weight=1
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='龙卷风',
+                    weight=16
+                ),
+                WeightedSkillCombo(
+                    combo='先发制人',
+                    weight=3
+                ),
+            ]
+        ),
+    )
 }
 attacker_random_pools = {k: asdict(v) for k, v in attacker_random_pools.items()}
 
