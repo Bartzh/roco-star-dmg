@@ -2700,7 +2700,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 }
 .data-mgr-row-desc {
   font-size: 0.78rem;
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.88);
   margin-top: 2px;
   line-height: 1.5;
 }
@@ -2757,8 +2757,8 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 12px;
-  right: 12px;
+  left: 10px;
+  right: 10px;
   background: rgba(255,255,255,0.18);
   border-radius: 22px;
   transition: background 0.2s ease;
@@ -2766,10 +2766,10 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 .data-mgr-switch-track::before {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
+  top: 0px;
+  left: 0px;
+  width: 22px;
+  height: 22px;
   background: #fff;
   border-radius: 50%;
   transition: transform 0.2s ease;
@@ -2783,6 +2783,18 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 .data-mgr-switch input:focus-visible + .data-mgr-switch-track {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
+}
+.data-mgr-switch:hover .data-mgr-switch-track {
+  background: rgba(255,255,255,0.28);
+}
+.data-mgr-switch:hover input:checked + .data-mgr-switch-track {
+  background: color-mix(in srgb, var(--accent-primary) 85%, transparent);
+}
+.data-mgr-switch:active .data-mgr-switch-track::before {
+  transform: scale(1.15);
+}
+.data-mgr-switch:active input:checked + .data-mgr-switch-track::before {
+  transform: translateX(18px) scale(1.15);
 }
 
 /* 移动端：弹窗占满宽度的安全边距更小 */
