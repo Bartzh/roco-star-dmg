@@ -372,7 +372,7 @@ function resetFavorites(side) {
         btn.classList.remove('pulse');
         void btn.offsetWidth;   // 强制 reflow 以重启动画
         btn.classList.add('pulse');
-        setTimeout(() => btn.classList.remove('pulse'), 420);
+        setTimeout(() => btn.classList.remove('pulse'), 500);
       }
     }
   );
