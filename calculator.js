@@ -458,15 +458,6 @@ function _clearAllFavorites() {
   }
 }
 
-// 元素短暂脉动反馈（复用 resetFavorites 的 pulse 思路）。
-function _pulseElement(el) {
-  if (!el) return;
-  el.classList.remove('pulse');
-  void el.offsetWidth;
-  el.classList.add('pulse');
-  setTimeout(() => el.classList.remove('pulse'), 420);
-}
-
 // 导出全部数据为结构化 JSON 并触发下载。
 function exportData() {
   const data = {
@@ -504,7 +495,6 @@ function clearAllMemory() {
      <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">删除后，下次选择精灵时将使用默认配置。当前已选精灵的显示不受影响。</div>`,
     () => {
       _clearAllSpiritConfigs();
-      _pulseElement(document.getElementById('clear-memory-btn'));
     }
   );
 }
@@ -521,7 +511,6 @@ function clearAllFavorites() {
       refreshPickerGrid('defender');
       _refreshFavoriteBtn('attacker');
       _refreshFavoriteBtn('defender');
-      _pulseElement(document.getElementById('clear-favorites-btn'));
     }
   );
 }
