@@ -41,6 +41,31 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
+  /* 默认禁止页面文本选取，防止移动端长按/误触触发系统选词、复制菜单。
+     需要可选取的区域（标题、副标题、伤害明细内容、页脚、弹窗文字、输入框）
+     在下面单独覆盖为 user-select: text。 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 需要保留可选取性的区域 */
+.header h1,
+.subtitle,
+.footer,
+.breakdown-list,
+.modal-body,
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 输入框占位符单独恢复不可选取：避免 PC 端大段拖拽和 Ctrl+A 时把 placeholder
+   高亮，但用户实际输入的文本仍可正常选中/编辑。 */
+input::placeholder,
+textarea::placeholder {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ============ Star Background ============ */
@@ -2740,6 +2765,8 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   color: var(--text-primary);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .data-mgr-btn:hover {
   background: rgba(255,255,255,0.14);
