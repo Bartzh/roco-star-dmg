@@ -1054,10 +1054,20 @@ body {
 .seal-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 100%;
+  /* 原生 range 的 thumb 中心行进范围是 [thumb_radius, width - thumb_radius]，
+     即中心无法到达滑条两端。把 input 宽度向两侧各延伸 thumb_radius(8px)，
+     使 thumb 中心恰好行进 [0, 100%] 全程，与下方标签 0 / 50 / 99 对齐。
+     input 宽度比容器宽 16px，flex align-items:center 会将其居中（两侧各溢出 8px）。
+     负 margin 在 flex 居中下无效果，故省略。
+     轨道（background）用渐变在两侧各裁掉 8px，使可见轨道恰好落在 [0, 100%]，
+     不超出 0 / 99 标签。 */
+  width: calc(100% + 16px);
   height: 4px;
   border-radius: 2px;
-  background: rgba(255,255,255,0.1);
+  background: linear-gradient(to right,
+    transparent 0, transparent 8px,
+    rgba(255,255,255,0.1) 8px, rgba(255,255,255,0.1) calc(100% - 8px),
+    transparent calc(100% - 8px), transparent 100%);
   outline: none;
   transition: all 0.3s;
 }
@@ -1084,12 +1094,24 @@ body {
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 50%, transparent);
 }
 .slider-labels {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
   width: 100%;
+  height: 1.3em;
   font-size: 0.65rem;
   color: var(--text-secondary);
 }
+/* 标签用绝对定位 + translateX(-50%) 居中对齐到 thumb 中心：
+   - "0"  → left:0%   (thumb 中心在 value=0 时恰好在此)
+   - "50" → left:50.505%  (= 50/99，匹配 value=50 时 thumb 的非线性位置)
+   - "99" → left:100% (thumb 中心在 value=99 时恰好在此) */
+.slider-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.slider-labels span:nth-child(1) { left: 0; }
+.slider-labels span:nth-child(2) { left: 50.505%; }
+.slider-labels span:nth-child(3) { left: 100%; }
 
 /* Bonus display */
 .seal-bonus {
