@@ -2705,6 +2705,17 @@ function hasSkillMod(skill) {
   return !!(SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id]);
 }
 
+// 判断某技能的 mod 在指定侧（攻击方/防御方）是否可能触发，用于 mod-icon 显示决策。
+// 与 isSkillModActive 的区别：这里只看方向相关性（fn.sides），不看运行时条件是否满足。
+// 方向不匹配时返回 false，避免显示永远不可能触发的灰色 icon。
+function isSkillModRelevant(skill, side) {
+  if (!skill || !hasSkillMod(skill)) return false;
+  const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
+  const sides = fn.sides || 'both';
+  if (sides === 'both') return true;
+  return (sides === 'attacker') === (side === 'attacker');
+}
+
 // 构造 SKILL_MODS 函数需要的公共 ctx，伤害计算与标题栏 mod 图标共用。
 // 所有参数可为空，内部用空对象 / 0 兜底，避免调用方重复拼装。
 function buildSkillModCtx(
@@ -2802,8 +2813,8 @@ function renderModIcons(side) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   const ability = spirit ? getSpiritAbility(spirit) : null;
   const selectedSkill = side === 'attacker' ? state.attackSkill : state.defenseSkill;
-  const abilityHasMod = ability ? hasSkillMod(ability) : false;
-  const skillHasMod = hasSkillMod(selectedSkill);
+  const abilityHasMod = ability ? isSkillModRelevant(ability, side) : false;
+  const skillHasMod = isSkillModRelevant(selectedSkill, side);
 
   // 计算目标状态（desired 为空表示该侧无可显示的 mod）
   const desired = [];
@@ -3728,6 +3739,30 @@ const SKILL_MODS = {
   },
   // Add more skills here as they're introduced.
 };
+
+// 标注每个 mod 的触发方向（'attacker' / 'defender' / 'both'），用于 mod-icon
+// 显示决策：方向不匹配时该侧 icon 不显示，避免显示永远不可能触发的特性。
+// 未标注的 mod 默认 'both'（向后兼容）。新增 mod 时请同步登记方向。
+const SKILL_MODS_SIDES = {
+  // 只在攻击方触发
+  多维击打: 'attacker', 观星: 'attacker', 坠星: 'attacker', 天体吸积: 'attacker',
+  星痕: 'attacker', 顺风: 'attacker', 破空: 'attacker', 扇风: 'attacker',
+  疾风刺: 'attacker', 铁蒺藜: 'attacker', 龙卷风: 'attacker', 追打: 'attacker',
+  炙热波动: 'attacker', 虫击: 'attacker', 突袭: 'attacker', 暗突袭: 'attacker',
+  爆冲: 'attacker', 技巧打击: 'attacker', 无影脚: 'attacker', 偷袭: 'attacker',
+  散手: 'attacker', 连续爪击: 'attacker', 滚雪球: 'attacker', 吹炎: 'attacker',
+  地陷: 'attacker', 闪燃: 'attacker', 灾厄: 'attacker', 变形活画: 'attacker',
+  急中生智: 'attacker', 闪击: 'attacker', 鸣沙陷阱: 'attacker',
+  __yuanli__: 'attacker', 和弦共振: 'attacker',
+  // 只在防御方触发
+  狂欢开始: 'defender',
+  // 双方都可能触发
+  展翅: 'both',
+};
+// 把 sides 挂到对应函数上，isSkillModRelevant 通过 fn.sides 查询
+for (const [key, sides] of Object.entries(SKILL_MODS_SIDES)) {
+  if (SKILL_MODS[key]) SKILL_MODS[key].sides = sides;
+}
 
 // 必先手技能：使用这些技能时无视双方速度差，必定先于敌方行动。
 // 与 skill_000049（顺风）配合：先手技能让顺风必定触发威力 +50%。
