@@ -2705,28 +2705,31 @@ function hasSkillMod(skill) {
   return !!(SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id]);
 }
 
-// 构造用于检测 mod 是否生效的上下文（与 computeSkillDynamicModifiers 保持一致）
-function buildModCheckCtx() {
-  const attacker = state.attacker;
-  const defender = state.defender;
+// 构造 SKILL_MODS 函数需要的公共 ctx，伤害计算与标题栏 mod 图标共用。
+// 所有参数可为空，内部用空对象 / 0 兜底，避免调用方重复拼装。
+function buildSkillModCtx(
+  attacker, attackSkill, attackerNature, attackerIVs,
+  defender, defenseSkill, defenderNature, defenderIVs,
+  starLayer
+) {
   const atkSpeedBonus = state.attackerSpeed;
   const defSpeedBonus = state.defenderSpeed;
   const atkEffectiveSpeed = attacker
-    ? getFinalStat(attacker, 'spd', state.attackerNature, state.attackerIVs) + atkSpeedBonus
+    ? getFinalStat(attacker, 'spd', attackerNature, attackerIVs) + atkSpeedBonus
     : 0;
   const defEffectiveSpeed = defender
-    ? getFinalStat(defender, 'spd', state.defenderNature, state.defenderIVs) + defSpeedBonus
+    ? getFinalStat(defender, 'spd', defenderNature, defenderIVs) + defSpeedBonus
     : 0;
   return {
-    starLayer: state.starLayer,
-    attackSkill: state.attackSkill || {},
+    starLayer: starLayer ?? 0,
+    attackSkill: attackSkill || {},
     attacker: attacker || {},
     defender: defender || {},
-    defenseSkill: state.defenseSkill || { category: '' },
-    attackerNature: state.attackerNature,
-    defenderNature: state.defenderNature,
-    attackerIVs: state.attackerIVs,
-    defenderIVs: state.defenderIVs,
+    defenseSkill: defenseSkill || { category: '' },
+    attackerNature,
+    defenderNature,
+    attackerIVs,
+    defenderIVs,
     attackerSpeedBonus: atkSpeedBonus,
     defenderSpeedBonus: defSpeedBonus,
     attackerEffectiveSpeed: atkEffectiveSpeed,
@@ -2739,7 +2742,11 @@ function isSkillModActive(skill, side) {
   if (!skill || !hasSkillMod(skill)) return false;
   const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
   const fromAttacker = side === 'attacker';
-  const ctx = buildModCheckCtx();
+  const ctx = buildSkillModCtx(
+    state.attacker, state.attackSkill, state.attackerNature, state.attackerIVs,
+    state.defender, state.defenseSkill, state.defenderNature, state.defenderIVs,
+    state.starLayer
+  );
   try {
     return fn(ctx, fromAttacker) !== null;
   } catch (err) {
@@ -3661,17 +3668,12 @@ function computeSkillDynamicModifiers(
   defender, defenseSkill, defenderNature, defenderIVs,
   starLayer
 ) {
-  const atkSpeedBonus = state.attackerSpeed;
-  const defSpeedBonus = state.defenderSpeed;
-  const atkEffectiveSpeed = getFinalStat(attacker, 'spd', attackerNature, attackerIVs) + atkSpeedBonus;
-  const defEffectiveSpeed = getFinalStat(defender, 'spd', defenderNature, defenderIVs) + defSpeedBonus;
-  const ctx = {
-    starLayer, attackSkill, attacker, defender, defenseSkill,
-    attackerNature, defenderNature, attackerIVs, defenderIVs,
-    attackerSpeedBonus: atkSpeedBonus, defenderSpeedBonus: defSpeedBonus,
-    attackerEffectiveSpeed: atkEffectiveSpeed, defenderEffectiveSpeed: defEffectiveSpeed,
-  };
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, ignoreResist: false, elementOverride: null, matkAdd: 0, speedAdd: 0, notes: [] };
+  const ctx = buildSkillModCtx(
+    attacker, attackSkill, attackerNature, attackerIVs,
+    defender, defenseSkill, defenderNature, defenderIVs,
+    starLayer
+  );
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, matkAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
 
   const apply = (skill, fromAttacker) => {
     // 优先用 modKey（用于把多个"同族"技能共享到同一条 SKILL_MODS），
