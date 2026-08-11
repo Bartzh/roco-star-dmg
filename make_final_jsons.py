@@ -156,11 +156,6 @@ for pet_id, pet_info in core.items():
         no_skills.append(pet_id)
         continue
     name = pet_info['t']
-    if name == '落陨星兔（信使精灵）':
-        name = '落陨星兔'
-        print(f'出现"落陨星兔（信使精灵）"，重命名为"{name}"')
-    elif name == '落陨星兔':
-        print(f'出现"落陨星兔"，可能不再需要重命名代码')
     pinyin_full, pinyin_initials = make_search_keys(name)
     sprites[name] = {
         # 用于排序，随后删除
@@ -184,7 +179,7 @@ for pet_id, pet_info in core.items():
         'pinyin_initials': pinyin_initials,
         'hbid': int(pet_info['hb']['i'][9:]),
     }
-    if il_url := pet_illustration_urls.get(pet_id):
+    if il_url := pet_illustration_urls.get(name):
         sprites[name]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
@@ -240,7 +235,7 @@ for skill_id, skill_info in skill_catalog.items():
                 skill_info['combo'] = int(match.group(1))
             else:
                 print('no combo:', skill_info['name'])
-    if icon_url := skill_icon_urls.get(skill_id):
+    if icon_url := skill_icon_urls.get(skill_info['name']):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
 # 以技能最终名作为 key（重名时已加数字后缀以保证唯一）
 skill_catalog = {skill_info['id']: skill_info for skill_info in skill_catalog.values()}
