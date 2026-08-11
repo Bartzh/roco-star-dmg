@@ -2764,8 +2764,7 @@ function renderModIconHTML(skill, active) {
   } else {
     imgHTML = `<div class="mod-icon-placeholder" style="--el-color:${el.color}">${el.emoji}</div>`;
   }
-  const statusText = active ? '已生效' : '未生效';
-  return `<span class="mod-icon ${active ? 'active' : 'inactive'}" title="${skill.name}（${statusText}）" aria-hidden="true">${imgHTML}</span>`;
+  return `<span class="mod-icon ${active ? 'active' : 'inactive'}" title="${skill.name}：${skill.desc}" aria-hidden="true">${imgHTML}</span>`;
 }
 
 // 刷新指定侧 panel-label 中间的 mod 图标。
