@@ -2046,6 +2046,7 @@ function renderSpiritCard(side, opts) {
   skillsSection.style.display = 'block';
   renderSkills(side);
   renderStatsConfig(side);
+  renderModIcons(side);
   if (side === 'attacker') renderPowerBoostChip();
 }
 
@@ -2686,6 +2687,124 @@ function renderSkillIconHTML(sk, el) {
     elOverlay = `<div class="el-overlay"><img src="${el.iconUrl}" loading="lazy" alt="${el.name}"></div>`;
   }
   return main + elOverlay;
+}
+
+// 获取精灵的当前特性技能（spirit.skills 中第一个 category === '特性' 的技能）
+function getSpiritAbility(spirit) {
+  if (!spirit) return null;
+  for (const sid of (spirit.skills || [])) {
+    const sk = SKILLS[sid];
+    if (sk && sk.category === '特性') return { id: sid, ...sk };
+  }
+  return null;
+}
+
+// 判断某技能是否在 SKILL_MODS 中存在特别适配
+function hasSkillMod(skill) {
+  if (!skill) return false;
+  return !!(SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id]);
+}
+
+// 构造用于检测 mod 是否生效的上下文（与 computeSkillDynamicModifiers 保持一致）
+function buildModCheckCtx() {
+  const attacker = state.attacker;
+  const defender = state.defender;
+  const atkSpeedBonus = state.attackerSpeed;
+  const defSpeedBonus = state.defenderSpeed;
+  const atkEffectiveSpeed = attacker
+    ? getFinalStat(attacker, 'spd', state.attackerNature, state.attackerIVs) + atkSpeedBonus
+    : 0;
+  const defEffectiveSpeed = defender
+    ? getFinalStat(defender, 'spd', state.defenderNature, state.defenderIVs) + defSpeedBonus
+    : 0;
+  return {
+    starLayer: state.starLayer,
+    attackSkill: state.attackSkill || {},
+    attacker: attacker || {},
+    defender: defender || {},
+    defenseSkill: state.defenseSkill || { category: '' },
+    attackerNature: state.attackerNature,
+    defenderNature: state.defenderNature,
+    attackerIVs: state.attackerIVs,
+    defenderIVs: state.defenderIVs,
+    attackerSpeedBonus: atkSpeedBonus,
+    defenderSpeedBonus: defSpeedBonus,
+    attackerEffectiveSpeed: atkEffectiveSpeed,
+    defenderEffectiveSpeed: defEffectiveSpeed,
+  };
+}
+
+// 判断指定技能的特别适配在当前状态下是否生效
+function isSkillModActive(skill, side) {
+  if (!skill || !hasSkillMod(skill)) return false;
+  const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
+  const fromAttacker = side === 'attacker';
+  const ctx = buildModCheckCtx();
+  try {
+    return fn(ctx, fromAttacker) !== null;
+  } catch (err) {
+    return false;
+  }
+}
+
+// 渲染单个 mod 图标 HTML：active 为 true 时彩色，否则黑白/灰度
+function renderModIconHTML(skill, active) {
+  if (!skill) return '';
+  const el = elOf(skill.element);
+  let imgHTML;
+  if (skill.icon_url) {
+    imgHTML = `<img src="${skill.icon_url}" loading="lazy" alt="${skill.name}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon-placeholder',textContent:'${el.emoji}',style:'--el-color:${el.color}'}))">`;
+  } else {
+    imgHTML = `<div class="mod-icon-placeholder" style="--el-color:${el.color}">${el.emoji}</div>`;
+  }
+  const statusText = active ? '已生效' : '未生效';
+  return `<span class="mod-icon ${active ? 'active' : 'inactive'}" title="${skill.name}（${statusText}）" aria-hidden="true">${imgHTML}</span>`;
+}
+
+// 刷新指定侧 panel-label 中间的 mod 图标。
+// 只有特性或选中技能在 SKILL_MODS 中存在适配时才显示；
+// 两个都存在时特性在左、技能在右。
+function renderModIcons(side) {
+  const container = document.getElementById(`${side}-mod-icons`);
+  if (!container) return;
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+  if (!spirit) {
+    if (container.dataset.modKey !== '') {
+      container.innerHTML = '';
+      container.dataset.modKey = '';
+    }
+    return;
+  }
+  const ability = getSpiritAbility(spirit);
+  const selectedSkill = side === 'attacker' ? state.attackSkill : state.defenseSkill;
+  const abilityHasMod = hasSkillMod(ability);
+  const skillHasMod = hasSkillMod(selectedSkill);
+  if (!abilityHasMod && !skillHasMod) {
+    if (container.dataset.modKey !== '') {
+      container.innerHTML = '';
+      container.dataset.modKey = '';
+    }
+    return;
+  }
+  const abilityActive = isSkillModActive(ability, side);
+  const skillActive = isSkillModActive(selectedSkill, side);
+  // 用稳定的语义 key 判断是否真正需要更新 DOM，避免 iOS Safari 等浏览器
+  // 在内容未变时因 innerHTML 重建（或属性序列化差异）导致图片闪烁。
+  const modKey = [
+    abilityHasMod && ability ? `${ability.id}:${abilityActive ? 1 : 0}` : '',
+    skillHasMod && selectedSkill ? `${selectedSkill.id}:${skillActive ? 1 : 0}` : ''
+  ].join('|');
+  if (container.dataset.modKey === modKey) return;
+  let html = '';
+  if (abilityHasMod) html += renderModIconHTML(ability, abilityActive);
+  if (skillHasMod) html += renderModIconHTML(selectedSkill, skillActive);
+  container.innerHTML = html;
+  container.dataset.modKey = modKey;
+}
+
+function refreshAllModIcons() {
+  renderModIcons('attacker');
+  renderModIcons('defender');
 }
 
 // Build the badge row (物攻/魔攻 + 威力 * 减伤) — multiple badges
@@ -3726,6 +3845,7 @@ function computeFinalDamage(ctx) {
 function calculateDamage() {
   if (!state.attacker || !state.defender || !state.attackSkill) {
     renderWaiting();
+    refreshAllModIcons();
     return;
   }
   // 构造 ctx 并调纯计算函数。挑战模式下，state 可能反映"上一题提交时的快照"，
@@ -3749,6 +3869,7 @@ function calculateDamage() {
   });
   renderResult(data);
   updateAtmosphere(data.hpPercent, data.isKill);
+  refreshAllModIcons();
 }
 
 // ============================================================
@@ -5506,6 +5627,7 @@ function applyQuestion(index) {
   setStarLayer(0);
   // 6. 答题阶段不计算伤害：保持空圆环 + 等待提交
   renderWaiting();
+  refreshAllModIcons();
   // 7. 进度条 + 提交按钮
   renderChallengeProgress();
   renderSubmitButton();

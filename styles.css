@@ -224,6 +224,7 @@ textarea::placeholder {
 /* ============ Spirit Panel ============ */
 .spirit-panel { min-height: 703px; min-width: 0; }
 .spirit-panel .panel-label {
+  position: relative;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -239,6 +240,64 @@ textarea::placeholder {
   min-height: 21px;
 }
 .spirit-panel .panel-label .icon { font-size: 1rem; }
+
+/* 标题栏中间的特性 / 技能特别适配图标容器：
+   使用 absolute + translate 使其始终相对于 panel-label 正中心，
+   不受左侧 label-text/label-chip-group 宽度变化影响。 */
+.mod-icons {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 20px;
+  z-index: 1;
+}
+.mod-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: filter 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.mod-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.mod-icon .mod-icon-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
+  color: rgba(255,255,255,0.95);
+}
+/* 未生效：黑白/灰度 */
+.mod-icon.inactive {
+  filter: grayscale(100%) brightness(0.7);
+  opacity: 0.75;
+}
+/* 已生效：彩色高亮 */
+.mod-icon.active {
+  filter: grayscale(0%);
+  opacity: 1;
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: 0 0 8px rgba(255,255,255,0.12);
+}
 
 /* label-text 内的小字（如"（可选）"）：与 label-text 一起淡出，
    避免进入挑战模式后留下孤儿小字。 */
