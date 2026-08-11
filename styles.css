@@ -1916,7 +1916,9 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   filter: contrast(0.94);
   /*opacity: 0.8;*/
 }
-/* 用一个透明遮罩拦截所有点击，不使用 pointer-events: none，因为需要使 cursor 变为 not-allowed */
+/* 用一个透明遮罩拦截所有点击，不使用 pointer-events: none，因为需要使 cursor 变为 not-allowed。
+   z-index 须高于 .spirit-panel 内的所有定位后代（.mod-icons=1、.skill-icon .el-overlay=2），
+   否则 .mod-icons 等会画在遮罩之上、脱离锁定。 */
 .challenge-locked::after {
   content: '';
   position: absolute;
@@ -1924,7 +1926,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   left: 0;
   right: 0;
   bottom: 0;
-  /* 不需要 z-index 太复杂，覆盖住就行 */
+  z-index: 10;
   cursor: not-allowed;
 }
 
