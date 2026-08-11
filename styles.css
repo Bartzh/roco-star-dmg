@@ -266,7 +266,8 @@ textarea::placeholder {
   align-items: center;
   justify-content: center;
   background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.4);
+  box-shadow: 0 0 8px rgba(255,255,255,0.12);
   transition: filter 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
 }
 .mod-icon img {
@@ -288,15 +289,13 @@ textarea::placeholder {
 }
 /* 未生效：黑白/灰度 */
 .mod-icon.inactive {
-  filter: grayscale(100%) brightness(0.7);
+  filter: grayscale(100%);
   opacity: 0.75;
 }
 /* 已生效：彩色高亮 */
 .mod-icon.active {
   filter: grayscale(0%);
   opacity: 1;
-  border-color: rgba(255,255,255,0.4);
-  box-shadow: 0 0 8px rgba(255,255,255,0.12);
 }
 /* 进入 / 离开过渡：放在 .active / .inactive 之后，
    以便覆盖其 opacity（动画起止点为 0）。 */
