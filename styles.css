@@ -267,7 +267,7 @@ textarea::placeholder {
   justify-content: center;
   background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.15);
-  transition: filter 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+  transition: filter 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
 }
 .mod-icon img {
   width: 100%;
@@ -297,6 +297,13 @@ textarea::placeholder {
   opacity: 1;
   border-color: rgba(255,255,255,0.4);
   box-shadow: 0 0 8px rgba(255,255,255,0.12);
+}
+/* 进入 / 离开过渡：放在 .active / .inactive 之后，
+   以便覆盖其 opacity（动画起止点为 0）。 */
+.mod-icon.enter,
+.mod-icon.leave {
+  opacity: 0;
+  transform: scale(1.4);
 }
 
 /* label-text 内的小字（如"（可选）"）：与 label-text 一起淡出，

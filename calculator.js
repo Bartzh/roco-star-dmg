@@ -2754,58 +2754,148 @@ function isSkillModActive(skill, side) {
   }
 }
 
-// 渲染单个 mod 图标 HTML：active 为 true 时彩色，否则黑白/灰度
-function renderModIconHTML(skill, active) {
-  if (!skill) return '';
+// mod-icon 过渡时长（须与 styles.css 中 .mod-icon 的 transition 时长一致）
+const MOD_ICON_TRANSITION_MS = 220;
+
+// 构建 mod 图标 DOM 节点（带初始 .enter 类，附加到 DOM 后由调用方移除以触发进入过渡）
+function buildModIconNode(skill, active) {
+  if (!skill) return null;
   const el = elOf(skill.element);
-  let imgHTML;
+  const span = document.createElement('span');
+  span.className = `mod-icon ${active ? 'active' : 'inactive'} enter`;
+  span.title = `${skill.name}：${skill.desc}`;
+  span.setAttribute('aria-hidden', 'true');
   if (skill.icon_url) {
-    imgHTML = `<img src="${skill.icon_url}" loading="lazy" alt="${skill.name}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'mod-icon-placeholder',textContent:'${el.emoji}',style:'--el-color:${el.color}'}))">`;
+    const img = document.createElement('img');
+    img.src = skill.icon_url;
+    img.loading = 'lazy';
+    img.alt = skill.name;
+    img.onerror = () => {
+      const ph = document.createElement('div');
+      ph.className = 'mod-icon-placeholder';
+      ph.textContent = el.emoji;
+      ph.style.setProperty('--el-color', el.color);
+      img.replaceWith(ph);
+    };
+    span.appendChild(img);
   } else {
-    imgHTML = `<div class="mod-icon-placeholder" style="--el-color:${el.color}">${el.emoji}</div>`;
+    const ph = document.createElement('div');
+    ph.className = 'mod-icon-placeholder';
+    ph.style.setProperty('--el-color', el.color);
+    ph.textContent = el.emoji;
+    span.appendChild(ph);
   }
-  return `<span class="mod-icon ${active ? 'active' : 'inactive'}" title="${skill.name}：${skill.desc}" aria-hidden="true">${imgHTML}</span>`;
+  return span;
 }
 
 // 刷新指定侧 panel-label 中间的 mod 图标。
 // 只有特性或选中技能在 SKILL_MODS 中存在适配时才显示；
 // 两个都存在时特性在左、技能在右。
+// 过渡策略：
+//   - 仅 active/inactive 切换：复用已有 DOM，仅切换 class，触发 CSS 过渡
+//   - 结构变化：旧图标淡出后，新图标淡入
+//   - 无可显示：旧图标淡出后清空
 function renderModIcons(side) {
   const container = document.getElementById(`${side}-mod-icons`);
   if (!container) return;
+
   const spirit = side === 'attacker' ? state.attacker : state.defender;
-  if (!spirit) {
-    if (container.dataset.modKey !== '') {
-      container.innerHTML = '';
-      container.dataset.modKey = '';
-    }
-    return;
-  }
-  const ability = getSpiritAbility(spirit);
+  const ability = spirit ? getSpiritAbility(spirit) : null;
   const selectedSkill = side === 'attacker' ? state.attackSkill : state.defenseSkill;
-  const abilityHasMod = hasSkillMod(ability);
+  const abilityHasMod = ability ? hasSkillMod(ability) : false;
   const skillHasMod = hasSkillMod(selectedSkill);
-  if (!abilityHasMod && !skillHasMod) {
-    if (container.dataset.modKey !== '') {
-      container.innerHTML = '';
-      container.dataset.modKey = '';
-    }
+
+  // 计算目标状态（desired 为空表示该侧无可显示的 mod）
+  const desired = [];
+  if (abilityHasMod || skillHasMod) {
+    const abilityActive = isSkillModActive(ability, side);
+    const skillActive = isSkillModActive(selectedSkill, side);
+    if (abilityHasMod) desired.push({ skill: ability, active: abilityActive });
+    if (skillHasMod) desired.push({ skill: selectedSkill, active: skillActive });
+  }
+
+  // 结构 key（仅 skill id）与状态 key（active 标记）分离：
+  //   - 状态变化时复用 DOM、仅切换 class 触发过渡；
+  //   - 合并 key 用于完全无变化时的早返回（避免 iOS Safari 图片闪烁）。
+  const structureKey = desired.map(d => d.skill.id).join('|');
+  const stateKey = desired.map(d => d.active ? 1 : 0).join('|');
+  const modKey = structureKey + '@' + stateKey;
+
+  // 1. 完全无变化：早返回
+  if (container.dataset.modKey === modKey) return;
+
+  // 2. 仅状态变化（结构未变且无进行中的淡出）：复用 DOM，切换 class 触发 CSS 过渡
+  //    淡出期间 modStructure 已被删除，不会误入此分支
+  if (container.dataset.modStructure === structureKey
+      && !container.querySelector('.mod-icon.leave')) {
+    const icons = container.querySelectorAll('.mod-icon:not(.leave)');
+    icons.forEach((icon, i) => {
+      if (desired[i].active) {
+        icon.classList.remove('inactive');
+        icon.classList.add('active');
+      } else {
+        icon.classList.remove('active');
+        icon.classList.add('inactive');
+      }
+    });
+    container.dataset.modKey = modKey;
     return;
   }
-  const abilityActive = isSkillModActive(ability, side);
-  const skillActive = isSkillModActive(selectedSkill, side);
-  // 用稳定的语义 key 判断是否真正需要更新 DOM，避免 iOS Safari 等浏览器
-  // 在内容未变时因 innerHTML 重建（或属性序列化差异）导致图片闪烁。
-  const modKey = [
-    abilityHasMod && ability ? `${ability.id}:${abilityActive ? 1 : 0}` : '',
-    skillHasMod && selectedSkill ? `${selectedSkill.id}:${skillActive ? 1 : 0}` : ''
-  ].join('|');
-  if (container.dataset.modKey === modKey) return;
-  let html = '';
-  if (abilityHasMod) html += renderModIconHTML(ability, abilityActive);
-  if (skillHasMod) html += renderModIconHTML(selectedSkill, skillActive);
-  container.innerHTML = html;
-  container.dataset.modKey = modKey;
+
+  // 3. 正在进行淡出（有 .leave 图标 + pending timeout）：不打断淡出，
+  //    仅更新 pending 目标，让现有 timeout 触发后构建最新状态。
+  //    这避免了切换精灵时 calculateDamage() → refreshAllModIcons() 的二次
+  //    调用取消 pending 淡出、立即重建导致淡出动画被跳过的问题。
+  if (container._modIconTimeout && container.querySelector('.mod-icon.leave')) {
+    container._modIconPending = { desired, modKey, structureKey };
+    return;
+  }
+
+  // 4. 结构变化或消失：旧图标淡出 → 构建（或清空）
+  //    到达此处说明无进行中的淡出（case 3 未命中），若有 pending timeout 则为残留，清理之
+  if (container._modIconTimeout) {
+    clearTimeout(container._modIconTimeout);
+    container._modIconTimeout = null;
+  }
+  const existing = container.querySelectorAll('.mod-icon:not(.leave)');
+  delete container.dataset.modKey;
+  delete container.dataset.modStructure;
+
+  const finalize = () => {
+    // 读取 pending 目标（淡出期间可能被后续 renderModIcons 调用更新）
+    const pending = container._modIconPending;
+    const finalDesired = pending ? pending.desired : desired;
+    const finalModKey = pending ? pending.modKey : modKey;
+    const finalStructureKey = pending ? pending.structureKey : structureKey;
+
+    container.innerHTML = '';
+    finalDesired.forEach(({ skill, active }) => {
+      const node = buildModIconNode(skill, active);
+      if (node) container.appendChild(node);
+    });
+    // 无论是否构建了图标都写入 key，使后续无变化调用走 case 1 早返回
+    container.dataset.modKey = finalModKey;
+    container.dataset.modStructure = finalStructureKey;
+    // 强制 reflow 使初始 .enter 样式生效，再移除 .enter 触发进入过渡
+    if (finalDesired.length > 0) {
+      void container.offsetWidth;
+      container.querySelectorAll('.mod-icon.enter').forEach(ic => ic.classList.remove('enter'));
+    }
+    container._modIconTimeout = null;
+    container._modIconPending = null;
+  };
+
+  if (existing.length > 0) {
+    existing.forEach(ic => {
+      ic.classList.remove('enter');
+      ic.classList.add('leave');
+    });
+    container._modIconPending = null;
+    container._modIconTimeout = setTimeout(finalize, MOD_ICON_TRANSITION_MS);
+  } else {
+    // 无旧图标：直接构建（无需淡出）
+    finalize();
+  }
 }
 
 function refreshAllModIcons() {
