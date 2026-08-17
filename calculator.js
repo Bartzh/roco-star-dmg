@@ -3817,6 +3817,7 @@ const SKILL_MODS = {
 // 同族技能共享适配：夺目与目空效果一致，齐鸣与共鸣效果一致。
 SKILL_MODS.夺目 = SKILL_MODS.目空;
 SKILL_MODS.齐鸣 = SKILL_MODS.共鸣;
+SKILL_MODS["“国王”的威严"] = SKILL_MODS.挺起胸脯;
 
 // 标注每个 mod 的触发方向（'attacker' / 'defender' / 'both'），用于 mod-icon
 // 显示决策：方向不匹配时该侧 icon 不显示，避免显示永远不可能触发的特性。
