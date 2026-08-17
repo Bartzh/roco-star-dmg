@@ -3840,6 +3840,7 @@ const SKILL_MODS_SIDES = {
   // 双方都可能触发
   展翅: 'both',
 };
+SKILL_MODS_SIDES["“国王”的威严"] = 'attacker';
 // 把 sides 挂到对应函数上，isSkillModRelevant 通过 fn.sides 查询
 for (const [key, sides] of Object.entries(SKILL_MODS_SIDES)) {
   if (SKILL_MODS[key]) SKILL_MODS[key].sides = sides;
