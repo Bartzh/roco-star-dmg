@@ -2748,6 +2748,19 @@ function buildSkillModCtx(
   };
 }
 
+// 计算技能实际能耗：部分技能会根据战场状态减免能耗。
+// 调用方传入技能对象与当前星陨印记层数，返回该技能本次的生效能耗（不低于 0）。
+// 新增"能耗减免"类技能时，在此处集中适配，避免散落在各调用点。
+function getSkillEnergy(skill, starLayer = 0) {
+  if (!skill) return 0;
+  let energy = skill.energy || 0;
+  // 四维降解：敌方每有1层星陨印记，本技能能耗-1。
+  if (skill.name === '四维降解' && starLayer > 0) {
+    energy = Math.max(0, energy - starLayer);
+  }
+  return energy;
+}
+
 // 判断指定技能的特别适配在当前状态下是否生效
 function isSkillModActive(skill, side) {
   if (!skill || !hasSkillMod(skill)) return false;
@@ -3749,7 +3762,7 @@ const SKILL_MODS = {
   // 勇敢：携带的能耗大于3的技能，威力+40%
   勇敢(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    if (!(ctx.attackSkill.energy > 3)) return null;
+    if (!(getSkillEnergy(ctx.attackSkill, ctx.starLayer) > 3)) return null;
     return {
       powerMultAdd: 0.4,
       notes: ['威力 +40%（能耗 >3）'],
@@ -3758,7 +3771,7 @@ const SKILL_MODS = {
   // 挺起胸脯：携带的能耗为1的技能，威力+50%
   挺起胸脯(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    if (ctx.attackSkill.energy !== 1) return null;
+    if (getSkillEnergy(ctx.attackSkill, ctx.starLayer) !== 1) return null;
     return {
       powerMultAdd: 0.5,
       notes: ['威力 +50%（能耗为1）'],
