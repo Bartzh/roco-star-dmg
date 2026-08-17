@@ -3737,8 +3737,73 @@ const SKILL_MODS = {
       notes: [`魔攻 +50%（场上存在一种印记）`],
     };
   },
+  // 目空：携带的非光系技能，威力+25%
+  目空(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (stripXi(ctx.attackSkill.element) === '光') return null;
+    return {
+      powerMultAdd: 0.25,
+      notes: ['威力 +25%（非光系技能）'],
+    };
+  },
+  // 勇敢：携带的能耗大于3的技能，威力+40%
+  勇敢(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (!(ctx.attackSkill.energy > 3)) return null;
+    return {
+      powerMultAdd: 0.4,
+      notes: ['威力 +40%（能耗 >3）'],
+    };
+  },
+  // 挺起胸脯：携带的能耗为1的技能，威力+50%
+  挺起胸脯(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.attackSkill.energy !== 1) return null;
+    return {
+      powerMultAdd: 0.5,
+      notes: ['威力 +50%（能耗为1）'],
+    };
+  },
+  // 共鸣：携带的「虫鸣」技能威力+20
+  共鸣(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    if (ctx.attackSkill.name !== '虫鸣') return null;
+    return {
+      powerAdd: 20,
+      notes: ['威力 +20（虫鸣）'],
+    };
+  },
+  // 涂鸦：使用非本系技能时威力+50%
+  涂鸦(ctx, fromAttacker) {
+    if (!fromAttacker) return null;
+    const skillEl = stripXi(ctx.attackSkill.element);
+    if (!skillEl) return null;
+    const attackerTypes = (ctx.attacker.types || []).map(t => stripXi(t));
+    if (attackerTypes.includes(skillEl)) return null;
+    return {
+      powerMultAdd: 0.5,
+      notes: ['威力 +50%（非本系技能）'],
+    };
+  },
+  // 绝对秩序：受到非敌方系别的技能攻击时伤害-50%
+  // "敌方系别"指攻击方自身的系别；攻击技能的系别不属于攻击方本系时触发。
+  绝对秩序(ctx, fromAttacker) {
+    if (fromAttacker) return null;
+    const skillEl = stripXi(ctx.attackSkill.element);
+    if (!skillEl) return null;
+    const attackerTypes = (ctx.attacker.types || []).map(t => stripXi(t));
+    if (attackerTypes.includes(skillEl)) return null;
+    return {
+      powerMult: 0.5,
+      notes: ['威力 ×0.5（非敌方系别技能）'],
+    };
+  },
   // Add more skills here as they're introduced.
 };
+
+// 同族技能共享适配：夺目与目空效果一致，齐鸣与共鸣效果一致。
+SKILL_MODS.夺目 = SKILL_MODS.目空;
+SKILL_MODS.齐鸣 = SKILL_MODS.共鸣;
 
 // 标注每个 mod 的触发方向（'attacker' / 'defender' / 'both'），用于 mod-icon
 // 显示决策：方向不匹配时该侧 icon 不显示，避免显示永远不可能触发的特性。
@@ -3754,8 +3819,10 @@ const SKILL_MODS_SIDES = {
   地陷: 'attacker', 闪燃: 'attacker', 灾厄: 'attacker', 变形活画: 'attacker',
   急中生智: 'attacker', 闪击: 'attacker', 鸣沙陷阱: 'attacker',
   __yuanli__: 'attacker', 和弦共振: 'attacker',
+  目空: 'attacker', 夺目: 'attacker', 勇敢: 'attacker', 挺起胸脯: 'attacker',
+  共鸣: 'attacker', 齐鸣: 'attacker', 涂鸦: 'attacker',
   // 只在防御方触发
-  狂欢开始: 'defender',
+  狂欢开始: 'defender', 绝对秩序: 'defender',
   // 双方都可能触发
   展翅: 'both',
 };
