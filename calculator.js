@@ -148,6 +148,7 @@ const DEFAULT_IVS = {
 //     buff:    { atk, matk, spd, power, combo }    // attacker
 //            | { def, mdef, spd }                  // defender
 //     skillId: string                              // 攻击 / 防御技能 id
+//     skillModInputs: { skillKey: value, ... }     // 手动 mod 输入（如色散 toggle）
 //   }
 // JSON 表达清晰、**自然兼容旧版"只存 nature+ivs"的格式**：
 // 解析时缺 buff / skillId 字段会自动用该侧默认值（buff 全 0、
@@ -180,6 +181,8 @@ function _serializeSpiritConfig(entry) {
     ivs:     Array.isArray(entry.ivs) ? entry.ivs : [],
     buff:    entry.buff || {},
     skillId: typeof entry.skillId === 'string' ? entry.skillId : '',
+    skillModInputs: (entry.skillModInputs && typeof entry.skillModInputs === 'object'
+                     && !Array.isArray(entry.skillModInputs)) ? entry.skillModInputs : {},
   });
 }
 
@@ -226,15 +229,22 @@ function _parseSpiritConfig(raw, side) {
   // skillId —— 旧数据无此字段 → 空串
   const skillId = typeof entry.skillId === 'string' ? entry.skillId : '';
 
+  // skillModInputs —— 旧数据无此字段 → 空对象
+  const skillModInputs = (entry.skillModInputs && typeof entry.skillModInputs === 'object'
+                          && !Array.isArray(entry.skillModInputs))
+    ? entry.skillModInputs
+    : {};
+
   return {
     nature: { up, down },
     ivs,
     buff,
-    skillId
+    skillId,
+    skillModInputs,
   };
 }
 
-// 返回完整 entry（含 nature/ivs/buff/skillId）；无存档或数据不合法时返回 null。
+// 返回完整 entry（含 nature/ivs/buff/skillId/skillModInputs）；无存档或数据不合法时返回 null。
 function loadSpiritConfig(id, side) {
   if (!id || !VALID_SIDES.has(side)) return null;
   let raw;
@@ -274,6 +284,7 @@ function saveSpiritConfig(side) {
         combo: state.attackerCombo,
       },
       skillId: state.attackSkill ? state.attackSkill.id : '',
+      skillModInputs: { ...state.skillModInputs.attacker },
     });
   } else {
     _saveSpiritConfig(id, 'defender', {
@@ -285,6 +296,7 @@ function saveSpiritConfig(side) {
         spd:   state.defenderSpeed,
       },
       skillId: state.defenseSkill ? state.defenseSkill.id : '',
+      skillModInputs: { ...state.skillModInputs.defender },
     });
   }
 }
@@ -808,6 +820,12 @@ let state = {
   // attacker and defender panels.
   attackerSpeed: 0,
   defenderSpeed: 0,
+  // Per-side 手动 mod 输入：skillKey → 输入值（布尔 / 数字等）。
+  // 用于无法自动计算触发条件的技能适配（如色散：对混血精灵 +50%，
+  // 计算器无法判断防御方是否混血）。用户点击 mod-icon 切换；
+  // 亮 = 触发，灰 = 不触发。是否使用此值由 SKILL_MODS 函数的
+  // .manual 标记决定（见 SKILL_MODS_MANUAL）。
+  skillModInputs: { attacker: {}, defender: {} },
   // 挑战模式状态（UI 控件 + 用户偏好 + 答题运行时）
   //   active      : 是否处于挑战设置阶段（chip 可见）
   //   preset/count/pool/useMemoryStats/useMemorySkill：用户偏好，退出答题时保留
@@ -2098,6 +2116,7 @@ function selectSpirit(side, id) {
       state.attackerSpeed  = savedA.buff.spd   || 0;
       state.attackerPowerBoost = savedA.buff.power || 0;
       state.attackerCombo  = savedA.buff.combo || 0;
+      state.skillModInputs.attacker = { ...(savedA.skillModInputs || {}) };
       // 技能 id 可能因精灵 / 数据更新失效，找不到对应 idx 就回退到第一个
       const restoredIdx = savedA.skillId
         ? opts.findIndex(sk => sk.id === savedA.skillId)
@@ -2127,6 +2146,7 @@ function selectSpirit(side, id) {
       state.attackerSpeed      = 0;
       state.attackerPowerBoost = 0;
       state.attackerCombo      = 0;
+      state.skillModInputs.attacker = {};
       state.attackSkill        = opts[0] || null;
       state.attackSkillIdx     = state.attackSkill ? 0 : -1;
       state.customSkillResolved.attacker = null;
@@ -2147,6 +2167,7 @@ function selectSpirit(side, id) {
       state.defenderIVs    = savedD.ivs.slice();
       state.defenderBuff   = { def: savedD.buff.def || 0, mdef: savedD.buff.mdef || 0 };
       state.defenderSpeed  = savedD.buff.spd   || 0;
+      state.skillModInputs.defender = { ...(savedD.skillModInputs || {}) };
       // 防御方第一项是 "无"（id='__none__'），不传 skillId 时默认 0
       const restoredIdx = savedD.skillId
         ? opts.findIndex(sk => sk.id === savedD.skillId)
@@ -2174,6 +2195,7 @@ function selectSpirit(side, id) {
       state.defenderIVs    = DEFAULT_IVS.defender.slice();
       state.defenderBuff   = { def: 0, mdef: 0 };
       state.defenderSpeed  = 0;
+      state.skillModInputs.defender = {};
       state.defenseSkill    = opts[0]; // "无"
       state.defenseSkillIdx = 0;
       state.customSkillResolved.defender = null;
@@ -2765,6 +2787,10 @@ function getSkillEnergy(skill, starLayer = 0) {
 function isSkillModActive(skill, side) {
   if (!skill || !hasSkillMod(skill)) return false;
   const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
+  // 手动 mod：触发状态由用户输入决定，不运行时计算
+  if (fn.manual) {
+    return !!getSkillModInput(skill, side);
+  }
   const fromAttacker = side === 'attacker';
   const ctx = buildSkillModCtx(
     state.attacker, state.attackSkill, state.attackerNature, state.attackerIVs,
@@ -2778,17 +2804,69 @@ function isSkillModActive(skill, side) {
   }
 }
 
+// 判断某技能的 mod 是否需要手动输入（无法自动计算触发条件）
+function isSkillModManual(skill) {
+  if (!skill) return false;
+  const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
+  return !!(fn && fn.manual);
+}
+
+// 获取某技能 mod 的当前手动输入值（仅对 manual mod 有效）。
+// 未设置时回退到 fn.defaultInput。返回值类型由 mod 决定（布尔 / 数字等）。
+function getSkillModInput(skill, side) {
+  if (!isSkillModManual(skill)) return undefined;
+  const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
+  const skillKey = skill.modKey || skill.id;
+  const v = state.skillModInputs[side][skillKey];
+  return v === undefined ? fn.defaultInput : v;
+}
+
+// 切换某技能 mod 的手动输入值（布尔 toggle）。
+// 更新 state 并持久化到 localStorage（跟随 spirit config 记忆）。
+function toggleSkillModInput(skill, side) {
+  if (!isSkillModManual(skill)) return;
+  const skillKey = skill.modKey || skill.id;
+  const current = getSkillModInput(skill, side);
+  state.skillModInputs[side][skillKey] = !current;
+  saveSpiritConfig(side);
+}
+
 // mod-icon 过渡时长（须与 styles.css 中 .mod-icon 的 transition 时长一致）
 const MOD_ICON_TRANSITION_MS = 220;
 
 // 构建 mod 图标 DOM 节点（带初始 .enter 类，附加到 DOM 后由调用方移除以触发进入过渡）
-function buildModIconNode(skill, active) {
+// side 用于 manual mod 的点击交互（toggle 该侧 state.skillModInputs）。
+function buildModIconNode(skill, active, side) {
   if (!skill) return null;
   const el = elOf(skill.element);
   const span = document.createElement('span');
   span.className = `mod-icon ${active ? 'active' : 'inactive'} enter`;
   span.title = `${skill.name}：${skill.desc}`;
-  span.setAttribute('aria-hidden', 'true');
+  // 可点击的 manual mod：附加点击 / 键盘交互 + 悬停样式
+  if (isSkillModManual(skill)) {
+    span.classList.add('clickable');
+    span.setAttribute('role', 'button');
+    span.setAttribute('tabindex', '0');
+    span.setAttribute('aria-pressed', active ? 'true' : 'false');
+    span.title = `${skill.name}：${skill.desc}\n（点击切换是否触发）`;
+    const onClick = (e) => {
+      e.stopPropagation();
+      // 挑战模式答题期间面板锁定，不应响应键盘 / 点击
+      if (state.challenge.running) return;
+      toggleSkillModInput(skill, side);
+      calculateDamage();
+    };
+    span.addEventListener('click', onClick);
+    span.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick(e);
+      }
+    });
+  } else {
+    span.setAttribute('aria-hidden', 'true');
+  }
   if (skill.icon_url) {
     const img = document.createElement('img');
     img.src = skill.icon_url;
@@ -2861,6 +2939,10 @@ function renderModIcons(side) {
         icon.classList.remove('active');
         icon.classList.add('inactive');
       }
+      // 同步可点击 icon 的 aria-pressed（复用 DOM 时不重建节点）
+      if (icon.hasAttribute('aria-pressed')) {
+        icon.setAttribute('aria-pressed', desired[i].active ? 'true' : 'false');
+      }
     });
     container.dataset.modKey = modKey;
     return;
@@ -2894,7 +2976,7 @@ function renderModIcons(side) {
 
     container.innerHTML = '';
     finalDesired.forEach(({ skill, active }) => {
-      const node = buildModIconNode(skill, active);
+      const node = buildModIconNode(skill, active, side);
       if (node) container.appendChild(node);
     });
     // 无论是否构建了图标都写入 key，使后续无变化调用走 case 1 早返回
@@ -3811,6 +3893,18 @@ const SKILL_MODS = {
       notes: ['威力 ×0.5（非敌方系别技能）'],
     };
   },
+  // 色散：对混血精灵造成伤害+50%。计算器无法判断防御方是否混血，
+  // 由用户手动点击 mod-icon 切换（input=true 表示防御方是混血）。
+  // 这是"手动 mod"——fn.manual=true，触发状态由 state.skillModInputs
+  // 决定，而非运行时自动计算。详见 SKILL_MODS_MANUAL。
+  色散(ctx, fromAttacker, input) {
+    if (!fromAttacker) return null;
+    if (!input) return null;
+    return {
+      powerMult: 1.5,
+      notes: ['威力 +50%（对混血精灵）'],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
@@ -3834,7 +3928,7 @@ const SKILL_MODS_SIDES = {
   急中生智: 'attacker', 闪击: 'attacker', 鸣沙陷阱: 'attacker',
   __yuanli__: 'attacker', 和弦共振: 'attacker',
   目空: 'attacker', 夺目: 'attacker', 勇敢: 'attacker', 挺起胸脯: 'attacker',
-  共鸣: 'attacker', 齐鸣: 'attacker', 涂鸦: 'attacker',
+  共鸣: 'attacker', 齐鸣: 'attacker', 涂鸦: 'attacker', 色散: 'attacker',
   // 只在防御方触发
   狂欢开始: 'defender', 绝对秩序: 'defender',
   // 双方都可能触发
@@ -3844,6 +3938,22 @@ SKILL_MODS_SIDES["“国王”的威严"] = 'attacker';
 // 把 sides 挂到对应函数上，isSkillModRelevant 通过 fn.sides 查询
 for (const [key, sides] of Object.entries(SKILL_MODS_SIDES)) {
   if (SKILL_MODS[key]) SKILL_MODS[key].sides = sides;
+}
+
+// 标注需要"手动输入"的 mod：触发条件无法自动计算（如色散无法判断防御方
+// 是否混血），由用户点击 mod-icon 切换。fn.manual=true 时：
+//   - mod-icon 可点击（带 .clickable 类 + 悬停动画）
+//   - 触发状态由 state.skillModInputs[side][skillKey] 决定，而非运行时计算
+//   - fn.defaultInput 为用户未点击时的默认值（通常 false = 不触发）
+// 未来需要数字输入的 mod 可在此注册 { defaultInput: 0 }，并扩展 toggle 逻辑。
+const SKILL_MODS_MANUAL = {
+  色散: { defaultInput: false },
+};
+for (const [key, cfg] of Object.entries(SKILL_MODS_MANUAL)) {
+  if (SKILL_MODS[key]) {
+    SKILL_MODS[key].manual = true;
+    SKILL_MODS[key].defaultInput = cfg.defaultInput;
+  }
 }
 
 // 必先手技能：使用这些技能时无视双方速度差，必定先于敌方行动。
@@ -3886,7 +3996,12 @@ function computeSkillDynamicModifiers(
     // 找不到时回退到 skill.id。
     const fn = SKILL_MODS[skill?.modKey] || SKILL_MODS[skill?.id];
     if (!fn) return;
-    const mod = fn(ctx, fromAttacker);
+    // 手动 mod：传入用户输入值（fn.manual=true 时从 state 读取）；
+    // 自动 mod：第3参数为 undefined（fn 不使用它）。
+    const input = fn.manual
+      ? getSkillModInput(skill, fromAttacker ? 'attacker' : 'defender')
+      : undefined;
+    const mod = fn(ctx, fromAttacker, input);
     if (!mod) return;
     // speedAdd 必须在其它依赖速度的修正（isFirstStrike）之前应用到 ctx：
     // apply 顺序是 攻击方特性 → 攻击技能 → 防御方特性，所以攻击方特性的
@@ -5446,6 +5561,15 @@ function buildQuestionSnapshot(_index) {
   const atkSkId  = buildSkillRng('attacker')(attacker);
   const defSkId  = buildSkillRng('defender')(defender);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
+  // 手动 mod 输入：跟随 useMemorySkill（mod 与技能绑定）。
+  // 启用记忆 → 从 localStorage 加载该精灵该侧的 skillModInputs；
+  // 未启用 / 无存档 → 空对象（所有 manual mod 走 defaultInput，如色散=不触发）。
+  const atkModInputs = state.challenge.useMemorySkill.attacker
+    ? { ...(loadSpiritConfig(attacker.id, 'attacker')?.skillModInputs || {}) }
+    : {};
+  const defModInputs = state.challenge.useMemorySkill.defender
+    ? { ...(loadSpiritConfig(defender.id, 'defender')?.skillModInputs || {}) }
+    : {};
   return {
     attacker,
     defender,
@@ -5462,6 +5586,9 @@ function buildQuestionSnapshot(_index) {
     attackerCombo: atkStats.combo,
     attackSkillId: atkSkId,
     defenseSkillId: defSkId,
+    // 手动 mod 输入（如色散 toggle），applyQuestion 会写入 state 供伤害计算使用
+    attackerModInputs: atkModInputs,
+    defenderModInputs: defModInputs,
     defHP,
   };
 }
@@ -5764,6 +5891,9 @@ function applyQuestion(index) {
   // 威力 / 连击：题目配置的一部分（与双攻/双防/速度同级），不再每题重置
   state.attackerPowerBoost = q.attackerPowerBoost;
   state.attackerCombo = q.attackerCombo;
+  // 手动 mod 输入（如色散 toggle）：从题目快照恢复，供伤害计算与 mod-icon 显示使用
+  state.skillModInputs.attacker = { ...(q.attackerModInputs || {}) };
+  state.skillModInputs.defender = { ...(q.defenderModInputs || {}) };
   state.spiritPicking.attacker = false;
   state.spiritPicking.defender = false;
   // 2. 攻击技能：在新精灵的可用列表中找对应 id

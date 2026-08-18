@@ -297,6 +297,20 @@ textarea::placeholder {
   filter: grayscale(0%);
   opacity: 1;
 }
+/* 可点击的 manual mod（如色散）：悬停动画。自动计算的 mod 没有 .clickable，
+   保持原样（无悬停反馈）。放在 .enter/.leave 之前，让进出场过渡优先级更高。 */
+.mod-icon.clickable {
+  cursor: pointer;
+}
+.mod-icon.clickable:hover {
+  transform: scale(1.15);
+  border-color: rgba(255,255,255,0.7);
+  box-shadow: 0 0 12px rgba(255,255,255,0.3);
+}
+.mod-icon.clickable:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.6);
+  outline-offset: 1px;
+}
 /* 进入 / 离开过渡：放在 .active / .inactive 之后，
    以便覆盖其 opacity（动画起止点为 0）。 */
 .mod-icon.enter,
