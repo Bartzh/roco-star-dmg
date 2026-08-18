@@ -2831,6 +2831,27 @@ function toggleSkillModInput(skill, side) {
   saveSpiritConfig(side);
 }
 
+// 挑战模式生成题目时，从 localStorage 加载 skillModInputs 并按 category 过滤：
+//   - 特性（category === '特性'）跟随 useMemoryStats（属性配置记忆）
+//   - 非特性技能跟随 useMemorySkill（技能选择记忆）
+// 两个记忆开关都关闭时返回空对象。rawInputs 为 loadSpiritConfig 返回的
+// skillModInputs 对象（可能为 undefined）。
+function filterSkillModInputsByMemory(rawInputs, side) {
+  const useSkill = state.challenge.useMemorySkill[side];
+  const useStats = state.challenge.useMemoryStats[side];
+  if (!useSkill && !useStats) return {};
+  const result = {};
+  for (const [key, val] of Object.entries(rawInputs || {})) {
+    const sk = SKILLS[key];
+    const isAbility = sk && sk.category === '特性';
+    // 特性跟随 useMemoryStats，其他技能跟随 useMemorySkill
+    if (isAbility ? useStats : useSkill) {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
 // mod-icon 过渡时长（须与 styles.css 中 .mod-icon 的 transition 时长一致）
 const MOD_ICON_TRANSITION_MS = 220;
 
@@ -3905,6 +3926,18 @@ const SKILL_MODS = {
       notes: ['威力 +50%（对混血精灵）'],
     };
   },
+  // 偏振（特性）：受到自己携带技能系别的攻击伤害-40%。
+  // "携带技能"指精灵装备的技能（游戏中可携带有限数量），计算器无法判断
+  // 防御方实际携带了哪些技能，由用户手动点击 mod-icon 切换。
+  // 仅防御方生效（减伤）。input=true 时受到伤害 ×0.6（-40%）。
+  偏振(ctx, fromAttacker, input) {
+    if (fromAttacker) return null;
+    if (!input) return null;
+    return {
+      powerMult: 0.6,
+      notes: ['受到伤害 -40%（攻击系别匹配携带技能）'],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
@@ -3930,7 +3963,7 @@ const SKILL_MODS_SIDES = {
   目空: 'attacker', 夺目: 'attacker', 勇敢: 'attacker', 挺起胸脯: 'attacker',
   共鸣: 'attacker', 齐鸣: 'attacker', 涂鸦: 'attacker', 色散: 'attacker',
   // 只在防御方触发
-  狂欢开始: 'defender', 绝对秩序: 'defender',
+  狂欢开始: 'defender', 绝对秩序: 'defender', 偏振: 'defender',
   // 双方都可能触发
   展翅: 'both',
 };
@@ -3941,13 +3974,15 @@ for (const [key, sides] of Object.entries(SKILL_MODS_SIDES)) {
 }
 
 // 标注需要"手动输入"的 mod：触发条件无法自动计算（如色散无法判断防御方
-// 是否混血），由用户点击 mod-icon 切换。fn.manual=true 时：
+// 是否混血、偏振无法判断防御方实际携带了哪些技能），由用户点击 mod-icon
+// 切换。fn.manual=true 时：
 //   - mod-icon 可点击（带 .clickable 类 + 悬停动画）
 //   - 触发状态由 state.skillModInputs[side][skillKey] 决定，而非运行时计算
 //   - fn.defaultInput 为用户未点击时的默认值（通常 false = 不触发）
 // 未来需要数字输入的 mod 可在此注册 { defaultInput: 0 }，并扩展 toggle 逻辑。
 const SKILL_MODS_MANUAL = {
   色散: { defaultInput: false },
+  偏振: { defaultInput: false },
 };
 for (const [key, cfg] of Object.entries(SKILL_MODS_MANUAL)) {
   if (SKILL_MODS[key]) {
@@ -5561,15 +5596,16 @@ function buildQuestionSnapshot(_index) {
   const atkSkId  = buildSkillRng('attacker')(attacker);
   const defSkId  = buildSkillRng('defender')(defender);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
-  // 手动 mod 输入：跟随 useMemorySkill（mod 与技能绑定）。
-  // 启用记忆 → 从 localStorage 加载该精灵该侧的 skillModInputs；
-  // 未启用 / 无存档 → 空对象（所有 manual mod 走 defaultInput，如色散=不触发）。
-  const atkModInputs = state.challenge.useMemorySkill.attacker
-    ? { ...(loadSpiritConfig(attacker.id, 'attacker')?.skillModInputs || {}) }
-    : {};
-  const defModInputs = state.challenge.useMemorySkill.defender
-    ? { ...(loadSpiritConfig(defender.id, 'defender')?.skillModInputs || {}) }
-    : {};
+  // 手动 mod 输入按 category 分别跟随记忆开关：
+  //   - 特性（如偏振）跟随 useMemoryStats（属性配置记忆）
+  //   - 非特性技能（如色散）跟随 useMemorySkill（技能选择记忆）
+  // 对应开关关闭时，该 category 的 mod 走 defaultInput（通常 false = 不触发）。
+  const atkModInputs = filterSkillModInputsByMemory(
+    loadSpiritConfig(attacker.id, 'attacker')?.skillModInputs, 'attacker'
+  );
+  const defModInputs = filterSkillModInputsByMemory(
+    loadSpiritConfig(defender.id, 'defender')?.skillModInputs, 'defender'
+  );
   return {
     attacker,
     defender,
