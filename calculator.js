@@ -4699,7 +4699,7 @@ const MODAL_CONTENT = {
       <h3>数据来源</h3>
       <ul>
         <li>精灵与技能数据来自 <a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
-        <li>数据更新于 2026-07-16。</li>
+        <li>数据更新于 2026-08-24。</li>
       </ul>
 
       <h3>关于</h3>
