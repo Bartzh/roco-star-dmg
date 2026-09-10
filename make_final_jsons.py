@@ -901,12 +901,16 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='多维击打',
-                    weight=20
+                    weight=16
                 ),
                 WeightedSkillCombo(
                     combo='离子震荡',
                     weight=3
                 ),
+                WeightedSkillCombo(
+                    combo='翼击',
+                    weight=16
+                )
             ]
         ),
     ),
