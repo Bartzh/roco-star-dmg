@@ -1,3 +1,4 @@
+import os
 import requests
 import json
 import time
@@ -14,14 +15,22 @@ def reversed_dict(d: dict) -> dict:
     for k, v in d.items():
         reversed_d.setdefault(v, []).append(k)
     return reversed_d
-def get_image_urls(owners_and_titles: dict[str, str], size: int = 10000) -> dict[str, str]:
+def get_image_urls(file_name: str, owners_and_titles: dict[str, str], size: int = 10000) -> dict[str, str]:
     reversed_d = reversed_dict(owners_and_titles)
+    titles = list(reversed_d.keys())
     step = 50
     current = 0
     urls = {}
     duplicates = []
     missing = []
-    titles = list(reversed_d.keys())
+    if os.path.exists(f'datas/intermediate/{file_name}.checkpoint.json'):
+        with open(f'datas/intermediate/{file_name}.checkpoint.json', 'r', encoding='utf-8') as f:
+            checkpoint = json.load(f)
+            current = checkpoint['current']
+            urls = checkpoint['urls']
+            duplicates = checkpoint['duplicates']
+            missing = checkpoint['missing']
+            print(f"检测到{file_name}存在checkpoint，已读取，当前标题索引：{current}")
     while current < len(titles):
         time.sleep(random.uniform(30, 60))
         params = {
@@ -36,7 +45,13 @@ def get_image_urls(owners_and_titles: dict[str, str], size: int = 10000) -> dict
             "formatversion": "2"
         }
         response = requests.get(api_url, params=params, headers=headers)
-        data = response.json()
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            with open(f'datas/intermediate/{file_name}.checkpoint.json', 'w', encoding='utf-8') as f:
+                json.dump({'current': current, 'urls': urls, 'duplicates': duplicates, 'missing': missing}, f, indent=4, ensure_ascii=False)
+                print(f"因风控导致爬取中断，已将当前处理结果写入{file_name}.checkpoint.json")
+            raise
         if 'continue' in data:
             raise Exception("API 返回了继续参数，需要分页处理")
         if 'warnings' in data:
@@ -54,6 +69,9 @@ def get_image_urls(owners_and_titles: dict[str, str], size: int = 10000) -> dict
                 urls[owner] = page['imageinfo'][0]['thumburl']
         current += step
         print(f"已处理 {len(urls)+len(missing)+len(duplicates)} 个标题")
+    if os.path.exists(f'datas/intermediate/{file_name}.checkpoint.json'):
+        os.remove(f'datas/intermediate/{file_name}.checkpoint.json')
+        print(f'爬取完毕，{file_name}.checkpoint.json文件已删除')
     print(f"成功获取 {len(urls)} 个图片 URL")
     print(f"重复的图片owner：{duplicates}")
     print(f"缺失的图片title：{missing}")
@@ -64,6 +82,7 @@ def get_image_urls(owners_and_titles: dict[str, str], size: int = 10000) -> dict
 with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
 illustration_urls = get_image_urls(
+    'pet_illustration_urls',
     {p_info['title']: f'文件:{p_info['image']['illustration']}' for p_info in core.values() if p_info.get('image')},
     400
 )
@@ -74,6 +93,7 @@ with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8'
 with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
     skill_catalog = json.load(f)
 skill_urls = get_image_urls(
+    'skill_icon_urls',
     {s_info['name']: f'文件:{s_info['icon']}' for s_info in skill_catalog.values() if s_info.get('icon')},
     128
 )
@@ -83,7 +103,10 @@ with open('datas/intermediate/skill_icon_urls.json', 'w', encoding='utf-8') as f
 
 with open('datas/final/types.json', 'r', encoding='utf-8') as f:
     types = json.load(f)
-element_icon_urls = get_image_urls({e_id: f'文件:图标_宠物_属性_{e_id}.png' for e_id in types.keys()})
+element_icon_urls = get_image_urls(
+    'element_icon_urls',
+    {e_id: f'文件:图标_宠物_属性_{e_id}.png' for e_id in types.keys()}
+)
 for e_id, icon_url in element_icon_urls.items():
     types[e_id]['iconUrl'] = icon_url
 with open('datas/final/types.json', 'w', encoding='utf-8') as f:
