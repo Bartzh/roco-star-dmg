@@ -5,7 +5,6 @@ import json
 FILES = [
     'core',
     'learnset_catalog',
-    'learnsets',
     'skill_catalog',
 ]
 
