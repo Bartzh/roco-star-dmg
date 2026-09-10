@@ -4,9 +4,9 @@ import time
 import random
 
 # 目标网站的 API 端点
-api_url = "https://wiki.biligame.com/rocom/api.php"
+api_url = "https://wiki.biligame.com/nrc/api.php"
 headers = {
-    "User-Agent": "roco-star-dmg/2026.08.11 (https://stardmg.top/; https://github.com/Bartzh/roco-star-dmg; bartzh15115@foxmail.com)"
+    "User-Agent": "roco-star-dmg/2026.09.10 (https://stardmg.top/; https://github.com/Bartzh/roco-star-dmg; bartzh15115@foxmail.com)"
 }
 
 def reversed_dict(d: dict) -> dict:
@@ -14,7 +14,7 @@ def reversed_dict(d: dict) -> dict:
     for k, v in d.items():
         reversed_d.setdefault(v, []).append(k)
     return reversed_d
-def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
+def get_image_urls(owners_and_titles: dict[str, str], size: int = 10000) -> dict[str, str]:
     reversed_d = reversed_dict(owners_and_titles)
     step = 50
     current = 0
@@ -30,6 +30,7 @@ def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
 
             "prop": "imageinfo",
             "iiprop": "url",
+            "iiurlwidth": size,
 
             "format": "json",
             "formatversion": "2"
@@ -50,7 +51,7 @@ def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
                 if owner in urls:
                     duplicates.append(owner)
                     continue
-                urls[owner] = page['imageinfo'][0]['url']
+                urls[owner] = page['imageinfo'][0]['thumburl']
         current += step
         print(f"已处理 {len(urls)+len(missing)+len(duplicates)} 个标题")
     print(f"成功获取 {len(urls)} 个图片 URL")
@@ -63,7 +64,8 @@ def get_image_urls(owners_and_titles: dict[str, str]) -> dict[str, str]:
 with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
 illustration_urls = get_image_urls(
-    {p_info['t']: f'文件:{p_info['img']['il']}.png' for p_id, p_info in core.items() if p_id != '_meta' and p_info.get('img')}
+    {p_info['title']: f'文件:{p_info['image']['illustration']}' for p_info in core.values() if p_info.get('image')},
+    400
 )
 with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
     json.dump(illustration_urls, f, indent=4, ensure_ascii=False)
@@ -71,7 +73,10 @@ with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8'
 
 with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
     skill_catalog = json.load(f)
-skill_urls = get_image_urls({s_info['name']: f'文件:{'Skill' if s_info['category'] != '特性' else 'Feature'}_{s_info['icon_id']}.png' for s_id, s_info in skill_catalog.items() if s_id != '_meta'})
+skill_urls = get_image_urls(
+    {s_info['name']: f'文件:{s_info['icon']}' for s_info in skill_catalog.values() if s_info.get('icon')},
+    128
+)
 with open('datas/intermediate/skill_icon_urls.json', 'w', encoding='utf-8') as f:
     json.dump(skill_urls, f, indent=4, ensure_ascii=False)
 
