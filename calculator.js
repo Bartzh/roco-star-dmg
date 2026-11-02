@@ -398,10 +398,10 @@ function toggleFavorite(side) {
 // 重置该侧"常见"列表为 others.json 中的预定义列表，刷新 picker grid。
 // 先弹确认窗，用户确认后才执行重置。
 function resetFavorites(side) {
-  const sideText = side === 'attacker' ? '攻击方' : '防御方';
+  const sideText = t(side === 'attacker' ? 'side.attacker' : 'side.defender');
   showConfirmDialog(
-    '重置收藏列表',
-    `<div style="line-height:1.7">确认要将 <strong>${sideText}</strong> 的收藏列表重置为默认吗？</div>`,
+    t('confirm.resetFavorites.title'),
+    t('confirm.resetFavorites.body', { side: sideText }),
     () => {
       _favoritesCache[side] = _defaultCommonList(side).slice();
       _saveFavorites(side);
@@ -530,9 +530,8 @@ function exportData() {
 // 删除全部记忆配置（带二次确认）。
 function clearAllMemory() {
   showConfirmDialog(
-    '删除记忆',
-    `<div style="line-height:1.7">确认删除 <strong>所有精灵的自动记忆配置</strong>吗？</div>
-     <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">删除后，下次选择精灵时将使用默认配置。当前已选精灵的显示不受影响。</div>`,
+    t('confirm.clearMemory.title'),
+    t('confirm.clearMemory.body'),
     () => {
       _clearAllSpiritConfigs();
     }
@@ -542,9 +541,8 @@ function clearAllMemory() {
 // 删除全部收藏（带二次确认；等价于双侧重置收藏）。
 function clearAllFavorites() {
   showConfirmDialog(
-    '删除收藏',
-    `<div style="line-height:1.7">确认清空 <strong>攻击方与防御方的收藏列表</strong>吗？</div>
-     <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">此操作与精灵面板中的「重置收藏」等价，将恢复为默认列表。</div>`,
+    t('confirm.clearFav.title'),
+    t('confirm.clearFav.body'),
     () => {
       _clearAllFavorites();
       refreshPickerGrid('attacker');
@@ -564,17 +562,17 @@ function importData(file) {
     try {
       data = JSON.parse(e.target.result);
     } catch (_) {
-      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件不是有效的 JSON，请检查文件内容。</div>', null);
+      showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.json')}</div>`, null);
       return;
     }
     if (!data || typeof data !== 'object' || data.version !== 1) {
-      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件格式不正确或版本不兼容。</div>', null);
+      showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.format')}</div>`, null);
       return;
     }
     const hasFavorites = data.favorites && typeof data.favorites === 'object';
     const hasConfigs = data.spiritConfigs && typeof data.spiritConfigs === 'object';
     if (!hasFavorites && !hasConfigs) {
-      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件中未包含任何可导入的数据。</div>', null);
+      showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.empty')}</div>`, null);
       return;
     }
     const favCount = hasFavorites
@@ -583,16 +581,14 @@ function importData(file) {
       : 0;
     const cfgCount = hasConfigs ? Object.keys(data.spiritConfigs).length : 0;
     showConfirmDialog(
-      '确认导入',
-      `<div style="line-height:1.7">即将导入：<br>
-       ・收藏精灵 <strong>${favCount}</strong> 个<br>
-       ・记忆配置 <strong>${cfgCount}</strong> 条</div>
-       <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">导入将覆盖现有数据，页面将自动刷新。</div>`,
+      t('import.confirm.title'),
+      `<div style="line-height:1.7">${t('import.confirm.body', { fav: favCount, cfg: cfgCount })}</div>
+       <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">${t('import.confirm.note')}</div>`,
       () => _applyImportedData(data, hasFavorites, hasConfigs)
     );
   };
   reader.onerror = () => {
-    showConfirmDialog('导入失败', '<div style="line-height:1.7">读取文件失败，请重试。</div>', null);
+    showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.read')}</div>`, null);
   };
   reader.readAsText(file);
 }
@@ -3469,14 +3465,23 @@ function isFirstStrike(ctx) {
   const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
   const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
   const reacted = ctx.attackSkill.desc.includes('应对状态：') && ctx.defenseSkill.category === '状态';
-  if (ctx.defenseSkill.category === '防御' || lastStrike) return [false, ''];
-  if (!(firstStrike || faster || reacted)) return [false, ''];
+  if (ctx.defenseSkill.category === '防御' || lastStrike) return [false, null];
+  if (!(firstStrike || faster || reacted)) return [false, null];
   const reason = firstStrike
-    ? `先手技能 ${ctx.attackSkill.name}`
+    ? { key: 'reason.firstStrikeSkill', params: { skill: displayName(ctx.attackSkill) } }
     : reacted
-    ? '应对必定先手'
-    : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    ? { key: 'reason.counterAlwaysFirst' }
+    : {
+        key: 'reason.speedHigher',
+        params: {
+          attacker: ctx.attackerEffectiveSpeed,
+          defender: ctx.defenderEffectiveSpeed
+        }
+      };
   return [true, reason];
+}
+function reasonText(reason) {
+  return reason ? t(reason.key, reason.params) : '';
 }
 const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
@@ -3485,7 +3490,7 @@ const SKILL_MODS = {
     if (!ctx.starLayer) return null;
     return {
       comboAdd: ctx.starLayer,
-      notes: [`连击 +${ctx.starLayer}（星陨 ${ctx.starLayer} 层）`],
+      notes: [{ key: 'mod.comboStar', params: { add: ctx.starLayer, layer: ctx.starLayer } }],
     };
   },
   // 观星：地系技能威力每层星陨 +20%
@@ -3496,7 +3501,7 @@ const SKILL_MODS = {
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
-      notes: [`威力 +${Math.floor(multAdd*100)}%（星陨 ${ctx.starLayer} 层 ×20%）`],
+      notes: [{ key: 'mod.powerStarPct', params: { pct: Math.floor(multAdd * 100), layer: ctx.starLayer } }],
     };
   },
   // 坠星：全技能威力每层星陨 +20%
@@ -3506,7 +3511,7 @@ const SKILL_MODS = {
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
-      notes: [`威力 +${Math.floor(multAdd*100)}%（星陨 ${ctx.starLayer} 层 ×20%）`],
+      notes: [{ key: 'mod.powerStarPct', params: { pct: Math.floor(multAdd * 100), layer: ctx.starLayer } }],
     };
   },
   // 天体吸积：每 1 层星陨印记，技能威力 +20
@@ -3516,7 +3521,7 @@ const SKILL_MODS = {
     const add = 20 * ctx.starLayer;
     return {
       powerAdd: add,
-      notes: [`威力 +${add}（星陨 ${ctx.starLayer} 层 ×20）`],
+      notes: [{ key: 'mod.powerStarFlat', params: { add, layer: ctx.starLayer } }],
     };
   },
   // 星痕：若对手有印记，本次技能威力 +40
@@ -3525,7 +3530,7 @@ const SKILL_MODS = {
     if (!ctx.starLayer) return null;
     return {
       powerAdd: 40,
-      notes: ['威力 +40（有至少一层印记）'],
+      notes: [{ key: 'mod.powerMark' }],
     };
   },
   // 狂欢开始：本精灵受到的克制伤害+25%
@@ -3534,7 +3539,7 @@ const SKILL_MODS = {
     if (effectiveness(ctx.attackSkill.element, ctx.defender.types) <= 1) return null;
     return {
       powerMult: 1.25,
-      notes: ['威力 ×1.25（额外克制伤害）'],
+      notes: [{ key: 'mod.powerExtraSuper' }],
     };
   },
   // 顺风（岚鸟特性）：若先于敌方攻击，本次技能威力 +50%。
@@ -3549,7 +3554,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       powerMultAdd: 0.5,
-      notes: [`威力 +50%（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.powerFirst', params: { pct: 50, reason: reasonText(reason) } }],
     };
   },
   // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
@@ -3559,7 +3564,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       powerMultAdd: 0.75,
-      notes: [`威力 +75%（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.powerFirst', params: { pct: 75, reason: reasonText(reason) } }],
     };
   },
   // 扇风：若先于敌方攻击，本次技能威力 +50%
@@ -3569,7 +3574,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       powerMultAdd: 0.5,
-      notes: [`威力 +50%（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.powerFirst', params: { pct: 50, reason: reasonText(reason) } }],
     };
   },
   // 疾风刺：若先于敌方攻击，改为3连击
@@ -3579,7 +3584,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       comboAdd: 2,
-      notes: [`变为3连击（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.comboFirst', params: { combo: 3, reason: reasonText(reason) } }],
     };
   },
   // 展翅：自己携带的普通系技能变为翼系技能，若后于对手行动，自己受到的伤害+25%
@@ -3589,7 +3594,7 @@ const SKILL_MODS = {
       if (stripXi(ctx.attackSkill.element) !== '普通') return null;
       return {
         elementOverride: '翼系',
-        notes: ['普通系技能变为翼系'],
+        notes: [{ key: 'mod.commonToWing' }],
       };
     }
     else {
@@ -3597,7 +3602,7 @@ const SKILL_MODS = {
       if (!firstStrike) return null;
       return {
         powerMult: 1.25,
-        notes: [`威力 ×1.25（后于对手行动 · ${reason}）`],
+        notes: [{ key: 'mod.powerAfter', params: { mult: 1.25, reason: reasonText(reason) } }],
       };
     }
   },
@@ -3607,7 +3612,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 龙卷风：应对状态：本次技能威力变为1.5倍
@@ -3616,7 +3621,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 1.5,
-      notes: [`威力 ×1.5（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 1.5 } }],
     };
   },
   // 追打：应对状态：本技能变为3连击
@@ -3625,7 +3630,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboAdd: 2,
-      notes: [`技能变为3连击（应对状态）`],
+      notes: [{ key: 'mod.comboCounter', params: { combo: 3 } }],
     };
   },
   // 炙热波动：应对状态：本次技能威力和赋予灼烧翻倍
@@ -3634,7 +3639,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 虫击：应对状态：本次技能威力变为2倍，无视敌方系别抵抗
@@ -3644,7 +3649,7 @@ const SKILL_MODS = {
     return {
       powerMult: 2,
       ignoreResist: true,
-      notes: [`威力 ×2，无视敌方系别抵抗（应对状态）`],
+      notes: [{ key: 'mod.powerIgnoreResist', params: { mult: 2 } }],
     };
   },
   // 突袭：应对状态：本次技能威力变为3倍
@@ -3653,7 +3658,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 3,
-      notes: [`威力 ×3（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 3 } }],
     };
   },
   // 暗突袭：应对状态：本次技能威力翻倍
@@ -3662,7 +3667,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 爆冲：应对状态：本次技能威力变为5倍
@@ -3671,7 +3676,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 5,
-      notes: [`威力 ×5（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 5 } }],
     };
   },
   // 技巧打击：应对状态：本次技能威力变为10倍
@@ -3680,7 +3685,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 10,
-      notes: [`威力 ×10（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 10 } }],
     };
   },
   // 无影脚：应对状态：本次技能威力变为2倍
@@ -3689,7 +3694,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力 ×2（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 2 } }],
     };
   },
   // 偷袭：应对状态：本次技能威力变为3倍
@@ -3698,7 +3703,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 3,
-      notes: [`威力 ×3（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 3 } }],
     };
   },
   // 散手：应对状态：本技能改为6连击
@@ -3707,7 +3712,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboAdd: 4,
-      notes: [`变为6连击（应对状态）`],
+      notes: [{ key: 'mod.comboCounter', params: { combo: 6 } }],
     };
   },
   // 连续爪击：应对状态：本次技能连击数翻倍
@@ -3716,7 +3721,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboMult: 2,
-      notes: [`连击数翻倍（应对状态）`],
+      notes: [{ key: 'mod.comboDoubleCounter' }],
     };
   },
   // 滚雪球：应对状态：额外获得2层，本次技能威力翻倍
@@ -3725,7 +3730,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 吹炎：应对状态：本次技能威力翻倍
@@ -3734,7 +3739,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 地陷：应对状态：本次技能威力翻倍，且物防额外+70%
@@ -3743,7 +3748,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 闪燃：应对状态：本次技能威力变为4倍
@@ -3752,7 +3757,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 4,
-      notes: [`威力 ×4（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 4 } }],
     };
   },
   // 灾厄：对自己造成物伤，应对状态：改为对敌方造成物伤，且本次技能威力+120
@@ -3762,13 +3767,13 @@ const SKILL_MODS = {
       return {
         // 相当于不造成伤害
         powerAdd: -9999,
-        notes: [`威力 -9999（对自己造成物伤）`],
+        notes: [{ key: 'mod.selfPhysicalDamage' }],
       };
     }
     else {
       return {
         powerAdd: 120,
-        notes: [`威力 +120（应对状态）`],
+        notes: [{ key: 'mod.powerFlatCounter', params: { add: 120 } }],
       };
     }
   },
@@ -3783,7 +3788,7 @@ const SKILL_MODS = {
     return {
       powerMultAdd: layers * 0.1,
       speedAdd: layers * 5,
-      notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）· 速度 +${layers * 5}（${layers} 层增益 ×5）`],
+      notes: [{ key: 'mod.powerSpeedPerBuff', params: { powerPct: layers * 10, speedAdd: layers * 5, layers } }],
     };
   },
   // 急中生智：自己有减益时，本次技能威力 +40
@@ -3798,7 +3803,7 @@ const SKILL_MODS = {
       if (b < 0) {
         return {
           powerAdd: 40,
-          notes: ['威力 +40（自身有减益）'],
+          notes: [{ key: 'mod.powerDebuff' }],
         };
       }
     }
@@ -3818,7 +3823,7 @@ const SKILL_MODS = {
     }
     return {
       powerAdd,
-      notes: [`威力 +${powerAdd}（速度差 ${spdGap}）`],
+      notes: [{ key: 'mod.powerSpeedGap', params: { add: powerAdd, gap: spdGap } }],
     };
   },
   // 鸣沙陷阱：物防比敌方越高，本次技能威力越高
@@ -3837,7 +3842,7 @@ const SKILL_MODS = {
     }
     return {
       powerAdd,
-      notes: [`威力 +${powerAdd}（物防差 ${defGap}）`],
+      notes: [{ key: 'mod.powerDefGap', params: { add: powerAdd, gap: defGap } }],
     };
   },
   // 愿力冲击：应对状态：技能威力 +150%。伤害类型由精灵当前最终
@@ -3849,7 +3854,7 @@ const SKILL_MODS = {
     return {
       // 愿力是乘算
       powerMult: 2.5,
-      notes: [`威力 ×2.5（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 2.5 } }],
     };
   },
   // 和弦共振：双方场上每有1种不同的印记，自己获得魔攻+50%。
@@ -3858,7 +3863,7 @@ const SKILL_MODS = {
     if (!ctx.starLayer) return null;
     return {
       matkAdd: 50,
-      notes: [`魔攻 +50%（场上存在一种印记）`],
+      notes: [{ key: 'mod.matkMark', params: { pct: 50 } }],
     };
   },
   // 目空：携带的非光系技能，威力+25%
@@ -3867,7 +3872,7 @@ const SKILL_MODS = {
     if (stripXi(ctx.attackSkill.element) === '光') return null;
     return {
       powerMultAdd: 0.25,
-      notes: ['威力 +25%（非光系技能）'],
+      notes: [{ key: 'mod.powerNonLight' }],
     };
   },
   // 勇敢：携带的能耗大于3的技能，威力+40%
@@ -3876,7 +3881,7 @@ const SKILL_MODS = {
     if (!(getSkillEnergy(ctx.attackSkill, ctx.starLayer) > 3)) return null;
     return {
       powerMultAdd: 0.4,
-      notes: ['威力 +40%（能耗 >3）'],
+      notes: [{ key: 'mod.powerHighEnergy' }],
     };
   },
   // 挺起胸脯：携带的能耗为1的技能，威力+50%
@@ -3885,7 +3890,7 @@ const SKILL_MODS = {
     if (getSkillEnergy(ctx.attackSkill, ctx.starLayer) !== 1) return null;
     return {
       powerMultAdd: 0.5,
-      notes: ['威力 +50%（能耗为1）'],
+      notes: [{ key: 'mod.powerEnergyOne' }],
     };
   },
   // 共鸣：携带的「虫鸣」技能威力+20
@@ -3894,7 +3899,7 @@ const SKILL_MODS = {
     if (ctx.attackSkill.name !== '虫鸣') return null;
     return {
       powerAdd: 20,
-      notes: ['威力 +20（虫鸣）'],
+      notes: [{ key: 'mod.powerInsectSong' }],
     };
   },
   // 涂鸦：使用非本系技能时威力+50%
@@ -3906,7 +3911,7 @@ const SKILL_MODS = {
     if (attackerTypes.includes(skillEl)) return null;
     return {
       powerMultAdd: 0.5,
-      notes: ['威力 +50%（非本系技能）'],
+      notes: [{ key: 'mod.powerNonStab' }],
     };
   },
   // 绝对秩序：受到非敌方系别的技能攻击时伤害-50%
@@ -3919,7 +3924,7 @@ const SKILL_MODS = {
     if (attackerTypes.includes(skillEl)) return null;
     return {
       powerMult: 0.5,
-      notes: ['威力 ×0.5（非敌方系别技能）'],
+      notes: [{ key: 'mod.powerOffClass' }],
     };
   },
   // Add more skills here as they're introduced.
@@ -3969,7 +3974,7 @@ const LAST_STRIKE_SKILLS = {
   'skill_000309': true, // 后发制人
 };
 
-// Returns { powerMult, powerAdd, comboAdd, comboMult, notes: [{source, text}, ...] }.
+// Returns { powerMult, powerAdd, comboAdd, comboMult, notes: [{source, key, params}, ...] }.
 // Iterates the attacker's skills (category === '特性') to collect
 // passive characteristics; no positional assumption is made.
 //
@@ -4015,8 +4020,8 @@ function computeSkillDynamicModifiers(
     if (mod.matkAdd)      result.matkAdd      += mod.matkAdd;
     if (mod.ignoreResist) result.ignoreResist  = true;
     if (mod.elementOverride != null) result.elementOverride = mod.elementOverride;
-    for (const text of (mod.notes || [])) {
-      result.notes.push({ source: skill.name, text });
+    for (const note of (mod.notes || [])) {
+      result.notes.push({ source: skill, ...note });
     }
   };
 
@@ -4375,9 +4380,9 @@ function renderBreakdownList(breakdownList, data) {
   const skillElementRaw = (data.dyn && data.dyn.elementOverride) || data.skill.element;
   const skillNameEl = elLabel(skillElementRaw);
   const stabBadge = data.stab > 1
-    ? ' <span class="skill-badge stab">本系 ×1.25</span>'
+    ? ` <span class="skill-badge stab">${t('breakdown.stab')} ×1.25</span>`
     : '';
-  const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
+  const stabCoef = data.stab > 1 ? ' × ' + data.stab + ` (${t('breakdown.stab')})` : '';
   const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, notes: [] };
   const powerBoost = data.powerBoost || 0;
   const comboChip = data.attackerCombo || 0;
@@ -4460,19 +4465,19 @@ function renderBreakdownList(breakdownList, data) {
   let comboText;
   if (!hasCombo) {
     // No inherent combo: the chip is suppressed.
-    comboText = '无连击';
+    comboText = t('breakdown.noCombo');
   } else if (comboAdditiveExpr && comboMultExpr) comboText = `${comboAdditiveExpr}${comboMultExpr}`;
   else if (comboAdditiveExpr)            comboText = comboAdditiveExpr;
   else if (comboMultExpr)                comboText = `${baseCombo}${comboMultExpr}`;
   else                                  comboText = String(baseCombo);
   const dynNotesHTML = dynMods.notes.length
-    ? `<div><span class="label">动态修正:</span></div>` +
+    ? `<div><span class="label">${t('breakdown.dynamic')}:</span></div>` +
       dynMods.notes.map(n =>
-        `<div style="padding-left:1.4em"><span class="multiplier">· ${n.source}: ${n.text}</span></div>`
+        `<div style="padding-left:1.4em"><span class="multiplier">· ${displayName(n.source)}: ${t(n.key, n.params)}</span></div>`
       ).join('')
     : '';
-  const atkStatLabel = data.isMagic ? '魔攻' : '物攻';
-  const defStatLabel = data.isMagic ? '魔防' : '物防';
+  const atkStatLabel = t(data.isMagic ? 'stat.matk' : 'stat.atk');
+  const defStatLabel = t(data.isMagic ? 'stat.mdef' : 'stat.def');
   // Compose the 攻击/防御 stat line — shows base × buff breakdown = final,
   // parallel to the 威力/连击 lines. Uses the multiplier form (not additive
   // contributions) because Math.round(base × pct/100) summed across terms
@@ -4499,33 +4504,33 @@ function renderBreakdownList(breakdownList, data) {
   const ignoredResist = (dynMods.ignoreResist || (data.dyn && data.dyn.ignoreResist))
     && (data.skillEffRaw ?? 1) < 1;
   const effExpr = ignoredResist
-    ? `${data.skillEff} <span class="label" style="font-size:0.7rem">(原 ×${data.skillEffRaw} 抵抗已无视)</span>`
+    ? `${data.skillEff} <span class="label" style="font-size:0.7rem">${t('breakdown.resistIgnored', { eff: data.skillEffRaw })}</span>`
     : `${data.skillEff}`;
   breakdownList.innerHTML = `
-    <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
-    <div><span class="label">攻击方:</span> <span class="value">${displayName(data.atk)}</span></div>
-    <div><span class="label">技能:</span> <span class="value">${displayName(data.skill)}</span> <span class="label" style="font-size:0.7rem">(${displayDamageClass(data.skill.damage_class)} · ${skillNameEl})</span>${stabBadge}</div>
-    <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
-    <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
-    <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
-    <div><span class="label">连击:</span> <span class="value">${comboText}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
+    <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— ${t('breakdown.sectionSkill')} ——</div>
+    <div><span class="label">${t('breakdown.attacker')}:</span> <span class="value">${displayName(data.atk)}</span></div>
+    <div><span class="label">${t('breakdown.skill')}:</span> <span class="value">${displayName(data.skill)}</span> <span class="label" style="font-size:0.7rem">(${displayDamageClass(data.skill.damage_class)} · ${skillNameEl})</span>${stabBadge}</div>
+    <div><span class="label">${atkStatLabel}:</span> <span class="value">${atkStatText}</span></div>
+    <div><span class="label">${defStatLabel}:</span> <span class="value">${defStatText}</span></div>
+    <div><span class="label">${t('buffLabel.power')}:</span> <span class="value">${powerText}</span></div>
+    <div><span class="label">${t('buffLabel.combo')}:</span> <span class="value">${comboText}</span></div>
+    <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ` (${t('buffLabel.combo')})` : ''}</span></div>
     ${dynNotesHTML}
-    <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
+    <div class="final-line"><span class="label">${t('breakdown.skillSubtotal')}:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
-    <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
-    <div><span class="label">星陨层数:</span> <span class="value">${data.n}</span></div>
-    <div><span class="label">星陨 power:</span> <span class="value">${data.n}² + 24×${data.n} - 24 = ${data.starPower}</span></div>
-    ${data.isSkillIllusion ? `<div><span class="label">触发:</span> <span class="value" style="color:#ff8c00">否 (技能为幻系)</span></div>`
+    <div class="label" style="color:var(--accent-gold);font-weight:600;">—— ${t('breakdown.sectionStar')} ——</div>
+    <div><span class="label">${t('breakdown.starLayers')}:</span> <span class="value">${data.n}</span></div>
+    <div><span class="label">${t('breakdown.starPower')}:</span> <span class="value">${data.n}² + 24×${data.n} - 24 = ${data.starPower}</span></div>
+    ${data.isSkillIllusion ? `<div><span class="label">${t('breakdown.triggered')}:</span> <span class="value" style="color:#ff8c00">${t('breakdown.noStellar')}</span></div>`
       : (data.n > 0
-        ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
-           <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
-           <div><span class="label">克制(幻系):</span> <span class="multiplier">×${data.starEff}</span></div>
-           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
-        : `<div><span class="label">触发:</span> <span class="value" style="color:var(--text-secondary)">否 (层数为 0)</span></div>`)}
-    <div class="final-line"><span class="label">星陨伤害小计:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
+        ? `<div><span class="label">${atkStatLabel}:</span> <span class="value">${atkStatText}</span></div>
+           <div><span class="label">${defStatLabel}:</span> <span class="value">${defStatText}</span></div>
+           <div><span class="label">${t('breakdown.stellarEffect')}:</span> <span class="multiplier">×${data.starEff}</span></div>
+           <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
+        : `<div><span class="label">${t('breakdown.triggered')}:</span> <span class="value" style="color:var(--text-secondary)">${t('breakdown.noLayers')}</span></div>`)}
+    <div class="final-line"><span class="label">${t('breakdown.starSubtotal')}:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
     <hr class="divider">
-    <div class="final-line"><span class="label">最终合计伤害:</span> <span class="value" style="color:var(--accent-cyan);font-size:1.1rem">${data.finalDamage.toLocaleString()}</span>
+    <div class="final-line"><span class="label">${t('breakdown.total')}:</span> <span class="value" style="color:var(--accent-cyan);font-size:1.1rem">${data.finalDamage.toLocaleString()}</span>
       <span class="label" style="font-size:0.7rem"> / ${data.defHP.toLocaleString()} HP (${data.hpPercent.toFixed(1)}%)</span></div>
   `;
 }
