@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-  <title>星陨伤害计算器 - 洛克王国世界 PVP 伤害模拟工具</title>
+  <title data-i18n="meta.title">星陨伤害计算器 - 洛克王国世界 PVP 伤害模拟工具</title>
 
-  <meta name="description" content="在线星陨伤害计算器，支持自定义攻击方/防御方精灵属性、性格、buff、连击数与星陨层数，实时计算 PVP 战斗伤害与剩余血量。数据来自 BWIKI，开源免费。">
-  <meta name="keywords" content="星陨伤害计算器,星陨,洛克王国世界伤害计算,洛克王国 PVP,星陨层数,伤害模拟,星陨印记,精灵对战计算器">
+  <meta name="description" content="在线星陨伤害计算器，支持自定义攻击方/防御方精灵属性、性格、buff、连击数与星陨层数，实时计算 PVP 战斗伤害与剩余血量。数据来自 BWIKI，开源免费。" data-i18n-attr="content:meta.description">
+  <meta name="keywords" content="星陨伤害计算器,星陨,洛克王国世界伤害计算,洛克王国 PVP,星陨层数,伤害模拟,星陨印记,精灵对战计算器" data-i18n-attr="content:meta.keywords">
   <meta name="author" content="Bartzh">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <meta name="theme-color" content="#000000">
@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="./styles.css">
 
   <!-- JSON-LD 结构化数据 -->
-  <script type="application/ld+json">
+  <script type="application/ld+json" data-i18n-jsonld="name:jsonld.name;alternateName:jsonld.alternateName;description:jsonld.description;inLanguage:jsonld.inLanguage">
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
@@ -43,28 +43,28 @@
 
 <!-- SEO：给搜索引擎爬虫与屏幕阅读器可见的功能说明（视觉上隐藏） -->
 <div class="sr-only" aria-hidden="true">
-  <h2>洛克王国星陨伤害计算器使用说明</h2>
-  <p>本工具用于模拟《洛克王国：世界》PVP 战斗中的星陨伤害。选择攻击方与防御方精灵，调整种族、性格、努力值、buff、连击数与星陨层数（0~99），即可实时得到伤害数值与剩余血量百分比，并展示完整伤害公式的逐项乘数。数据来源：BWiki。</p>
-  <h3>主要功能</h3>
+  <h2 data-i18n="seo.h2">洛克王国星陨伤害计算器使用说明</h2>
+  <p data-i18n="seo.intro">本工具用于模拟《洛克王国：世界》PVP 战斗中的星陨伤害。选择攻击方与防御方精灵，调整种族、性格、努力值、buff、连击数与星陨层数（0~99），即可实时得到伤害数值与剩余血量百分比，并展示完整伤害公式的逐项乘数。数据来源：BWiki。</p>
+  <h3 data-i18n="seo.h3.features">主要功能</h3>
   <ul>
-    <li>攻击方 / 防御方双面板，内嵌式精灵选择器（拼音、首字母、图鉴编号搜索）。</li>
-    <li>18 系属性相克表，实时计算属性克制与弱化。</li>
-    <li>自动从技能描述中识别连击数增伤与减伤百分比。</li>
-    <li>双攻 / 双防 / 威力 / 连击等多种 buff 调节。</li>
-    <li>星陨印记能量层数（0~99）可视化与脉动动画。</li>
+    <li data-i18n="seo.feature1">攻击方 / 防御方双面板，内嵌式精灵选择器（拼音、首字母、图鉴编号搜索）。</li>
+    <li data-i18n="seo.feature2">18 系属性相克表，实时计算属性克制与弱化。</li>
+    <li data-i18n="seo.feature3">自动从技能描述中识别连击数增伤与减伤百分比。</li>
+    <li data-i18n="seo.feature4">双攻 / 双防 / 威力 / 连击等多种 buff 调节。</li>
+    <li data-i18n="seo.feature5">星陨印记能量层数（0~99）可视化与脉动动画。</li>
   </ul>
-  <h3>常见问题</h3>
+  <h3 data-i18n="seo.h3.faq">常见问题</h3>
   <ul>
-    <li>星陨层数最多 99 层，伤害随层数非线性增长。</li>
-    <li>所有数据开源，可在 GitHub 查看与贡献。</li>
-    <li>国内主站：https://stardmg.top/ ；备用镜像（GitHub Pages）：https://bartzh.github.io/roco-star-dmg/。</li>
+    <li data-i18n="seo.faq1">星陨层数最多 99 层，伤害随层数非线性增长。</li>
+    <li data-i18n="seo.faq2">所有数据开源，可在 GitHub 查看与贡献。</li>
+    <li data-i18n="seo.faq3">国内主站：https://stardmg.top/ ；备用镜像（GitHub Pages）：https://bartzh.github.io/roco-star-dmg/。</li>
   </ul>
 </div>
 
 <noscript>
   <div style="padding:40px;text-align:center;color:#fff;background:#1b1b1b;max-width:680px;margin:60px auto;border-radius:12px;">
-    <h1 style="font-size:1.4rem;margin-bottom:12px;">星陨伤害计算器需要启用 JavaScript</h1>
-    <p style="line-height:1.7;">本工具是一个网页应用，需要在浏览器中启用 JavaScript 才能使用。请启用后刷新页面。</p>
+    <h1 style="font-size:1.4rem;margin-bottom:12px;" data-i18n="noscript.title">星陨伤害计算器需要启用 JavaScript</h1>
+    <p style="line-height:1.7;" data-i18n="noscript.body">本工具是一个网页应用，需要在浏览器中启用 JavaScript 才能使用。请启用后刷新页面。</p>
   </div>
 </noscript>
 
@@ -77,11 +77,12 @@
 
 <div class="container" id="main-container">
   <header class="header">
-    <h1>星陨伤害计算器</h1>
+    <h1 data-i18n="app.title">星陨伤害计算器</h1>
     <p class="subtitle">
-      <button type="button" class="nav-link" data-modal="guide">使用说明</button> |
-      <button type="button" class="nav-link" id="data-mgr-trigger">数据管理</button> |
-      <button type="button" class="nav-link" data-modal="announcement">更新公告</button>
+      <button type="button" class="nav-link" data-modal="guide" data-i18n="nav.guide">使用说明</button> |
+      <button type="button" class="nav-link" id="data-mgr-trigger" data-i18n="nav.data">数据管理</button> |
+      <button type="button" class="nav-link" data-modal="announcement" data-i18n="nav.announcement">更新公告</button> |
+      <button type="button" class="nav-link" id="lang-toggle" data-i18n="lang.switch">EN</button>
     </p>
   </header>
 
@@ -92,31 +93,31 @@
        进入答题态由 JS 加 .is-shown 类触发 220ms 淡入；退出答题态移除该类
        触发淡出。aria-hidden 与可见性同步更新，避免屏幕阅读器读出隐藏内容。
   -->
-  <section class="challenge-bar" id="challenge-bar" aria-label="挑战模式">
-    <span id="challenge-progress-info" class="challenge-progress-info" aria-hidden="true">第 1 / 5 题</span>
+  <section class="challenge-bar" id="challenge-bar" aria-label="挑战模式" data-i18n-attr="aria-label:challenge.aria">
+    <span id="challenge-progress-info" class="challenge-progress-info" aria-hidden="true" data-i18n="challenge.progress.init">第 1 / 5 题</span>
     <button type="button" class="challenge-toggle-btn" id="challenge-toggle-btn" aria-pressed="false">
-      <span class="challenge-toggle-text">挑战模式</span>
+      <span class="challenge-toggle-text" data-i18n="challenge.toggle">挑战模式</span>
     </button>
-    <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled aria-hidden="true">提交答案</button>
+    <button type="button" id="challenge-submit-btn" class="challenge-submit-btn" disabled aria-hidden="true" data-i18n="challenge.submit">提交答案</button>
   </section>
 
   <!-- 移动端伤害结果条：桌面端隐藏，移动端置于伤害计算明细上方（去掉背景面板）。
        用横向进度条替代圆形伤害环，显示百分比 + 伤害数值 + 克制/抵抗信息。 -->
-  <section class="battle-area" aria-label="对战配置区">
+  <section class="battle-area" aria-label="对战配置区" data-i18n-attr="aria-label:battle.aria">
     <div class="battle-carousel">
-    <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方">
+    <section class="spirit-panel glass-panel" id="attacker-panel" aria-label="攻击方" data-i18n-attr="aria-label:side.attacker">
       <h2 class="panel-label">
-        <span class="label-text">攻击方</span>
+        <span class="label-text" data-i18n="side.attacker">攻击方</span>
         <span class="label-chip-group" data-kind="pool" data-side="attacker" hidden>
-          <button type="button" class="label-chip" data-pool="custom">固定</button>
-          <button type="button" class="label-chip active" data-pool="common" aria-pressed="true">收藏</button>
-          <button type="button" class="label-chip" data-pool="all">全部</button>
+          <button type="button" class="label-chip" data-pool="custom" data-i18n="pool.fixed">固定</button>
+          <button type="button" class="label-chip active" data-pool="common" aria-pressed="true" data-i18n="pool.favorite">收藏</button>
+          <button type="button" class="label-chip" data-pool="all" data-i18n="pool.all">全部</button>
         </span>
         <span class="mod-icons" id="attacker-mod-icons" aria-hidden="true"></span>
-        <button type="button" class="label-action fav-btn" data-side="attacker" title="加入收藏" aria-label="收藏当前精灵" hidden onclick="toggleFavorite('attacker')">
+        <button type="button" class="label-action fav-btn" data-side="attacker" title="加入收藏" aria-label="收藏当前精灵" data-i18n-attr="title:favorite.add.title;aria-label:favorite.add.aria" hidden onclick="toggleFavorite('attacker')">
           <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"></path></svg>
         </button>
-        <button type="button" class="label-action reset-btn" data-side="attacker" title="重置收藏列表" aria-label="重置收藏列表为默认" onclick="resetFavorites('attacker')">
+        <button type="button" class="label-action reset-btn" data-side="attacker" title="重置收藏列表" aria-label="重置收藏列表为默认" data-i18n-attr="title:favorite.reset.title;aria-label:favorite.reset.aria" onclick="resetFavorites('attacker')">
           <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 6H3"></path><path d="M7 12H3"></path><path d="M7 18H3"></path><path d="M12 18a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L11 14"></path><path d="M11 10v4h4"></path></svg>
         </button>
       </h2>
@@ -125,29 +126,29 @@
       </div>
       <div class="stats-section" id="attacker-stats" style="display:none">
         <h3 class="section-title">
-          <span class="label-text">属性配置</span>
+          <span class="label-text" data-i18n="section.stats">属性配置</span>
           <span class="label-chip-group" data-kind="memory-stats" data-side="attacker" hidden>
-            <button type="button" class="label-chip" data-memory="stats" aria-pressed="false" title="是否优先使用记忆配置">记忆</button>
+            <button type="button" class="label-chip" data-memory="stats" aria-pressed="false" title="是否优先使用记忆配置" data-i18n-attr="title:memory.title" data-i18n="memory.label">记忆</button>
           </span>
-          <span class="buff-chips" id="attacker-buff-chips" aria-label="攻击方 buff 调节"></span>
+          <span class="buff-chips" id="attacker-buff-chips" aria-label="攻击方 buff 调节" data-i18n-attr="aria-label:buff.attacker.aria"></span>
         </h3>
         <div class="stats-grid" id="attacker-stats-grid"></div>
       </div>
       <div class="skills-section" id="attacker-skills" style="display:none">
         <h3 class="section-title">
-          <span class="label-text">攻击技能</span>
+          <span class="label-text" data-i18n="section.attackSkills">攻击技能</span>
           <span class="label-chip-group" data-kind="memory-skill" data-side="attacker" hidden>
-            <button type="button" class="label-chip" data-memory="skill" aria-pressed="false" title="是否优先使用记忆配置">记忆</button>
+            <button type="button" class="label-chip" data-memory="skill" aria-pressed="false" title="是否优先使用记忆配置" data-i18n-attr="title:memory.title" data-i18n="memory.label">记忆</button>
           </span>
-          <span class="buff-chips" id="attacker-power-boost-chip" aria-label="连击数 / 威力 调节"></span>
+          <span class="buff-chips" id="attacker-power-boost-chip" aria-label="连击数 / 威力 调节" data-i18n-attr="aria-label:powerCombo.aria"></span>
         </h3>
         <div class="skill-list" id="attacker-skill-list"><div class="skill-list-inner"></div></div>
       </div>
     </section>
 
-    <section class="seal-container" aria-label="星陨印记控制与伤害结果">
+    <section class="seal-container" aria-label="星陨印记控制与伤害结果" data-i18n-attr="aria-label:seal.aria">
       <div class="seal-section seal-top">
-        <h2 class="seal-label">星陨层数</h2>
+        <h2 class="seal-label" data-i18n="seal.label">星陨层数</h2>
         <div class="seal-wrapper" id="seal-wrapper" aria-hidden="true">
           <canvas id="particle-canvas" width="280" height="280"></canvas>
           <div class="seal" id="seal">
@@ -165,10 +166,10 @@
       </div>
 
       <div class="seal-section seal-middle" id="seal-middle">
-        <div class="seal-hint">↔ 拖拽 · 滚轮 · 或滑块调节</div>
+        <div class="seal-hint" data-i18n="seal.hint">↔ 拖拽 · 滚轮 · 或滑块调节</div>
         <div class="seal-slider-container">
           <input type="range" class="seal-slider" id="seal-slider" min="0" max="99" value="0"
-                 aria-label="星陨层数（数值滑块）">
+                 aria-label="星陨层数（数值滑块）" data-i18n-attr="aria-label:seal.slider.aria">
           <div class="slider-labels" aria-hidden="true"><span>0</span><span>50</span><span>99</span></div>
         </div>
       </div>
@@ -178,21 +179,21 @@
            显示/隐藏用 JS Web Animations API（与 enterChallengeMode / exitChallengeMode
            一致：opacity 0.22s + translateY 4-6px）。 -->
       <div class="seal-section challenge-answer-result" id="challenge-answer-result" hidden
-           aria-label="答题结果" aria-live="polite">
+           aria-label="答题结果" aria-live="polite" data-i18n-attr="aria-label:challenge.answer.aria">
         <div class="challenge-answer-result-row">
-          <span class="challenge-answer-result-label">你的得分</span>
+          <span class="challenge-answer-result-label" data-i18n="challenge.answer.score">你的得分</span>
           <span class="challenge-answer-result-value" id="challenge-answer-score">—</span>
-          <span class="challenge-answer-result-unit">分</span>
+          <span class="challenge-answer-result-unit" data-i18n="challenge.answer.scoreUnit">分</span>
         </div>
         <div class="challenge-answer-result-row">
-          <span class="challenge-answer-result-label">最优层数</span>
+          <span class="challenge-answer-result-label" data-i18n="challenge.answer.optimal">最优层数</span>
           <span class="challenge-answer-result-value" id="challenge-answer-optimal">—</span>
-          <span class="challenge-answer-result-unit">层</span>
+          <span class="challenge-answer-result-unit" data-i18n="challenge.answer.optimalUnit">层</span>
         </div>
       </div>
 
-      <div class="seal-section result-bottom" aria-label="伤害结果">
-        <h2 class="result-label">伤害结果</h2>
+      <div class="seal-section result-bottom" aria-label="伤害结果" data-i18n-attr="aria-label:result.aria">
+        <h2 class="result-label" data-i18n="result.label">伤害结果</h2>
         <div class="result-ring-wrap">
           <svg class="result-ring-svg" viewBox="0 0 200 200" aria-hidden="true">
             <circle class="result-ring-track" cx="100" cy="100" r="80"/>
@@ -205,25 +206,25 @@
           </div>
         </div>
         <div class="result-info" id="result-info" aria-live="polite" aria-atomic="true">
-          <div class="result-waiting-mini">选择双方精灵</div>
+          <div class="result-waiting-mini" data-i18n="result.waiting">选择双方精灵</div>
         </div>
       </div>
 
       <!-- 挑战设置：默认 hidden，进入挑战模式后整段替换星陨/伤害结果 -->
-      <div class="challenge-setup" id="challenge-setup" hidden aria-label="挑战设置">
-        <h2 class="challenge-setup-label">挑战设置</h2>
+      <div class="challenge-setup" id="challenge-setup" hidden aria-label="挑战设置" data-i18n-attr="aria-label:challenge.setup.aria">
+        <h2 class="challenge-setup-label" data-i18n="challenge.setup.title">挑战设置</h2>
         <div class="challenge-setup-rows">
           <div class="challenge-setup-row">
-            <div class="challenge-setup-row-label">预设</div>
-            <div class="challenge-setup-chips" data-group="preset" role="radiogroup" aria-label="预设难度">
-              <button type="button" class="label-chip active" data-value="easy" aria-pressed="true">简单</button>
-              <button type="button" class="label-chip" data-value="standard">标准</button>
-              <button type="button" class="label-chip" data-value="hard">困难</button>
+            <div class="challenge-setup-row-label" data-i18n="challenge.preset">预设</div>
+            <div class="challenge-setup-chips" data-group="preset" role="radiogroup" aria-label="预设难度" data-i18n-attr="aria-label:challenge.preset.aria">
+              <button type="button" class="label-chip active" data-value="easy" aria-pressed="true" data-i18n="challenge.easy">简单</button>
+              <button type="button" class="label-chip" data-value="standard" data-i18n="challenge.standard">标准</button>
+              <button type="button" class="label-chip" data-value="hard" data-i18n="challenge.hard">困难</button>
             </div>
           </div>
           <div class="challenge-setup-row">
-            <div class="challenge-setup-row-label">题数</div>
-            <div class="challenge-setup-chips" data-group="count" role="radiogroup" aria-label="题数">
+            <div class="challenge-setup-row-label" data-i18n="challenge.count">题数</div>
+            <div class="challenge-setup-chips" data-group="count" role="radiogroup" aria-label="题数" data-i18n-attr="aria-label:challenge.count.aria">
               <button type="button" class="label-chip" data-value="3">3</button>
               <button type="button" class="label-chip active" data-value="5" aria-pressed="true">5</button>
               <button type="button" class="label-chip" data-value="10">10</button>
@@ -231,23 +232,23 @@
             </div>
           </div>
         </div>
-        <button type="button" class="challenge-start-btn" id="challenge-start-btn">开始挑战</button>
+        <button type="button" class="challenge-start-btn" id="challenge-start-btn" data-i18n="challenge.start">开始挑战</button>
       </div>
     </section>
 
-    <section class="spirit-panel glass-panel" id="defender-panel" aria-label="防御方">
+    <section class="spirit-panel glass-panel" id="defender-panel" aria-label="防御方" data-i18n-attr="aria-label:side.defender">
       <h2 class="panel-label">
-        <span class="label-text">防御方</span>
+        <span class="label-text" data-i18n="side.defender">防御方</span>
         <span class="label-chip-group" data-kind="pool" data-side="defender" hidden>
-          <button type="button" class="label-chip" data-pool="custom">固定</button>
-          <button type="button" class="label-chip active" data-pool="common" aria-pressed="true">收藏</button>
-          <button type="button" class="label-chip" data-pool="all">全部</button>
+          <button type="button" class="label-chip" data-pool="custom" data-i18n="pool.fixed">固定</button>
+          <button type="button" class="label-chip active" data-pool="common" aria-pressed="true" data-i18n="pool.favorite">收藏</button>
+          <button type="button" class="label-chip" data-pool="all" data-i18n="pool.all">全部</button>
         </span>
         <span class="mod-icons" id="defender-mod-icons" aria-hidden="true"></span>
-        <button type="button" class="label-action fav-btn" data-side="defender" title="加入收藏" aria-label="收藏当前精灵" hidden onclick="toggleFavorite('defender')">
+        <button type="button" class="label-action fav-btn" data-side="defender" title="加入收藏" aria-label="收藏当前精灵" data-i18n-attr="title:favorite.add.title;aria-label:favorite.add.aria" hidden onclick="toggleFavorite('defender')">
           <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"></path></svg>
         </button>
-        <button type="button" class="label-action reset-btn" data-side="defender" title="重置收藏列表" aria-label="重置收藏列表为默认" onclick="resetFavorites('defender')">
+        <button type="button" class="label-action reset-btn" data-side="defender" title="重置收藏列表" aria-label="重置收藏列表为默认" data-i18n-attr="title:favorite.reset.title;aria-label:favorite.reset.aria" onclick="resetFavorites('defender')">
           <svg class="action-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 6H3"></path><path d="M7 12H3"></path><path d="M7 18H3"></path><path d="M12 18a5 5 0 0 0 9-3 4.5 4.5 0 0 0-4.5-4.5c-1.33 0-2.54.54-3.41 1.41L11 14"></path><path d="M11 10v4h4"></path></svg>
         </button>
       </h2>
@@ -256,19 +257,19 @@
       </div>
       <div class="stats-section" id="defender-stats" style="display:none">
         <h3 class="section-title">
-          <span class="label-text">属性配置</span>
+          <span class="label-text" data-i18n="section.stats">属性配置</span>
           <span class="label-chip-group" data-kind="memory-stats" data-side="defender" hidden>
-            <button type="button" class="label-chip" data-memory="stats" aria-pressed="false" title="是否优先使用记忆配置">记忆</button>
+            <button type="button" class="label-chip" data-memory="stats" aria-pressed="false" title="是否优先使用记忆配置" data-i18n-attr="title:memory.title" data-i18n="memory.label">记忆</button>
           </span>
-          <span class="buff-chips" id="defender-buff-chips" aria-label="防御方 buff 调节"></span>
+          <span class="buff-chips" id="defender-buff-chips" aria-label="防御方 buff 调节" data-i18n-attr="aria-label:buff.defender.aria"></span>
         </h3>
         <div class="stats-grid" id="defender-stats-grid"></div>
       </div>
       <div class="skills-section" id="defender-skills" style="display:none">
         <h3 class="section-title">
-          <span class="label-text">防御技能<span class="label-optional">（可选）</span></span>
+          <span class="label-text"><span data-i18n="section.defenseSkills">防御技能</span><span class="label-optional" data-i18n="section.optional">（可选）</span></span>
           <span class="label-chip-group" data-kind="memory-skill" data-side="defender" hidden>
-            <button type="button" class="label-chip" data-memory="skill" aria-pressed="false" title="是否优先使用记忆配置">记忆</button>
+            <button type="button" class="label-chip" data-memory="skill" aria-pressed="false" title="是否优先使用记忆配置" data-i18n-attr="title:memory.title" data-i18n="memory.label">记忆</button>
           </span>
         </h3>
         <div class="skill-list" id="defender-skill-list"><div class="skill-list-inner"></div></div>
@@ -296,20 +297,20 @@
     <div class="mobile-result-info" id="mobile-result-info-mob"></div>
   </div>
 
-  <section class="breakdown-section is-hidden" id="breakdown-section" aria-label="伤害计算明细">
+  <section class="breakdown-section is-hidden" id="breakdown-section" aria-label="伤害计算明细" data-i18n-attr="aria-label:breakdown.aria">
     <button class="breakdown-toggle" id="breakdown-toggle" type="button" onclick="toggleBreakdown()" aria-expanded="false" aria-controls="breakdown-content">
-      <span>伤害计算明细</span>
+      <span data-i18n="breakdown.toggle">伤害计算明细</span>
       <span class="arrow" aria-hidden="true">▼</span>
     </button>
-    <div class="breakdown-content" id="breakdown-content" role="region" aria-label="伤害计算明细">
+    <div class="breakdown-content" id="breakdown-content" role="region" aria-label="伤害计算明细" data-i18n-attr="aria-label:breakdown.aria">
       <div class="breakdown-list" id="breakdown-list"></div>
     </div>
   </section>
 
   <footer class="footer">
-    <p class="footer-meta">© 2026 Bartzh · <a href="https://www.wtfpl.net/" target="_blank" rel="noopener noreferrer">WTFPL</a> · <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">开源仓库</a></p>
-    <p class="footer-meta">精灵数据来自 <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a> · 2026-09-10 同步</p>
-    <p class="footer-meta">精灵立绘与游戏数据版权归官方及 <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a> 贡献者所有</p>
+    <p class="footer-meta" data-i18n-html="footer.copyright">© 2026 Bartzh · <a href="https://www.wtfpl.net/" target="_blank" rel="noopener noreferrer">WTFPL</a> · <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">开源仓库</a></p>
+    <p class="footer-meta" data-i18n-html="footer.data">精灵数据来自 <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a> · 2026-09-10 同步</p>
+    <p class="footer-meta" data-i18n-html="footer.license">精灵立绘与游戏数据版权归官方及 <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a> 贡献者所有</p>
   </footer>
 </div>
 
@@ -317,12 +318,12 @@
 <div class="modal-overlay" id="info-modal" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <header class="modal-header">
-      <h2 class="modal-title" id="modal-title">更新公告</h2>
-      <button type="button" class="modal-close" aria-label="关闭">×</button>
+      <h2 class="modal-title" id="modal-title" data-i18n="info.title">更新公告</h2>
+      <button type="button" class="modal-close" aria-label="关闭" data-i18n-attr="aria-label:modal.close.aria">×</button>
     </header>
     <div class="modal-body" id="modal-body"></div>
     <footer class="modal-footer">
-      <button type="button" class="modal-confirm">我知道了</button>
+      <button type="button" class="modal-confirm" data-i18n="info.confirm">我知道了</button>
     </footer>
   </div>
 </div>
@@ -331,13 +332,13 @@
 <div class="modal-overlay" id="confirm-modal" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
     <header class="modal-header">
-      <h2 class="modal-title" id="confirm-modal-title">确认操作</h2>
-      <button type="button" class="modal-close" aria-label="关闭">×</button>
+      <h2 class="modal-title" id="confirm-modal-title" data-i18n="confirm.title">确认操作</h2>
+      <button type="button" class="modal-close" aria-label="关闭" data-i18n-attr="aria-label:modal.close.aria">×</button>
     </header>
     <div class="modal-body" id="confirm-modal-body"></div>
     <footer class="modal-footer">
-      <button type="button" class="modal-confirm modal-cancel">取消</button>
-      <button type="button" class="modal-confirm modal-danger">确认</button>
+      <button type="button" class="modal-confirm modal-cancel" data-i18n="confirm.cancel">取消</button>
+      <button type="button" class="modal-confirm modal-danger" data-i18n="confirm.ok">确认</button>
     </footer>
   </div>
 </div>
@@ -346,18 +347,18 @@
 <div class="modal-overlay" id="data-mgr-modal" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="data-mgr-title">
     <header class="modal-header">
-      <h2 class="modal-title" id="data-mgr-title">数据管理</h2>
-      <button type="button" class="modal-close" aria-label="关闭">×</button>
+      <h2 class="modal-title" id="data-mgr-title" data-i18n="dataMgr.title">数据管理</h2>
+      <button type="button" class="modal-close" aria-label="关闭" data-i18n-attr="aria-label:modal.close.aria">×</button>
     </header>
     <div class="modal-body">
-      <p>本站只保存记忆和收藏的精灵数据在你的浏览器里，不会上传到任何服务器。下面可以开关记忆功能，对数据进行备份、导入或清除。</p>
+      <p data-i18n="dataMgr.intro">本站只保存记忆和收藏的精灵数据在你的浏览器里，不会上传到任何服务器。下面可以开关记忆功能，对数据进行备份、导入或清除。</p>
       <hr>
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
-          <div class="data-mgr-row-title">自动记忆</div>
-          <div class="data-mgr-row-desc">修改精灵配置时自动保存到本地，下次选择同一精灵时自动恢复（关闭后只是暂停保存功能，不影响已保存数据恢复，若需完全清除数据请点击下方的「删除记忆」）</div>
+          <div class="data-mgr-row-title" data-i18n="dataMgr.memory.title">自动记忆</div>
+          <div class="data-mgr-row-desc" data-i18n="dataMgr.memory.desc">修改精灵配置时自动保存到本地，下次选择同一精灵时自动恢复（关闭后只是暂停保存功能，不影响已保存数据恢复，若需完全清除数据请点击下方的「删除记忆」）</div>
         </div>
-        <label class="data-mgr-switch" title="开启 / 关闭自动记忆">
+        <label class="data-mgr-switch" title="开启 / 关闭自动记忆" data-i18n-attr="title:dataMgr.memory.switch.title">
           <input type="checkbox" id="memory-toggle">
           <span class="data-mgr-switch-track"></span>
         </label>
@@ -365,43 +366,44 @@
       <hr>
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
-          <div class="data-mgr-row-title">删除记忆</div>
-          <div class="data-mgr-row-desc">清除所有精灵的自动记忆配置，不影响当前已选精灵的显示</div>
+          <div class="data-mgr-row-title" data-i18n="dataMgr.clearMemory.title">删除记忆</div>
+          <div class="data-mgr-row-desc" data-i18n="dataMgr.clearMemory.desc">清除所有精灵的自动记忆配置，不影响当前已选精灵的显示</div>
         </div>
-        <button type="button" class="data-mgr-btn data-mgr-btn-danger" id="clear-memory-btn">删除</button>
+        <button type="button" class="data-mgr-btn data-mgr-btn-danger" id="clear-memory-btn" data-i18n="dataMgr.delete">删除</button>
       </div>
       <hr>
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
-          <div class="data-mgr-row-title">删除收藏</div>
-          <div class="data-mgr-row-desc">清空两侧收藏列表，恢复为默认列表（与精灵面板的「重置收藏」等价）</div>
+          <div class="data-mgr-row-title" data-i18n="dataMgr.clearFav.title">删除收藏</div>
+          <div class="data-mgr-row-desc" data-i18n="dataMgr.clearFav.desc">清空两侧收藏列表，恢复为默认列表（与精灵面板的「重置收藏」等价）</div>
         </div>
-        <button type="button" class="data-mgr-btn data-mgr-btn-danger" id="clear-favorites-btn">删除</button>
+        <button type="button" class="data-mgr-btn data-mgr-btn-danger" id="clear-favorites-btn" data-i18n="dataMgr.delete">删除</button>
       </div>
       <hr>
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
-          <div class="data-mgr-row-title">导出数据</div>
-          <div class="data-mgr-row-desc">将所有记忆配置与收藏列表导出为 JSON 文件</div>
+          <div class="data-mgr-row-title" data-i18n="dataMgr.export.title">导出数据</div>
+          <div class="data-mgr-row-desc" data-i18n="dataMgr.export.desc">将所有记忆配置与收藏列表导出为 JSON 文件</div>
         </div>
-        <button type="button" class="data-mgr-btn" id="export-btn">导出</button>
+        <button type="button" class="data-mgr-btn" id="export-btn" data-i18n="dataMgr.export">导出</button>
       </div>
       <hr>
       <div class="data-mgr-row">
         <div class="data-mgr-row-label">
-          <div class="data-mgr-row-title">导入数据</div>
-          <div class="data-mgr-row-desc">从 JSON 文件导入数据，将完全替换现有数据并刷新页面</div>
+          <div class="data-mgr-row-title" data-i18n="dataMgr.import.title">导入数据</div>
+          <div class="data-mgr-row-desc" data-i18n="dataMgr.import.desc">从 JSON 文件导入数据，将完全替换现有数据并刷新页面</div>
         </div>
-        <button type="button" class="data-mgr-btn" id="import-btn">导入</button>
+        <button type="button" class="data-mgr-btn" id="import-btn" data-i18n="dataMgr.import">导入</button>
         <input type="file" id="import-file" accept="application/json,.json" hidden>
       </div>
     </div>
     <footer class="modal-footer">
-      <button type="button" class="modal-confirm">关闭</button>
+      <button type="button" class="modal-confirm" data-i18n="dataMgr.close">关闭</button>
     </footer>
   </div>
 </div>
 
+<script src="./i18n.js" defer></script>
 <script src="./calculator.js" defer></script>
 
 </body>

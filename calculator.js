@@ -21,7 +21,18 @@ const ELEMENTS = {
   '机械': { name: '机械', emoji: '⚙️', color: '#40cba9' },
   '幻':   { name: '幻',   emoji: '🔮', color: '#9fa7f8' }
 };
-const FALLBACK_EL = { name: '无', emoji: '❔', color: '#666666' };
+const FALLBACK_EL = { name: '无', name_en: 'None', emoji: '❔', color: '#666666' };
+
+// i18n 入口（i18n.js 在 calculator.js 之前以 defer 加载）
+const I18N = window.I18N || {
+  locale: 'zh-CN',
+  t: (key) => key,
+  isEn: () => false,
+  switchLocale: () => {},
+  applyI18n: () => {}
+};
+const t = I18N.t;
+const isEn = I18N.isEn;
 
 // 自定义技能槽 sentinel index：表示"自定义技能槽"被选中。
 // renderSkills 把自定义槽渲染为 data-idx="custom" 的最后一项；
@@ -50,6 +61,29 @@ function stripXi(name) {
 function elOf(rawName) {
   if (rawName == null) return FALLBACK_EL;
   return ELEMENT_BY_RAW.get(rawName) || FALLBACK_EL;
+}
+
+// ---- 显示层 helper：数据键 / 中文名保持原样，只切换展示文案 ----
+function displayName(item) {
+  if (!item) return '';
+  return isEn() ? (item.name_en || item.name || '') : (item.name || item.name_en || '');
+}
+function displayDesc(item) {
+  if (!item) return '';
+  return isEn() ? (item.desc_en || item.desc || '') : (item.desc || item.desc_en || '');
+}
+function displayEl(el) {
+  if (!el) return displayEl(FALLBACK_EL);
+  return isEn() ? (el.name_en || el.name) : (el.name || el.name_en);
+}
+function elLabel(rawName) {
+  return displayEl(elOf(rawName));
+}
+function displayDamageClass(value) {
+  if (value === '物攻') return t('badge.atk');
+  if (value === '魔攻') return t('badge.matk');
+  if (value === '自适应') return t('badge.auto');
+  return value || '?';
 }
 
 // ============================================================
@@ -94,21 +128,28 @@ async function loadData() {
 // Merge iconUrl from TYPES into ELEMENTS (so elOf(...).iconUrl works for skill-card overlays)
 function augmentElementsWithTypes() {
   for (const key of Object.keys(TYPES || {})) {
-    if (ELEMENTS[key] && TYPES[key] && TYPES[key].iconUrl) {
-      ELEMENTS[key].iconUrl = TYPES[key].iconUrl;
-    }
+    if (!ELEMENTS[key] || !TYPES[key]) continue;
+    if (TYPES[key].iconUrl) ELEMENTS[key].iconUrl = TYPES[key].iconUrl;
+    if (TYPES[key].name_en) ELEMENTS[key].name_en = TYPES[key].name_en;
   }
 }
 
 // Build skill arrays (ATTACK / DEFENSE category index)
 const ATTACK_SKILLS = {};
 const DEFENSE_SKILLS = {};
+// 英文技能名 → 中文技能 id，供自定义技能槽输入使用。
+const SKILL_ID_BY_NAME_EN = {};
+function normalizeSkillInputName(name) {
+  return (name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
 function buildSkillIndices() {
   ATTACK_SKILLS && Object.keys(ATTACK_SKILLS).forEach(k => delete ATTACK_SKILLS[k]);
   DEFENSE_SKILLS && Object.keys(DEFENSE_SKILLS).forEach(k => delete DEFENSE_SKILLS[k]);
+  Object.keys(SKILL_ID_BY_NAME_EN).forEach(k => delete SKILL_ID_BY_NAME_EN[k]);
   for (const [id, s] of Object.entries(SKILLS)) {
     if (s.category === '攻击') ATTACK_SKILLS[id] = s;
     else if (s.category === '防御') DEFENSE_SKILLS[id] = s;
+    if (s.name_en) SKILL_ID_BY_NAME_EN[normalizeSkillInputName(s.name_en)] = id;
   }
 }
 
@@ -117,7 +158,6 @@ function buildSkillIndices() {
 // ============================================================
 // Stat keys in display order
 const STAT_KEYS = ['hp', 'atk', 'matk', 'def', 'mdef', 'spd'];
-const STAT_LABELS = { hp: '生命', atk: '物攻', matk: '魔攻', def: '物防', mdef: '魔防', spd: '速度' };
 const MAX_IV = 3;
 const IV_BONUS = 60;
 
@@ -655,7 +695,8 @@ function _refreshFavoriteBtn(side) {
   const fav = spirit ? isFavorite(side, spirit.id) : false;
   btn.classList.toggle('is-fav', fav);
   btn.innerHTML = fav ? _FAV_ICON_FILLED : _FAV_ICON_OUTLINE;
-  btn.title = fav ? '取消收藏' : '加入收藏';
+  btn.title = t(fav ? 'favorite.remove.title' : 'favorite.add.title');
+  btn.setAttribute('aria-label', t(fav ? 'favorite.remove.aria' : 'favorite.add.aria'));
   btn.setAttribute('aria-pressed', fav ? 'true' : 'false');
 }
 
@@ -891,20 +932,22 @@ function formatBuff(val) {
 const YUANLI_SKILLS = Object.keys(ELEMENTS).map(el => ({
   id: '__yuanli_' + el + '__',
   name: '愿力冲击',
+  name_en: 'Wishpower Blast',
   category: '攻击',
   element: el + '系',
   damage_class: '自适应',
   power: 80,
   modKey: '__yuanli__',
   desc: '造成伤害，伤害类型取决于精灵双攻更高的一项，应对状态：本次威力+150%。',
+  desc_en: "Deals damage. The damage type is determined by the spirit's higher Attack or Magic Attack. Counter: this skill's Power +150%.",
   icon_url: `./images/愿力冲击_${el}.webp`
 }));
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
   const opts = [
-    { id: '__none__', name: '无', reduction: 1, _pseudo: true },
-    { id: '__state__', name: '聚能', category: '状态', desc: '用于使攻击方能够应对状态。', icon_url: './images/聚能.webp' }
+    { id: '__none__', name: '无', name_en: 'None', reduction: 1, _pseudo: true },
+    { id: '__state__', name: '聚能', name_en: 'Rest', category: '状态', desc: '用于使攻击方能够应对状态。', desc_en: "Used to let the attacker trigger Counter effects.", icon_url: './images/聚能.webp' }
   ];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
@@ -932,9 +975,13 @@ function getAttackSkillOptions(attacker) {
 function findSkillByName(name, category) {
   const trimmed = (name || '').trim();
   if (!trimmed) return null;
-  const s = SKILLS[trimmed];
+  // 中文名优先（数据 id === 中文名），其次按官方英文名反查。
+  const id = SKILLS[trimmed]
+    ? trimmed
+    : SKILL_ID_BY_NAME_EN[normalizeSkillInputName(trimmed)];
+  const s = id ? SKILLS[id] : null;
   if (s && s.category === category) {
-    return { id: trimmed, ...s };
+    return { id, ...s };
   }
   return null;
 }
@@ -1634,29 +1681,35 @@ function escapeAttr(s) {
 function _renderPickerOptionsHTML(side, list) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   if (list.length === 0) {
-    return `<div class="spirit-picker-empty">没有匹配的精灵<button type="button" onclick="resetPickerFilter('${side}')">清除筛选</button></div>`;
+    return `<div class="spirit-picker-empty">${t('picker.empty')}<button type="button" onclick="resetPickerFilter('${side}')">${t('picker.clearFilter')}</button></div>`;
   }
   return list.map(([id, s]) => {
-    const types = (s.types || []).map(t => elOf(t));
+    const name = displayName(s);
+    const initial = escapeAttr(name.slice(0, 1));
+    const types = (s.types || []).map(raw => elOf(raw));
     const primaryColor = types[0]?.color || '#888';
-    const tagsHTML = types.map(t =>
-      t.iconUrl
-        ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
-        : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+    const tagsHTML = types.map(el =>
+      el.iconUrl
+        ? `<img class="type-icon" src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}">`
+        : `<span class="type-tag" style="--tag-color:${el.color};--tag-bg:${el.color}20;">${el.emoji} ${displayEl(el)}</span>`
     ).join('');
     const illus = s.illustration_url
-      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
-      : `<div class="placeholder" style="--el-color:${primaryColor}">${(s.name||'').slice(0,1)}</div>`;
+      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${initial}',style:'--el-color:${primaryColor}'}))">`
+      : `<div class="placeholder" style="--el-color:${primaryColor}">${initial}</div>`;
     const isCurrent = !!(spirit && spirit.id === id);
+    const optionAria = t('picker.option.aria', {
+      name,
+      current: isCurrent ? t('picker.option.current') : ''
+    });
     return `
       <div class="spirit-picker-option ${isCurrent ? 'current' : ''}" role="button" tabindex="0"
-           aria-label="选择 ${s.name}${isCurrent ? '（当前）' : ''}"
+           aria-label="${escapeAttr(optionAria)}"
            data-spirit-id="${id}"
            style="--el-color:${primaryColor}"
            onclick="selectSpirit('${side}', '${id}')"
            onkeydown="onSpiritPickerOptionKey(event, '${side}', '${id}')">
         <div class="picker-image">${illus}</div>
-        <div class="picker-name">${s.name}</div>
+        <div class="picker-name">${name}</div>
         <div class="picker-types">${tagsHTML}</div>
       </div>
     `;
@@ -1696,9 +1749,10 @@ function filterSpirits(side, filter) {
     }
     if (text) {
       const name = stripSpaces(normParens(s.name || '')).toLowerCase();
+      const nameEn = stripSpaces(normParens(s.name_en || '')).toLowerCase();
       const py = stripSpaces(normParens(s.pinyin || ''));
       const ini = stripSpaces(normParens(s.pinyin_initials || ''));
-      let matched = name.includes(text) || py.includes(text) || ini.includes(text);
+      let matched = name.includes(text) || nameEn.includes(text) || py.includes(text) || ini.includes(text);
       // 纯数字输入时，也按图鉴 id (hbid) 搜索
       if (!matched && /^\d+$/.test(text)) {
         matched = String(s.hbid ?? '').includes(text);
@@ -1719,14 +1773,18 @@ function renderPickerToolbar(side, filter) {
     const el = ELEMENTS[key];
     if (!el) return '';
     const isActive = filter.elements.has(key);
+    const elName = displayEl(el);
     const iconHTML = el.iconUrl
-      ? `<img class="chip-icon" src="${el.iconUrl}" loading="lazy" alt="${el.name}">`
+      ? `<img class="chip-icon" src="${el.iconUrl}" loading="lazy" alt="${elName}">`
       : `<span class="chip-emoji" aria-hidden="true">${el.emoji}</span>`;
+    const tipKey = filter.elements.has(key)
+      ? 'picker.element.cancel'
+      : (filter.elements.size >= 2 ? 'picker.element.max' : 'picker.element.filter');
     return `<button type="button" class="spirit-picker-chip element-chip${isActive ? ' active' : ''}"
               data-element="${key}"
               onclick="togglePickerElement('${side}', '${key}')"
               aria-pressed="${isActive ? 'true' : 'false'}"
-              title="${el.name}（${filter.elements.has(key) ? '点击取消' : (filter.elements.size >= 2 ? '最多选 2 个系别' : '点击筛选')}）">${iconHTML}</button>`;
+              title="${t('picker.element.title', { element: elName, tip: t(tipKey) })}">${iconHTML}</button>`;
   }).join('');
 
   const searchVal = escapeAttr(filter.text || '');
@@ -1740,13 +1798,13 @@ function renderPickerToolbar(side, filter) {
         <input id="${side}-picker-search" type="text" inputmode="search"
                value="${searchVal}"
                oninput="onPickerSearchInput('${side}', this.value)"
-               placeholder="搜索：名称 / 拼音 / 首字母 / 图鉴编号"
-               aria-label="搜索精灵">
+               placeholder="${t('picker.search.placeholder')}"
+               aria-label="${t('picker.search.aria')}">
       </div>
       <button type="button" class="spirit-picker-chip common${commonActive}"
               onclick="togglePickerCommon('${side}')"
               aria-pressed="${filter.common ? 'true' : 'false'}"
-              title="${filter.common ? '取消"收藏"筛选' : '只显示收藏精灵'}">
+              title="${filter.common ? t('picker.common.on') : t('picker.common.off')}">
         <svg class="chip-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"></path></svg>
       </button>
       ${elementChips}
@@ -1902,10 +1960,10 @@ function renderSpiritPicker(side, opts) {
   skillsSection.style.display = 'none';
   statsSection.style.display = 'none';
 
-  const titleText = side === 'attacker' ? '选择攻击方精灵' : '选择防御方精灵';
+  const titleText = t(side === 'attacker' ? 'picker.title.attacker' : 'picker.title.defender');
   // 始终渲染“取消”按钮，未选精灵时用 is-hidden 保留占位，避免排版跳动
   const cancelHiddenCls = spirit ? '' : ' is-hidden';
-  const cancelBtn = `<button class="picker-btn${cancelHiddenCls}" type="button" onclick="exitSpiritPicker('${side}')" aria-label="取消更换" tabindex="${spirit ? 0 : -1}">取消</button>`;
+  const cancelBtn = `<button class="picker-btn${cancelHiddenCls}" type="button" onclick="exitSpiritPicker('${side}')" aria-label="${t('picker.cancel.aria')}" tabindex="${spirit ? 0 : -1}">${t('picker.cancel')}</button>`;
 
   const filter = state.spiritPickerFilter[side];
   const toolbarHTML = renderPickerToolbar(side, filter);
@@ -1956,8 +2014,8 @@ function refreshPickerToolbar(side) {
     commonChip.classList.toggle('active', filter.common);
     commonChip.setAttribute('aria-pressed', filter.common ? 'true' : 'false');
     commonChip.title = filter.common
-      ? '点击取消"收藏"筛选'
-      : '点击只显示收藏精灵';
+      ? t('picker.common.on')
+      : t('picker.common.off');
   }
 
   // 系别 chip
@@ -1968,10 +2026,10 @@ function refreshPickerToolbar(side) {
     const active = filter.elements.has(key);
     chip.classList.toggle('active', active);
     chip.setAttribute('aria-pressed', active ? 'true' : 'false');
-    const tip = active
-      ? '点击取消'
-      : (filter.elements.size >= 2 ? '最多选 2 个系别' : '点击筛选');
-    chip.title = `${el.name}（${tip}）`;
+    const tipKey = active
+      ? 'picker.element.cancel'
+      : (filter.elements.size >= 2 ? 'picker.element.max' : 'picker.element.filter');
+    chip.title = t('picker.element.title', { element: displayEl(el), tip: t(tipKey) });
   });
 }
 
@@ -2017,30 +2075,36 @@ function renderSpiritCard(side, opts) {
   if (!spirit) return;
   const selectArea = document.getElementById(`${side}-select-area`);
   const skillsSection = document.getElementById(`${side}-skills`);
-  const types = (spirit.types || []).map(t => elOf(t));
+  const types = (spirit.types || []).map(raw => elOf(raw));
   const primaryColor = types[0]?.color || '#888';
-  const tagsHTML = types.map(t =>
-    t.iconUrl
-      ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
-      : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+  const tagsHTML = types.map(el =>
+    el.iconUrl
+      ? `<img class="type-icon" src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}">`
+      : `<span class="type-tag" style="--tag-color:${el.color};--tag-bg:${el.color}20;">${el.emoji} ${displayEl(el)}</span>`
   ).join('');
+  const spiritName = displayName(spirit);
+  const initial = escapeAttr(spiritName.slice(0, 1));
   const illus = spirit.illustration_url
-    ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
-    : `<div class="placeholder" style="--el-color:${primaryColor}">${(spirit.name||'').slice(0,1)}</div>`;
+    ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${initial}',style:'--el-color:${primaryColor}'}))">`
+    : `<div class="placeholder" style="--el-color:${primaryColor}">${initial}</div>`;
   // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
   // 比 body class 路线可靠（见 renderSpiritPicker 注释）。
   const skipAnim = !!(opts && opts.skipAnimation);
   const animStyle = skipAnim ? '; animation: none' : '';
+  const changeAria = t('spirit.changeAria', {
+    side: t(side === 'attacker' ? 'side.attacker' : 'side.defender'),
+    name: spiritName
+  });
   selectArea.innerHTML = `
     <div class="spirit-card" role="button" tabindex="0"
-         aria-label="更换${side === 'attacker' ? '攻击方' : '防御方'}精灵（当前：${spirit.name}）"
+         aria-label="${escapeAttr(changeAria)}"
          onclick="enterSpiritPicker('${side}')"
          onkeydown="onSpiritCardKey(event, '${side}')"
          style="--el-color:${primaryColor}${animStyle}">
       <div class="spirit-image">${illus}</div>
-      <div class="name">${spirit.name}</div>
+      <div class="name">${spiritName}</div>
       <div class="type-tags">${tagsHTML}</div>
-      <div class="change-hint">点击更换</div>
+      <div class="change-hint">${t('spirit.changeHint')}</div>
     </div>
   `;
   skillsSection.style.display = 'block';
@@ -2113,7 +2177,7 @@ function selectSpirit(side, id) {
         state.attackSkill    = { id: savedA.skillId, ...customSk };
         state.attackSkillIdx = CUSTOM_SKILL_IDX;
         state.customSkillResolved.attacker = state.attackSkill;
-        state.customSkillInput.attacker    = customSk.name;
+        state.customSkillInput.attacker    = displayName(customSk);
       } else {
         state.attackSkill    = opts[0] || null;
         state.attackSkillIdx = state.attackSkill ? 0 : -1;
@@ -2162,7 +2226,7 @@ function selectSpirit(side, id) {
         state.defenseSkill    = { id: savedD.skillId, ...customSk };
         state.defenseSkillIdx = CUSTOM_SKILL_IDX;
         state.customSkillResolved.defender = state.defenseSkill;
-        state.customSkillInput.defender    = customSk.name;
+        state.customSkillInput.defender    = displayName(customSk);
       } else {
         state.defenseSkill    = opts[0]; // "无"
         state.defenseSkillIdx = 0;
@@ -2215,6 +2279,13 @@ function renderStatsConfig(side) {
     const isDown = nature.down === statKey;
     const hasIV  = ivs.includes(statKey);
     const finalVal = getFinalStat(spirit, statKey, nature, ivs);
+    const statLabel = t(`stat.${statKey}`);
+    const natureState = t(isUp ? 'nature.up' : isDown ? 'nature.down' : 'nature.unset');
+    const ivState = t(hasIV ? 'iv.selected' : 'iv.unselected');
+    const natureAria = t('stat.nature.aria', { stat: statLabel, state: natureState });
+    const natureTitle = t('stat.nature.title', { state: natureState });
+    const ivAria = t('stat.iv.aria', { stat: statLabel, state: ivState });
+    const ivTitle = t('stat.iv.title', { state: ivState });
     // Determine if this slot can be assigned (only if both natures are not yet set, and slot is empty)
     // The slot is "available" if: (no up and no down) OR (only up set and this slot is not the up) OR (only down set and this slot is not the down)
     const noNature = !nature.up && !nature.down;
@@ -2228,22 +2299,22 @@ function renderStatsConfig(side) {
       <div class="stat-cell" data-stat="${statKey}">
         <div class="nature-slot ${isUp ? 'up' : ''} ${isDown ? 'down' : ''} ${!isUp && !isDown && !natureAvailable ? 'disabled' : ''}"
              role="button" tabindex="${(!isUp && !isDown && !natureAvailable) ? -1 : 0}"
-             aria-label="${STAT_LABELS[statKey]} 性格：${isUp ? '正面' : isDown ? '负面' : '未设置'}（点击切换）"
+             aria-label="${escapeAttr(natureAria)}"
              aria-pressed="${(isUp || isDown) ? 'true' : 'false'}"
-             title="性格: ${isUp ? '正面' : isDown ? '负面' : '未设置'}"
+             title="${escapeAttr(natureTitle)}"
              onclick="onNatureSlotClick('${side}', '${statKey}', event)"
              onkeydown="onNatureSlotKey(event, '${side}', '${statKey}')">
           ${isUp ? '▲' : isDown ? '▼' : ''}
         </div>
         <div class="stat-center">
-          <div class="stat-label">${STAT_LABELS[statKey]}</div>
+          <div class="stat-label">${statLabel}</div>
           <div class="stat-value">${finalVal}</div>
         </div>
         <div class="iv-slot ${hasIV ? 'active' : ''} ${!hasIV && !ivAddable ? 'disabled' : ''}"
              role="button" tabindex="${!hasIV && !ivAddable ? -1 : 0}"
-             aria-label="${STAT_LABELS[statKey]} 个体值：${hasIV ? '已选' : '未选'}（点击切换）"
+             aria-label="${escapeAttr(ivAria)}"
              aria-pressed="${hasIV ? 'true' : 'false'}"
-             title="个体值: ${hasIV ? '已选' : '未选'}"
+             title="${escapeAttr(ivTitle)}"
              onclick="onIVSlotClick('${side}', '${statKey}', event)"
              onkeydown="onIVSlotKey(event, '${side}', '${statKey}')">
           ${hasIV ? '(+60)' : ''}
@@ -2413,8 +2484,8 @@ function attachChipDrag(chip, opts) {
 // (or def/mdef) stat by ±10% per 8px; double-click to reset.
 // ============================================================
 const BUFF_STAT_CONFIGS = {
-  attacker: [{ key: 'atk',  label: '物攻' }, { key: 'matk', label: '魔攻' }],
-  defender: [{ key: 'def',  label: '物防' }, { key: 'mdef', label: '魔防' }]
+  attacker: [{ key: 'atk' }, { key: 'matk' }],
+  defender: [{ key: 'def' }, { key: 'mdef' }]
 };
 const BUFF_DRAG_PX_PER_STEP = 8;   // 8px → 10% step
 const BUFF_STEP_PCT = 10;
@@ -2434,18 +2505,20 @@ function renderBuffChips(side) {
   // atk/matk (or def/mdef) chips. Always present on both sides.
   const val = getSpeed(side);
   const cls = _buffChipClass(val);
+  const speedLabel = t('buffLabel.speed');
   const speedHTML = `<div class="buff-chip ${cls}"
-                          aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                          aria-label="${escapeAttr(t('buff.adjust.aria', { label: speedLabel, value: formatSpeed(val) }))}"
                           data-side="${side}" data-stat="speed"
-                          title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
+                          title="${escapeAttr(t('buff.title'))}">${speedLabel} <span class="buff-val">${formatSpeed(val)}</span></div>`;
 
   const buffsHTML = configs.map(c => {
     const bv = getBuff(side, c.key);
     const bcls = _buffChipClass(bv);
+    const label = t(`buffLabel.${c.key}`);
     return `<div class="buff-chip ${bcls}"
-                 aria-label="${c.label} 调整（当前 ${formatBuff(bv)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                 aria-label="${escapeAttr(t('buff.adjust.aria', { label, value: formatBuff(bv) }))}"
                  data-side="${side}" data-stat="${c.key}"
-                 title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${c.label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
+                 title="${escapeAttr(t('buff.title'))}">${label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
   }).join('');
 
   container.innerHTML = speedHTML + buffsHTML;
@@ -2510,13 +2583,11 @@ function renderBuffChips(side) {
 //   single always-visible 威力 chip, and adds a symmetric
 //   连击数 chip for adjusting the hit count.
 // ============================================================
-const POWER_LABEL = '威力';
 const POWER_MIN = -990;
 const POWER_MAX = 990;
 const POWER_STEP = 10;
 const POWER_DRAG_PX_PER_STEP = 8;
 
-const COMBO_LABEL = '连击';
 const COMBO_MIN = -99;
 const COMBO_MAX = 99;
 const COMBO_STEP = 1;
@@ -2556,18 +2627,20 @@ function renderPowerBoostChip() {
   // 连击数 chip — rendered first so it sits to the LEFT of 威力.
   const comboVal = getComboBoost();
   const comboCls = _buffChipClass(comboVal);
+  const comboLabel = t('buffLabel.combo');
   const comboHTML = `<div class="buff-chip ${comboCls}"
-                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，左右拖动或滚轮调整 / 双击重置）"
+                            aria-label="${escapeAttr(t('buff.adjust.aria.combo', { label: comboLabel, value: formatComboBoost(comboVal) }))}"
                             data-stat="combo"
-                            title="左右拖动或滚轮调整 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
+                            title="${escapeAttr(t('buff.title.combo'))}">${comboLabel} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
 
   // 威力 chip.
   const powerVal = getPowerBoost();
   const powerCls = _buffChipClass(powerVal);
+  const powerLabel = t('buffLabel.power');
   const powerHTML = `<div class="buff-chip ${powerCls}"
-                            aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(powerVal)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                            aria-label="${escapeAttr(t('buff.adjust.aria', { label: powerLabel, value: formatPowerBoost(powerVal) }))}"
                             data-stat="power"
-                            title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
+                            title="${escapeAttr(t('buff.title'))}">${powerLabel} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
 
   container.innerHTML = comboHTML + powerHTML;
 
@@ -2620,7 +2693,6 @@ function renderPowerBoostChip() {
 // behaviour mirrors the buff chips (press-and-drag horizontal,
 // wheel, dblclick to reset). Range [-990, +990], step 10.
 // ============================================================
-const SPEED_LABEL = '速度';
 const SPEED_MIN = -990;
 const SPEED_MAX = 990;
 const SPEED_STEP = 10;
@@ -2684,7 +2756,7 @@ function renderSkillIconHTML(sk, el) {
   // Element icon overlay at top-left corner (only when an iconUrl is available)
   let elOverlay = '';
   if (el && el.iconUrl) {
-    elOverlay = `<div class="el-overlay"><img src="${el.iconUrl}" loading="lazy" alt="${el.name}"></div>`;
+    elOverlay = `<div class="el-overlay"><img src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}"></div>`;
   }
   return main + elOverlay;
 }
@@ -2787,13 +2859,13 @@ function buildModIconNode(skill, active) {
   const el = elOf(skill.element);
   const span = document.createElement('span');
   span.className = `mod-icon ${active ? 'active' : 'inactive'} enter`;
-  span.title = `${skill.name}：${skill.desc}`;
+  span.title = t('mod.title', { name: displayName(skill), desc: displayDesc(skill) });
   span.setAttribute('aria-hidden', 'true');
   if (skill.icon_url) {
     const img = document.createElement('img');
     img.src = skill.icon_url;
     img.loading = 'lazy';
-    img.alt = skill.name;
+    img.alt = displayName(skill);
     img.onerror = () => {
       const ph = document.createElement('div');
       ph.className = 'mod-icon-placeholder';
@@ -2933,23 +3005,23 @@ function renderInlineBadge(sk, powerClass = '') {
   if (sk._pseudo) return '';
   const badges = [];
   if (sk.damage_class === '物攻') {
-    badges.push(`<span class="skill-badge atk">物攻</span>`);
+    badges.push(`<span class="skill-badge atk">${t('badge.atk')}</span>`);
   } else if (sk.damage_class === '魔攻') {
-    badges.push(`<span class="skill-badge matk">魔攻</span>`);
+    badges.push(`<span class="skill-badge matk">${t('badge.matk')}</span>`);
   } else if (sk.damage_class === '自适应') {
     // 愿力冲击：伤害类型由精灵当前最终物攻/魔攻中较高者决定
-    badges.push(`<span class="skill-badge auto">自适应</span>`);
+    badges.push(`<span class="skill-badge auto">${t('badge.auto')}</span>`);
   }
   if (sk.damage_class) {
     // attack skill: show power
     const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
     const comboSuffix = sk.combo != null ? `x${sk.combo}` : '';
-    badges.push(`<span class="${cls}">威力 ${sk.power}${comboSuffix}</span>`);
+    badges.push(`<span class="${cls}">${t('badge.power', { power: `${sk.power}${comboSuffix}` })}</span>`);
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
     const pct = Math.round((1 - (sk.reduction ?? 0)) * 100);
-    badges.push(`<span class="skill-badge reduction">减伤 ${pct}%</span>`);
+    badges.push(`<span class="skill-badge reduction">${t('badge.reduction', { pct })}</span>`);
   }
   return badges.join('');
 }
@@ -2964,7 +3036,7 @@ function renderSkills(side) {
     const inner = _inner(list);
     const opts = getAttackSkillOptions(state.attacker);
     if (!opts.length) {
-      inner.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
+      inner.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">${t('skills.noAttackSkills')}</div>`;
       return;
     }
     // For each attack skill, determine power-badge color based on
@@ -2986,9 +3058,9 @@ function renderSkills(side) {
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 data-idx="${idx}"
                 onclick="selectAttackSkill(${idx})">
-          <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
+          <div class="skill-icon"${displayDesc(sk) ? ` title="${escapeAttr(displayDesc(sk))}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
-            <span class="skill-name">${sk.name}</span>
+            <span class="skill-name">${displayName(sk)}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk, powerClass)}</div>
           </div>
         </button>
@@ -3008,9 +3080,9 @@ function renderSkills(side) {
         <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''}"
                 data-idx="${idx}"
                 onclick="selectDefenseSkill(${idx})">
-          <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${iconHTML}</div>
+          <div class="skill-icon"${displayDesc(sk) ? ` title="${escapeAttr(displayDesc(sk))}"` : ''}>${iconHTML}</div>
           <div class="skill-content">
-            <span class="skill-name">${isNone ? '无' : sk.name}</span>
+            <span class="skill-name">${isNone ? t('skills.none') : displayName(sk)}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
           </div>
         </button>
@@ -3078,7 +3150,8 @@ function _buildCustomSkillSlotHTML(side) {
     badgesHTML = renderInlineBadge(resolved, powerClass);
   }
 
-  const titleAttr = resolved && resolved.desc ? ` title="${resolved.desc}"` : '';
+  const resolvedDesc = resolved ? displayDesc(resolved) : '';
+  const titleAttr = resolvedDesc ? ` title="${escapeAttr(resolvedDesc)}"` : '';
   const disabledAttr = state.challenge.running ? ' disabled' : '';
 
   return `
@@ -3090,7 +3163,7 @@ function _buildCustomSkillSlotHTML(side) {
         <input class="custom-skill-input"
                type="text"
                value="${escapedInput}"
-               placeholder="自定义技能"
+               placeholder="${escapeAttr(t('skills.custom.placeholder'))}"
                ${disabledAttr}
                onclick="event.stopPropagation()"
                oninput="onCustomSkillInput('${side}', this.value)">
@@ -3121,7 +3194,8 @@ function _renderCustomSkillSlot(side) {
     if (resolved) {
       const el = elOf(resolved.element);
       iconEl.innerHTML = renderSkillIconHTML(resolved, el);
-      if (resolved.desc) iconEl.setAttribute('title', resolved.desc);
+      const desc = displayDesc(resolved);
+      if (desc) iconEl.setAttribute('title', desc);
       else iconEl.removeAttribute('title');
     } else {
       iconEl.innerHTML = `<div class="placeholder custom-skill-placeholder" style="--el-color:#666">?</div>`;
@@ -4135,24 +4209,25 @@ function renderResult(data) {
     let chipsHTML = '';
     const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
     if (data.skillEff > 1) {
-      chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
+      chipsHTML += `<span class="result-chip super-effective">${t('result.super')} ×${data.skillEff}</span>`;
     } else if (data.skillEff < 1 && !ignoredResist) {
-      chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+      chipsHTML += `<span class="result-chip not-effective">${t('result.resist')} ×${data.skillEff}</span>`;
     }
     if (ignoredResist) {
-      chipsHTML += `<span class="result-chip not-effective" title="原抵抗 ×${data.skillEffRaw} 已被虫击·应对状态忽略">无视抵抗</span>`;
+      const ignoreTip = escapeAttr(t('result.ignoreResist.title', { eff: data.skillEffRaw }));
+      chipsHTML += `<span class="result-chip not-effective" title="${ignoreTip}">${t('result.ignoreResist')}</span>`;
     }
     if (data.n > 0) {
       if (data.isSkillIllusion) {
-        chipsHTML += `<span class="result-chip not-effective">幻系不触发</span>`;
+        chipsHTML += `<span class="result-chip not-effective">${t('result.illusionNone')}</span>`;
       } else if (data.starEff !== 1) {
         const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
-        const label = data.starEff > 1 ? '星陨克制' : '星陨抵抗';
+        const label = data.starEff > 1 ? t('result.starSuper') : t('result.starResist');
         chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
       }
     }
     if (data.isKill) {
-      chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
+      chipsHTML += `<span class="result-chip overflow">${t('result.overflow', { n: data.overflow.toLocaleString() })}</span>`;
     }
     // Always render the chips row (even when empty) so its height is
     // always the same — adding/removing chips does not push the ring.
@@ -4160,7 +4235,7 @@ function renderResult(data) {
 
     // Damage lines
     const dmgLinesHTML = `
-      <div class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></div>
+      <div class="result-dmg-line">${t('result.dmgLine', { skill: data.skillDmg.toLocaleString(), star: data.starDmg.toLocaleString() })}</div>
     `;
 
     infoEl.innerHTML = chipsRow + dmgLinesHTML;
@@ -4204,7 +4279,7 @@ function updateMobileResultBar(data) {
     pctEl.textContent = '—';
     pctEl.style.textShadow = 'none';
     dmgEl.textContent = '—';
-    infoEl.innerHTML = '<span class="result-waiting-mini">选择双方精灵开始计算</span>';
+    infoEl.innerHTML = `<span class="result-waiting-mini">${t('waiting.pickBoth')}</span>`;
     return;
   }
 
@@ -4239,29 +4314,29 @@ function updateMobileResultBar(data) {
   let chipsHTML = '';
   const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
   if (data.skillEff > 1) {
-    chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
+    chipsHTML += `<span class="result-chip super-effective">${t('result.super')} ×${data.skillEff}</span>`;
   } else if (data.skillEff < 1 && !ignoredResist) {
-    chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+    chipsHTML += `<span class="result-chip not-effective">${t('result.resist')} ×${data.skillEff}</span>`;
   }
   if (ignoredResist) {
-    chipsHTML += `<span class="result-chip not-effective">无视抵抗</span>`;
+    chipsHTML += `<span class="result-chip not-effective">${t('result.ignoreResist')}</span>`;
   }
   if (data.n > 0 && !data.isSkillIllusion && data.starEff !== 1) {
     const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
-    const label = data.starEff > 1 ? '星陨克制' : '星陨抵抗';
+    const label = data.starEff > 1 ? t('result.starSuper') : t('result.starResist');
     chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
   }
   if (data.isKill) {
-    chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
+    chipsHTML += `<span class="result-chip overflow">${t('result.overflow', { n: data.overflow.toLocaleString() })}</span>`;
   }
-  const dmgLine = `<span class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></span>`;
+  const dmgLine = `<span class="result-dmg-line">${t('result.dmgLine', { skill: data.skillDmg.toLocaleString(), star: data.starDmg.toLocaleString() })}</span>`;
   infoEl.innerHTML = chipsHTML + dmgLine;
 }
 
 function renderBreakdownList(breakdownList, data) {
   // Use the overridden element (e.g. 展翅: 普通 → 翼) for the displayed name.
   const skillElementRaw = (data.dyn && data.dyn.elementOverride) || data.skill.element;
-  const skillNameEl = skillElementRaw ? elOf(skillElementRaw).name : '无';
+  const skillNameEl = elLabel(skillElementRaw);
   const stabBadge = data.stab > 1
     ? ' <span class="skill-badge stab">本系 ×1.25</span>'
     : '';
@@ -4391,8 +4466,8 @@ function renderBreakdownList(breakdownList, data) {
     : `${data.skillEff}`;
   breakdownList.innerHTML = `
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
-    <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
-    <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span>${stabBadge}</div>
+    <div><span class="label">攻击方:</span> <span class="value">${displayName(data.atk)}</span></div>
+    <div><span class="label">技能:</span> <span class="value">${displayName(data.skill)}</span> <span class="label" style="font-size:0.7rem">(${displayDamageClass(data.skill.damage_class)} · ${skillNameEl})</span>${stabBadge}</div>
     <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
     <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
     <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
@@ -4446,22 +4521,22 @@ function renderWaiting() {
     if (dmgEl) dmgEl.textContent = '—';
     // Info 文案：覆盖默认"选择双方精灵开始计算"
     const infoEl = document.getElementById('result-info');
-    if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">提交答案后计算结果</div>`;
+    if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">${t('waiting.submitFirst')}</div>`;
     // Hide breakdown
     const breakdownSection = document.getElementById('breakdown-section');
     if (breakdownSection) breakdownSection.classList.add('is-hidden');
     const breakdownContent = document.getElementById('breakdown-content');
     if (breakdownContent) breakdownContent.classList.remove('open');
     updateAtmosphere(0, false);
-    updateMobileResultBar({ _waitingMsg: '提交答案后计算结果' });
+    updateMobileResultBar({ _waitingMsg: t('waiting.submitFirst') });
     return;
   }
 
   // 普通模式（不在挑战答题中）的提示语
-  let msg = '选择双方精灵开始计算';
-  if (state.attacker && !state.defender) msg = '选择防御方精灵';
-  if (!state.attacker && state.defender) msg = '选择攻击方精灵';
-  if (state.attacker && state.defender && !state.attackSkill) msg = '该攻击方无可用攻击技能';
+  let msg = t('waiting.pickBoth');
+  if (state.attacker && !state.defender) msg = t('waiting.pickDefender');
+  if (!state.attacker && state.defender) msg = t('waiting.pickAttacker');
+  if (state.attacker && state.defender && !state.attackSkill) msg = t('waiting.noAttackSkills');
 
   // Reset ring
   const ringFill = document.getElementById('result-ring-fill');
@@ -5018,7 +5093,7 @@ function enterChallengeMode() {
     btn.classList.add('is-active');
     btn.setAttribute('aria-pressed', 'true');
   }
-  if (text) text.textContent = '退出挑战';
+  if (text) text.textContent = t('challenge.exit');
   // 现在没有icon了
   if (icon) icon.textContent = '✕';
 
@@ -5107,7 +5182,7 @@ function exitChallengeMode() {
     btn.classList.remove('is-active');
     btn.setAttribute('aria-pressed', 'false');
   }
-  if (text) text.textContent = '挑战模式';
+  if (text) text.textContent = t('challenge.toggle');
   if (icon) icon.textContent = '⚔';
 
   // 逐对 label 做反向过渡（与 setup 淡出并行）
@@ -5674,7 +5749,11 @@ function renderChallengeProgress() {
   const el = document.getElementById('challenge-progress-info');
   if (!el) return;
   const c = state.challenge;
-  el.textContent = `第 ${c.current + 1} / ${c.total} 题 · 累计 ${c.totalScore} 分`;
+  el.textContent = t('challenge.progress', {
+    current: c.current + 1,
+    total: c.total,
+    score: c.totalScore
+  });
 }
 
 // 渲染提交/下一道题/查看结果按钮文案 + 启用状态。
@@ -5685,15 +5764,15 @@ function renderSubmitButton() {
   const isLast = c.current >= c.total - 1;
   btn.classList.remove('is-next');
   if (c.phase === 'picking') {
-    btn.textContent = '提交答案';
+    btn.textContent = t('challenge.submit');
     btn.disabled = false;
   } else if (c.phase === 'answered') {
-    btn.textContent = isLast ? '查看结果' : '下一道题';
+    btn.textContent = isLast ? t('challenge.viewResults') : t('challenge.next');
     btn.disabled = false;
     btn.classList.add('is-next');
   } else {
     // 'idle' / 'done'
-    btn.textContent = '提交答案';
+    btn.textContent = t('challenge.submit');
     btn.disabled = true;
   }
 }
@@ -5705,7 +5784,7 @@ function renderSubmitButton() {
 function renderChallengeResult() {
   const c = state.challenge;
   const info = document.getElementById('challenge-progress-info');
-  if (info) info.textContent = `挑战完成 · 总分 ${c.totalScore} / ${c.total * 100}`;
+  if (info) info.textContent = t('challenge.done', { score: c.totalScore, max: c.total * 100 });
   // 提交按钮淡出（220ms），不直接 display:none 避免突兀。
   const btn = document.getElementById('challenge-submit-btn');
   if (btn) {
@@ -5784,7 +5863,7 @@ function applyQuestion(index) {
     state.attackSkill    = { id: q.attackSkillId, ...customSk };
     state.attackSkillIdx = CUSTOM_SKILL_IDX;
     state.customSkillResolved.attacker = state.attackSkill;
-    state.customSkillInput.attacker    = customSk.name;
+    state.customSkillInput.attacker    = displayName(customSk);
     state.customSkillPrevSkill.attacker = null;
   } else {
     // 题目的 id 在新精灵里不可用 → 用 opts[0] 兜底
@@ -5809,11 +5888,11 @@ function applyQuestion(index) {
     state.defenseSkill    = { id: q.defenseSkillId, ...customSk };
     state.defenseSkillIdx = CUSTOM_SKILL_IDX;
     state.customSkillResolved.defender = state.defenseSkill;
-    state.customSkillInput.defender    = customSk.name;
+    state.customSkillInput.defender    = displayName(customSk);
     state.customSkillPrevSkill.defender = null;
   } else {
     state.defenseSkillIdx = 0;
-    state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', reduction: 1, _pseudo: true };
+    state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', name_en: 'None', reduction: 1, _pseudo: true };
     state.customSkillResolved.defender = null;
     state.customSkillInput.defender    = '';
     state.customSkillPrevSkill.defender = { idx: 0, skill: state.defenseSkill };
@@ -6127,7 +6206,7 @@ function exitChallenge() {
     toggleBtn.setAttribute('aria-pressed', 'false');
     const text = toggleBtn.querySelector('.challenge-toggle-text');
     const icon = toggleBtn.querySelector('.challenge-toggle-icon');
-    if (text) text.textContent = '挑战模式';
+    if (text) text.textContent = t('challenge.toggle');
     if (icon) icon.textContent = '⚔';
   }
   // 4. body 退出 running（同时清理可能残留的 challenge-mode）—— 已移至
@@ -6171,9 +6250,9 @@ function startChallenge() {
         const title = document.getElementById('modal-title');
         const body = document.getElementById('modal-body');
         if (modal && title && body) {
-          title.textContent = '无法开始挑战';
-          const whichSide = side === 'attacker' ? '攻击方' : '防御方';
-          body.innerHTML = `<div style="line-height:1.7">「固定」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 收藏」池。</div>`;
+          title.textContent = t('challenge.cannotStart');
+          const whichSide = t(side === 'attacker' ? 'side.attacker' : 'side.defender');
+          body.innerHTML = `<div style="line-height:1.7">${t('challenge.fixedNeedsSpirit', { side: whichSide })}</div>`;
           modal.classList.add('is-open');
           modal.setAttribute('aria-hidden', 'false');
         }
@@ -6508,7 +6587,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadData();
   } catch (e) {
     const info = document.getElementById('result-info');
-    if (info) info.innerHTML = '<div class="result-waiting-mini" style="color:#ff3b3b;max-width:260px;line-height:1.5">数据加载失败: ' + (e.message || e) + '<br><br>若用 file:// 打开，请先执行 <code>python build.py</code> 生成 calculator.built.html。</div>';
+    if (info) info.innerHTML = `<div class="result-waiting-mini" style="color:#ff3b3b;max-width:260px;line-height:1.5">${t('load.error', { msg: e.message || String(e) })}</div>`;
     return;
   }
   buildSkillIndices();

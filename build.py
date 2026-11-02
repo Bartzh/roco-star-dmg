@@ -68,7 +68,7 @@ def main():
         f.write(out_html)
 
     # 复制到 dist 目录（GitHub Pages 镜像部署）
-    for seo_file in ('calculator.html', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'styles.css', 'calculator.js'):
+    for seo_file in ('calculator.html', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'styles.css', 'i18n.js', 'calculator.js'):
         src = os.path.join(ROOT, seo_file)
         if os.path.exists(src):
             shutil.copy2(src, os.path.join(ROOT, 'dist', 'index.html' if seo_file == 'calculator.html' else seo_file))
