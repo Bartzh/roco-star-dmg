@@ -1,4 +1,3 @@
-import os
 import lupa
 import json
 
@@ -6,6 +5,7 @@ FILES = [
     'core',
     'learnset_catalog',
     'skill_catalog',
+    'rocopedia_links',
 ]
 
 SRC_DIR = 'datas/src'

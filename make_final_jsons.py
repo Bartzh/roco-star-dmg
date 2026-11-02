@@ -2,6 +2,7 @@ import json
 import re
 
 from pypinyin import Style, lazy_pinyin
+import urllib.parse
 from dataclasses import dataclass, field, asdict
 from typing import Literal, Optional
 
@@ -15,6 +16,17 @@ with open('datas/intermediate/pet_illustration_urls.json', 'r', encoding='utf-8'
     pet_illustration_urls = json.load(f)
 with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f:
     skill_icon_urls = json.load(f)
+with open('datas/intermediate/rocopedia/jinies_en.json', 'r', encoding='utf-8') as f:
+    jinies_en = json.load(f)
+jinies_en_dict = {pet['gameId']: pet for pet in jinies_en['game']['pets']}
+with open('datas/intermediate/rocopedia/skills_en.json', 'r', encoding='utf-8') as f:
+    skills_en = json.load(f)
+skills_en_dict = {skill['gameId']: skill for skill in skills_en['game']['skills']}
+with open('datas/intermediate/rocopedia/traits_en.json', 'r', encoding='utf-8') as f:
+    traits_en = json.load(f)
+traits_en_dict = {trait['slug']: trait for trait in traits_en}
+with open('datas/intermediate/rocopedia_links.json', 'r', encoding='utf-8') as f:
+    rocopedia_links = json.load(f)
 
 
 # ============================================================
@@ -177,6 +189,11 @@ for pet_id, pet_info in core.items():
     }
     if il_url := pet_illustration_urls.get(name):
         sprites[name]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
+    if pet_en := jinies_en_dict.get(pet_info['game_id']):
+        splited_title = pet_en['title'].split('/', 1)
+        sprites[name]['name_en'] = splited_title[0]
+        if len(splited_title) > 1:
+            sprites[name]['name_en'] += ' (' + splited_title[1] + ')'
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
 # 排除剩下的一些精灵
@@ -206,8 +223,6 @@ sprites['拼图'] = {
 }
 
 for skill_id, skill_info in skill_catalog.items():
-    skill_info.pop('game_id', None)
-    skill_info.pop('icon', None)
     # 技能的 key 与 id 都用最终名（重名时已加数字后缀），更便于使用。
     skill_info['id'] = id_to_final_name[skill_id]
     if skill_info['category'] == '防御':
@@ -230,6 +245,23 @@ for skill_id, skill_info in skill_catalog.items():
                 print('no combo:', skill_info['name'])
     if icon_url := skill_icon_urls.get(skill_info['name']):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
+    if skill_info['category'] == '特性':
+        if link := rocopedia_links.get(skill_info['name']):
+            # 由于traits_en里也有部分符号被编码，所以不能用unquote全部解码
+            # 目前有 & 和 ' 被编码了
+            # slug = urllib.parse.unquote(link[0]['path'])
+            slug = link[0]['path'].replace('%28', '(').replace('%29', ')').replace('%21', '!')
+            if trait_en := traits_en_dict.get(slug):
+                skill_info['name_en'] = trait_en['name']
+                skill_info['desc_en'] = trait_en['effect']
+            else:
+                print(f'有link但没找到对应的trait_en：{slug}')
+    else:
+        if skill_en := skills_en_dict.get(skill_info['game_id']):
+            skill_info['name_en'] = skill_en['displayName']
+            skill_info['desc_en'] = skill_en['displayDescription']
+    skill_info.pop('game_id', None)
+    skill_info.pop('icon', None)
 # 以技能最终名作为 key（重名时已加数字后缀以保证唯一）
 skill_catalog = {skill_info['id']: skill_info for skill_info in skill_catalog.values()}
 
