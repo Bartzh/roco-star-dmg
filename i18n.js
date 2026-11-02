@@ -348,11 +348,11 @@
 
       /* ---- Stats / nature / IV ---- */
       'stat.hp': `HP`,
-      'stat.atk': `Attack`,
-      'stat.matk': `Magic Attack`,
-      'stat.def': `Defense`,
-      'stat.mdef': `Magic Defense`,
-      'stat.spd': `Speed`,
+      'stat.atk': `ATK`,
+      'stat.matk': `MATK`,
+      'stat.def': `DEF`,
+      'stat.mdef': `MDEF`,
+      'stat.spd': `SPD`,
       'stat.nature.title': `Nature: {state}`,
       'stat.nature.aria': `{stat} nature: {state} (click to toggle)`,
       'nature.up': `boosted`,
@@ -411,11 +411,11 @@
       'load.error': `Failed to load data: {msg}<br><br>If you opened this file via <code>file://</code>, run <code>python build.py</code> first to generate <code>calculator.built.html</code>.`,
 
       /* ---- Buff chips / mod icon ---- */
-      'buffLabel.atk': `Attack`,
-      'buffLabel.matk': `Magic Attack`,
-      'buffLabel.def': `Defense`,
-      'buffLabel.mdef': `Magic Defense`,
-      'buffLabel.speed': `Speed`,
+      'buffLabel.atk': `ATK`,
+      'buffLabel.matk': `MATK`,
+      'buffLabel.def': `DEF`,
+      'buffLabel.mdef': `MDEF`,
+      'buffLabel.speed': `SPD`,
       'buffLabel.power': `Power`,
       'buffLabel.combo': `Combo`,
       'buff.adjust.aria': `{label} adjustment (current {value}; drag or scroll to change / Shift+scroll for fine steps / double-click to reset)`,
