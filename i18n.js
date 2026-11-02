@@ -186,8 +186,12 @@
       'badge.atk': `物攻`,
       'badge.matk': `魔攻`,
       'badge.auto': `自适应`,
+      'badge.atkShort': `物攻`,
+      'badge.matkShort': `魔攻`,
+      'badge.autoShort': `自适应`,
       'badge.power': `威力 {power}`,
       'badge.reduction': `减伤 {pct}%`,
+      'badge.reductionTitle': `减伤 {pct}%`,
 
       /* ---- Result chips / waiting / errors ---- */
       'result.super': `克制`,
@@ -390,8 +394,12 @@
       'badge.atk': `Physical`,
       'badge.matk': `Magic`,
       'badge.auto': `Adaptive`,
+      'badge.atkShort': `PHYS`,
+      'badge.matkShort': `MAG`,
+      'badge.autoShort': `ADP`,
       'badge.power': `Power {power}`,
-      'badge.reduction': `Reduction {pct}%`,
+      'badge.reduction': `-{pct}%`,
+      'badge.reductionTitle': `Damage reduction {pct}%`,
 
       /* ---- Result chips / waiting / errors ---- */
       'result.super': `Super effective`,

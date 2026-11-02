@@ -2999,32 +2999,65 @@ function refreshAllModIcons() {
   renderModIcons('defender');
 }
 
-// Build the badge row (物攻/魔攻 + 威力 * 减伤) — multiple badges
+// Build the badge row (伤害类型 + 威力，或减伤) — 单行显示
 // `powerClass` optionally adds 'super-effective' / 'not-effective' to the power badge
 function renderInlineBadge(sk, powerClass = '') {
   if (sk._pseudo) return '';
   const badges = [];
-  if (sk.damage_class === '物攻') {
-    badges.push(`<span class="skill-badge atk">${t('badge.atk')}</span>`);
-  } else if (sk.damage_class === '魔攻') {
-    badges.push(`<span class="skill-badge matk">${t('badge.matk')}</span>`);
-  } else if (sk.damage_class === '自适应') {
-    // 愿力冲击：伤害类型由精灵当前最终物攻/魔攻中较高者决定
-    badges.push(`<span class="skill-badge auto">${t('badge.auto')}</span>`);
-  }
   if (sk.damage_class) {
-    // attack skill: show power
-    const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
+    // 伤害类型与威力合并成一枚徽章（中英文同一套渲染逻辑）：
+    //   zh: 物攻 100 / 魔攻 100 / 自适应 100
+    //   en: PHYS 100 / MAG 100 / ADP 100
+    // 合并后宽度足够放进技能卡右侧文本列，不会再压到左侧 48px icon。
+    const dcKey = sk.damage_class === '物攻' ? 'atk'
+                : sk.damage_class === '魔攻' ? 'matk'
+                : sk.damage_class === '自适应' ? 'auto'
+                : '';
     const comboSuffix = sk.combo != null ? `x${sk.combo}` : '';
-    badges.push(`<span class="${cls}">${t('badge.power', { power: `${sk.power}${comboSuffix}` })}</span>`);
+    const powerValue = `${sk.power}${comboSuffix}`;
+    const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
+    const label = dcKey
+      ? `${t(`badge.${dcKey}Short`)} ${powerValue}`
+      : t('badge.power', { power: powerValue });
+    const title = dcKey
+      ? `${t(`badge.${dcKey}`)} · ${t('badge.power', { power: powerValue })}`
+      : label;
+    badges.push(`<span class="${cls}" title="${escapeAttr(title)}">${label}</span>`);
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
     const pct = Math.round((1 - (sk.reduction ?? 0)) * 100);
-    badges.push(`<span class="skill-badge reduction">${t('badge.reduction', { pct })}</span>`);
+    badges.push(
+      `<span class="skill-badge reduction" title="${escapeAttr(t('badge.reductionTitle', { pct }))}">${t('badge.reduction', { pct })}</span>`
+    );
   }
   return badges.join('');
 }
+
+// 技能名自动缩字：.skill-name 在 CSS 中限制为最多两行。
+// 两行仍放不下（极长英文名 / 窄屏）时逐级缩小字号，最低 10.5px
+// （保证 375px 屏的 "Super Acceleration" 这类长单词也能完整放进两行）；
+// 仍未放下则由 -webkit-line-clamp 显示省略号。
+const SKILL_NAME_MIN_FONT = 10.5;
+function fitSkillNamesIn(scope) {
+  if (!scope) return;
+  scope.querySelectorAll('.skill-name').forEach(el => {
+    if (!el.clientWidth || !el.clientHeight) return;   // 隐藏状态不测量
+    el.style.fontSize = '';
+    const maxSize = parseFloat(getComputedStyle(el).fontSize);
+    let size = maxSize;
+    while (el.scrollHeight > el.clientHeight + 1 && size > SKILL_NAME_MIN_FONT) {
+      size = Math.max(SKILL_NAME_MIN_FONT, size - 0.5);
+      el.style.fontSize = `${size}px`;
+    }
+  });
+}
+
+// 面板宽度随断点/布局变化时重新适配。.skill-list-inner 在 renderSkills
+// 中复用，重复 observe 同一元素是幂等的，不会产生重复回调。
+const _skillNameRO = typeof ResizeObserver === 'function'
+  ? new ResizeObserver(entries => entries.forEach(entry => fitSkillNamesIn(entry.target)))
+  : null;
 
 function renderSkills(side) {
   // .skill-list 是外层（高度对齐 + 宽度补偿），实际 grid 在
@@ -3060,12 +3093,14 @@ function renderSkills(side) {
                 onclick="selectAttackSkill(${idx})">
           <div class="skill-icon"${displayDesc(sk) ? ` title="${escapeAttr(displayDesc(sk))}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
-            <span class="skill-name">${displayName(sk)}</span>
+            <span class="skill-name" title="${escapeAttr(displayName(sk))}">${displayName(sk)}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk, powerClass)}</div>
           </div>
         </button>
       `;
     }).join('') + _buildCustomSkillSlotHTML('attacker');
+    fitSkillNamesIn(inner);
+    if (_skillNameRO) _skillNameRO.observe(inner);
   } else {
     const list = document.getElementById('defender-skill-list');
     const inner = _inner(list);
@@ -3082,12 +3117,14 @@ function renderSkills(side) {
                 onclick="selectDefenseSkill(${idx})">
           <div class="skill-icon"${displayDesc(sk) ? ` title="${escapeAttr(displayDesc(sk))}"` : ''}>${iconHTML}</div>
           <div class="skill-content">
-            <span class="skill-name">${isNone ? t('skills.none') : displayName(sk)}</span>
+            <span class="skill-name" title="${escapeAttr(isNone ? t('skills.none') : displayName(sk))}">${isNone ? t('skills.none') : displayName(sk)}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
           </div>
         </button>
       `;
     }).join('') + _buildCustomSkillSlotHTML('defender');
+    fitSkillNamesIn(inner);
+    if (_skillNameRO) _skillNameRO.observe(inner);
   }
 }
 

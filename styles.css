@@ -914,20 +914,29 @@ textarea::placeholder {
   display: block;
 }
 
-/* Right side: name (top, right-aligned) + badges row (bottom) */
+/* Right side: name (top, right-aligned) + badges row (bottom)
+   名称最多两行、徽章强制单行：英文名称通常比中文长很多，
+   两行 + 单行徽章正好放进 .skill-btn 现有高度（66px / 54px），
+   卡片高度不变；徽章超宽时由 .skill-badge 自己省略，不允许压到左侧 icon。 */
 .skill-content {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  align-items: flex-end;
+  gap: 2px;
+  /* stretch 让名称/徽章都占满文本列，名称换行和 badge max-width 才能生效 */
+  align-items: stretch;
 }
 .skill-name {
   font-weight: 600;
   font-size: 0.92rem;
-  white-space: nowrap;
+  /* -webkit-box + line-clamp: 最多两行，第三行起省略 */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  line-height: 1.1;
   text-align: right;
   max-width: 100%;
   letter-spacing: 0.3px;
@@ -937,6 +946,10 @@ textarea::placeholder {
   gap: 4px;
   flex-shrink: 0;
   align-items: center;
+  justify-content: flex-end;
+  /* 单行显示，不换行；宽度受 align-items: stretch 约束 */
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .skill-badge {
   display: inline-block;
@@ -947,12 +960,13 @@ textarea::placeholder {
   background: rgba(255,255,255,0.06);
   color: var(--text-secondary);
   white-space: nowrap;
-  line-height: 1.4;
+  line-height: 1.3;
   letter-spacing: 0.2px;
+  /* 兜底：文案再长也只在本列内省略，不会向左盖住 icon */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.skill-badge.atk     { color: #ff8c00; }
-.skill-badge.matk    { color: #aa66ff; }
-.skill-badge.auto    { color: #ffd700; }   /* 愿力冲击：自适应 */
 .skill-badge.power   { color: var(--accent-cyan); }
 .skill-badge.power.super-effective {
   color: var(--accent-green);
@@ -969,6 +983,11 @@ textarea::placeholder {
   text-shadow: 0 0 10px rgba(255, 37, 37, 0.55);
 }
 .skill-badge.reduction { color: #00e676; }
+
+/* 英文名称更长：字号略降 + 去掉 letter-spacing，两行内尽量不触发省略。
+   徽章已合并为单枚短文案（PHYS 100 等），无需再压缩字号。 */
+html[lang="en"] .skill-name { font-size: 0.86rem; letter-spacing: 0; }
+html[lang="en"] .custom-skill-input { font-size: 0.86rem; letter-spacing: 0; }
 
 /* ============ Custom skill slot (固定附加在技能列表末尾) ============
  * .custom-skill-slot 是 .skill-btn 的变体：<div> 而非 <button>（因为
@@ -2226,6 +2245,9 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     min-height: 54px;
     padding: 0 8px;
     gap: 10px;
+    /* 移动端 icon 缩到 40px，列宽同步收缩：否则 48px 列 + 40px icon
+       会空出 8px，右侧文本列白白少 8px（英文名称/徽章更不够用）。 */
+    grid-template-columns: 40px 1fr;
   }
   .skill-icon {
     width: 40px;
