@@ -2672,7 +2672,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   /* 默认缩小 + 透明：关闭时与遮罩同步反向过渡回此状态 */
   transform: scale(0.95);
   opacity: 0;
-  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1.2);
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .modal-overlay.is-open .modal-card {
   transform: scale(1);
