@@ -914,17 +914,23 @@ textarea::placeholder {
   display: block;
 }
 
-/* Right side: name (top, right-aligned) + badges row (bottom)
+/* Right side: name (vertically centered) + badges row (pinned to card bottom)
    名称最多两行、徽章强制单行：英文名称通常比中文长很多，
    两行 + 单行徽章正好放进 .skill-btn 现有高度（66px / 54px），
-   卡片高度不变；徽章超宽时由 .skill-badge 自己省略，不允许压到左侧 icon。 */
+   卡片高度不变；徽章超宽时由 .skill-badge 自己省略，不允许压到左侧 icon。
+   布局用 grid 两行（1fr + auto）：名称在剩余空间里垂直居中，徽章行始终
+   贴住卡片底部，因此名称 1 行 / 2 行时徽章的垂直位置保持一致，不会上下跳动。 */
 .skill-content {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  /* stretch 让名称/徽章都占满文本列，名称换行和 badge max-width 才能生效 */
-  align-items: stretch;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  row-gap: 2px;
+  /* stretch 让名称/徽章都占满文本列，名称换行和 badge max-width 才能生效；
+     align-items: center 让名称在 1fr 行内垂直居中（自定义技能槽输入框同理） */
+  align-items: center;
+  /* 父级 .skill-btn 的 align-items: center 会把内容块收缩到自身高度，
+     这里必须撑满卡片内容高度，徽章行才能贴到卡片底部 */
+  align-self: stretch;
 }
 .skill-name {
   font-weight: 600;
@@ -2248,6 +2254,13 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
     /* 移动端 icon 缩到 40px，列宽同步收缩：否则 48px 列 + 40px icon
        会空出 8px，右侧文本列白白少 8px（英文名称/徽章更不够用）。 */
     grid-template-columns: 40px 1fr;
+  }
+  /* 移动端卡片上下没有 padding（为了把 54px 高度留给 40px icon + 两行名称），
+     内容列在桌面上由 .skill-btn 的 padding 撑出上下留白，这里会直接贴边。
+     补 3px 底部内边距，让贴底的徽章不紧挨着卡片底边；
+     两行中文名称（约 49px）仍能放进 52.5px 的内容高度，不会把卡片撑高。 */
+  .skill-content {
+    padding-bottom: 3px;
   }
   .skill-icon {
     width: 40px;
