@@ -4169,12 +4169,13 @@ function computeFinalDamage(ctx) {
 function calculateDamage() {
   if (!state.attacker || !state.defender || !state.attackSkill) {
     renderWaiting();
+    updateLethalReadout(null, 0);
     refreshAllModIcons();
     return;
   }
   // 构造 ctx 并调纯计算函数。挑战模式下，state 可能反映"上一题提交时的快照"，
   // 但 state.starLayer 仍随用户拖滑块实时变化，因此正常计算路径无需特殊处理。
-  const data = computeFinalDamage({
+  const ctx = {
     attacker: state.attacker,
     defender: state.defender,
     attackSkill: state.attackSkill,
@@ -4190,10 +4191,56 @@ function calculateDamage() {
     attackerPowerBoost: state.attackerPowerBoost,
     attackerCombo: state.attackerCombo,
     starLayer: state.starLayer,
-  });
+  };
+  const data = computeFinalDamage(ctx);
   renderResult(data);
   updateAtmosphere(data.hpPercent, data.isKill);
   refreshAllModIcons();
+  updateLethalReadout(ctx, data.defHP);
+}
+
+// 星陨滑条下方的最少致死层数读数：复用挑战模式的 findMinKillLayer，
+// 展示当前对位/配置下刚好击杀防御方所需的最少星陨层数。
+// 挑战模式下隐藏（并跳过计算），避免把答题答案直接摆在滑条下方。
+function updateLethalReadout(ctx, defHP) {
+  const el = document.getElementById('seal-lethal-label');
+  if (!el) return;
+  const c = state.challenge;
+  if (!ctx || c.active || c.running) {
+    el.hidden = true;
+    return;
+  }
+  const lethal = findMinKillLayer(ctx, { defHP });
+  el.textContent = lethal;
+  el.style.left = computeLethalLabelLeft(lethal);
+  el.hidden = false;
+}
+
+// 读数水平位置：默认按层数在滑条上的比例对齐（与 0/50/99 同一规则），
+// 若与固定刻度标签重叠，则向远离该刻度的方向让开，保证四个数字都可读。
+// .seal-slider-container 宽 200px，故 1 层 ≈ 2.02px。
+function computeLethalLabelLeft(lethal) {
+  const ROW_W = 200;
+  const GAP = 4;                          // 让位后与固定刻度的最小间距
+  const rowPx = (v) => (v / 99) * ROW_W;
+  const halfPx = lethal >= 10 ? 6 : 3;    // 两位 / 一位数字的半宽（0.65rem 字号）
+  const anchors = [
+    { value: 0,  half: 3 },               // "0"
+    { value: 50, half: 6 },               // "50"
+    { value: 99, half: 6 },               // "99"
+  ];
+  let center = rowPx(lethal);
+  for (const a of anchors) {
+    // 数值与刻度相同时字形完全重合，无需让位
+    if (lethal === a.value) continue;
+    const aCenter = rowPx(a.value);
+    const need = halfPx + a.half + GAP;
+    const delta = center - aCenter;
+    if (Math.abs(delta) < need) {
+      center = aCenter + (delta >= 0 ? need : -need);
+    }
+  }
+  return `${(center / ROW_W) * 100}%`;
 }
 
 // ============================================================

@@ -1228,6 +1228,17 @@ html[lang="en"] .custom-skill-input { font-size: 0.86rem; letter-spacing: 0; }
 .slider-labels span:nth-child(2) { left: 50.505%; }
 .slider-labels span:nth-child(3) { left: 100%; }
 
+/* 星陨滑条下方的最少致死层数读数（第 4 个刻度标签）：
+   与 0 / 50 / 99 同款字号与绝对定位，left 由 JS 按层数在滑条上的位置计算；
+   用 text-primary 与固定刻度区分。挑战模式下不显示，避免提前暴露答案。 */
+.slider-labels .slider-lethal-label {
+  color: var(--text-primary);
+}
+body.challenge-mode .slider-lethal-label,
+body.challenge-running .slider-lethal-label {
+  display: none;
+}
+
 /* Bonus display */
 .seal-bonus {
   font-size: 0.85rem;
