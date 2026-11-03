@@ -479,7 +479,7 @@
       'result.ignoreResist': `Ignores resistance`,
       'result.ignoreResist.title': `Original resistance ×{eff} ignored by Swarm Strike · Counter`,
       'result.dmgLine': `Skill <strong>{skill}</strong> · Starfall <strong class="star-val">{star}</strong>`,
-      'waiting.pickBoth': `Select both Jinies to start calculating`,
+      'waiting.pickBoth': `Select both Jinies to start`,
       'waiting.pickAttacker': `Select an attacker Jinie`,
       'waiting.pickDefender': `Select a defender Jinie`,
       'waiting.noAttackSkills': `This attacker has no attacking skills`,
