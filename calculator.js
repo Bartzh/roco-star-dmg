@@ -4743,6 +4743,16 @@ const MODAL_CONTENT_ZH = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>国际化支持 <span class="modal-date">· 2026-11-03</span></h3>
+      <ul>
+        <li>新增英文界面，可在页脚「中文 · English」处切换。</li>
+        <li>新增英文静态页：<a href="https://stardmg.top/en/" target="_blank" rel="noopener noreferrer">stardmg.top/en/</a>，并补充 hreflang 与 sitemap。</li>
+        <li>伤害明细、修正说明、数据管理弹窗、使用说明与更新公告均已支持英文。</li>
+        <li>精灵、技能和系别名称优先显示英文，缺少翻译时自动回退中文。</li>
+        <li>新增星陨斩杀线层数提示，显示在星陨滑条下方。</li>
+        <li>优化伤害圆环颜色，现在为真正的渐变色，而非之前的固定四个颜色。</li>
+      </ul>
+      <hr>
       <h3>特别适配提示 <span class="modal-date">· 2026-08-11</span></h3>
       <ul>
         <li>对于特别适配的特性和技能，如离心舞者的「和弦共振」，现在会在精灵面板顶部出现图标以提示其存在。</li>
@@ -4896,6 +4906,16 @@ const MODAL_CONTENT_EN = {
   announcement: {
     title: 'Update Announcement',
     html: `
+      <h3>English Support <span class="modal-date">· 2026-11-03</span></h3>
+      <ul>
+        <li>Added an English UI. Switch languages via the footer links "中文 · English".</li>
+        <li>Added a static English page at <a href="https://stardmg.top/en/" target="_blank" rel="noopener noreferrer">stardmg.top/en/</a>, with hreflang and sitemap entries.</li>
+        <li>Damage breakdown, modifier notes, data-management dialogs, How to Use and Update Announcement are now localized.</li>
+        <li>Jinie, skill and class names use English data when available and fall back to Chinese when missing.</li>
+        <li>Added a Starfall kill-threshold layer hint, displayed below the Starfall slider.</li>
+        <li>Improved the damage ring colors: it is now a true gradient instead of the previous four fixed colors.</li>
+      </ul>
+      <hr>
       <h3>Special Support Notes <span class="modal-date">· 2026-08-11</span></h3>
       <ul>
         <li>Specially supported traits and skills, such as Centrina's "Chord Resonance", now show an icon at the top of the Jinie panel to indicate their presence.</li>
