@@ -48,7 +48,7 @@
       'nav.guide': `使用说明`,
       'nav.data': `数据管理`,
       'nav.announcement': `更新公告`,
-      'lang.switch': `EN`,
+      'lang.aria': `语言`,
 
       /* ---- Challenge bar / setup ---- */
       'challenge.aria': `挑战模式`,
@@ -324,7 +324,7 @@
       'nav.guide': `How to Use`,
       'nav.data': `Data Management`,
       'nav.announcement': `Updates`,
-      'lang.switch': `中文`,
+      'lang.aria': `Language`,
 
       /* ---- Challenge bar / setup ---- */
       'challenge.aria': `Challenge Mode`,
@@ -673,16 +673,23 @@
     window.location.href = url.toString();
   }
 
-  function bindLangToggle() {
-    const btn = document.getElementById('lang-toggle');
-    if (!btn || btn.__i18nBound) return;
-    btn.__i18nBound = true;
-    btn.addEventListener('click', () => switchLocale(isEn() ? DEFAULT_LOCALE : 'en'));
+  function bindLocaleLinks() {
+    document.querySelectorAll('[data-locale]').forEach(link => {
+      if (link.__i18nBound) return;
+      link.__i18nBound = true;
+
+      link.addEventListener('click', (event) => {
+        // 保留 Ctrl/Cmd/Shift/中键的默认行为（新标签页打开等）。
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+        event.preventDefault();
+        switchLocale(link.dataset.locale);
+      });
+    });
   }
 
   function boot() {
     applyI18n();
-    bindLangToggle();
+    bindLocaleLinks();
   }
 
   window.I18N = {
