@@ -4204,13 +4204,27 @@ const RESULT_RING_CIRC = 2 * Math.PI * 80;
 
 // Ring now visualises DAMAGE taken (more intuitive):
 // 0% damage = empty ring, 100% damage (kill) = full red ring.
+// Colour anchors keep the old quarter-step hues, but every recalculation
+// interpolates between them so the ring warms up continuously
+// (green → yellow → orange → red) instead of snapping at 25/50/75%.
+const RING_COLOR_STOPS = [
+  { at: 0,   rgb: [0, 230, 118] },    // #00e676 — safe
+  { at: 45,  rgb: [255, 204, 0] },    // #ffcc00 — moderate
+  { at: 64,  rgb: [255, 140, 0] },    // #ff8c00 — heavy
+  { at: 88,  rgb: [255, 59, 59] },    // #ff3b3b — critical
+  { at: 100, rgb: [255, 0, 0] },      // #ff0000 — kill
+];
+
 function ringBarColor(data) {
-  if (data.isKill) return '#ff3b3b';
-  const d = data.hpPercent;
-  if (d < 25) return '#00e676';   // low damage — safe
-  if (d < 50) return '#ffcc00';   // moderate
-  if (d < 75) return '#ff8c00';   // heavy
-  return '#ff3b3b';               // critical (≥75% or kill)
+  // Clamped to [0, 100]%; a kill (damage ≥ 100%) lands on the red stop.
+  const pct = Math.max(0, Math.min(data.hpPercent, 100));
+  let i = 1;
+  while (i < RING_COLOR_STOPS.length - 1 && pct > RING_COLOR_STOPS[i].at) i++;
+  const a = RING_COLOR_STOPS[i - 1];
+  const b = RING_COLOR_STOPS[i];
+  const k = (pct - a.at) / (b.at - a.at);
+  const rgb = a.rgb.map((v, idx) => Math.round(v + (b.rgb[idx] - v) * k));
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
 function renderResult(data) {
