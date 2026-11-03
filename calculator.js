@@ -4678,7 +4678,7 @@ function toggleBreakdown() {
 // ============================================================
 // 维护指南：在数组开头追加新版本，html 字段支持 h3 / ul / li / code / a / hr 等行内结构。
 // 修改后无需改 HTML：所有渲染都由 initInfoModal() 注入。
-const MODAL_CONTENT = {
+const MODAL_CONTENT_ZH = {
   announcement: {
     title: '更新公告',
     html: `
@@ -4831,6 +4831,161 @@ const MODAL_CONTENT = {
   }
 };
 
+const MODAL_CONTENT_EN = {
+  announcement: {
+    title: 'Update Announcement',
+    html: `
+      <h3>Special Support Notes <span class="modal-date">· 2026-08-11</span></h3>
+      <ul>
+        <li>Specially supported traits and skills, such as Centrina's "Chord Resonance", now show an icon at the top of the Jinie panel to indicate their presence.</li>
+        <li>Improved text selection on the page, so control labels are no longer selected accidentally (especially on mobile).</li>
+        <li>Fixed inaccurate readings at the bottom of the Starfall slider.</li>
+      </ul>
+      <hr>
+      <h3>Data Management / Footer <span class="modal-date">· 2026-08-06</span></h3>
+      <ul>
+        <li>Added the Data Management modal (in the subtitle) to toggle memory and to clear, export or import data.</li>
+        <li>Added a footer with copyright information and moved the BWIKI link there.</li>
+      </ul>
+      <hr>
+      <h3>Favorites <span class="modal-date">· 2026-07-28</span></h3>
+      <ul>
+        <li>Renamed "Common" to "Favorites".</li>
+        <li>The "Favorites" filter is no longer a fixed list: use the star button next to the attacker/defender label to add or remove the current Jinie.</li>
+        <li>When the Jinie picker is open, the star button becomes a reset button that restores the default favorites list.</li>
+        <li>The "Favorites" pool in Challenge Mode now follows your own favorites list, so you can build a fully personalized question set.</li>
+      </ul>
+      <hr>
+      <h3>Custom Skill Slot <span class="modal-date">· 2026-07-25</span></h3>
+      <ul>
+        <li>The custom skill slot at the bottom of the skill list now lets a Jinie use skills it cannot normally learn, simulating "Borrow / Mind Read / Copy / Roller Coaster / Bizarre".</li>
+        <li>This feature also works with memory and Challenge Mode.</li>
+      </ul>
+      <hr>
+      <h3>Mobile Layout Improvements <span class="modal-date">· 2026-07-23</span></h3>
+      <ul>
+        <li>Improved the mobile layout: swipe left and right between the attacker, Starfall layers and defender instead of the previous vertical layout.</li>
+        <li>Damage results moved from a ring to a horizontal bar at the bottom to save space.</li>
+        <li>Various mobile detail improvements and fixes.</li>
+      </ul>
+      <hr>
+      <h3>Buff / Skill Auto Memory <span class="modal-date">· 2026-07-22</span></h3>
+      <ul>
+        <li>Following nature/IV auto memory: buffs and the selected skill are now remembered for each Jinie and restored when you select the same Jinie again.</li>
+        <li>Various visual improvements and fixes.</li>
+      </ul>
+      <hr>
+      <h3>Challenge Mode <span class="modal-date">· 2026-07-21</span></h3>
+      <ul>
+        <li><strong>Challenge Mode released</strong>: a mini-game that tests your grasp of Starfall kill thresholds and helps you remember them.</li>
+        <li>Flow: Challenge Setup → Start Challenge → random questions → drag Starfall layers → Submit Answer → score → Next Question / results.</li>
+        <li>Both Jinie pools support "Fixed / Favorites / All"; stats and skill selection support "Memory / Random"; defense skills are matched by equal damage reduction.</li>
+        <li>During answering, Jinie panels are locked (dimmed, non-clickable); only Starfall layers can be adjusted. You can exit at any time.</li>
+        <li>Added support for "Astral Scar" and "Quick Wit".</li>
+        <li>Other detail improvements and bug fixes.</li>
+      </ul>
+      <hr>
+      <h3>Nature / IV Auto Memory <span class="modal-date">· 2026-07-20</span></h3>
+      <ul>
+        <li>Nature and IV changes are now automatically saved to localStorage and restored the next time you select a Jinie.</li>
+      </ul>
+      <hr>
+      <h3>S3 Data Update <span class="modal-date">· 2026-07-16</span></h3>
+      <ul>
+        <li>Updated S3 Jinie and skill data.</li>
+        <li>Added "Centrina" and "Wingletch" to the common Jinie list.</li>
+      </ul>
+      <hr>
+      <h3>Info Modals <span class="modal-date">· 2026-07-13</span></h3>
+      <ul>
+        <li>Added the "How to Use" and "Updates" info modals (the one you are reading now).</li>
+      </ul>
+      <hr>
+      <h3>Reaction State and Trait Support <span class="modal-date">· 2026-07-08 ~ 07-10</span></h3>
+      <ul>
+        <li><strong>Reaction State released</strong>: the defender now has a "Charge" option. When active, <strong>all Reaction State skills</strong> change their power or combo count according to their own rules, covering Iron Caltrop, Maelstrom, Pursuit, Scorching Wave, Swarm Strike, Blitz, Stealth Strike, Burst Charge, Tactical Strike, Shadow Kick, Sneak Attack, Freestyle Punch, Flurry Claws, Snowball Roll, Searing Breath, Earth Sink, Scorch Assault and Calamity.</li>
+        <li>Added 18-class "Wishpower Strike": the damage type adapts automatically (using the Jinie's higher Attack or Magic Attack), and Power +150% during Reaction State.</li>
+        <li>The "Power" chip is now always visible for every Jinie.</li>
+        <li>Added a "Combo" chip and a separate combo row in the damage breakdown.</li>
+        <li>Added a "Speed" chip, affecting Tailwind / Void Breaker, Spread Wings, Gust, Gale Stab and Flash Strike calculations.</li>
+        <li>Gust: Power +50% when attacking first.</li>
+        <li>Flash Strike and Sand Trap now add power based on the speed gap and the Physical Defense gap respectively.</li>
+        <li>Gale Stab: becomes a 3-hit combo when attacking first.</li>
+        <li>Swiftwing family trait: Power +50% when attacking first; Snowcrown trait: Power +75% when attacking first.</li>
+        <li>Eyralon family trait: equipped Common-class skills become Wing-class; receives +25% damage when acting second.</li>
+        <li>Framorn trait: each enemy buff layer grants +10% Power to this skill.</li>
+        <li>Carnivark family trait: receives +25% damage when hit super-effectively.</li>
+        <li>Spaces in the search box are ignored, so accidental spaces no longer hide results.</li>
+        <li>Hovering over attack/defense skill icons now shows the full skill description.</li>
+        <li>Fixed several damage calculation bugs.</li>
+      </ul>
+      <hr>
+      <h3>Site Launch <span class="modal-date">· 2026-07-08</span></h3>
+      <ul>
+        <li>Initial release.</li>
+        <li>Full damage calculation, 18-class type effectiveness, combo count / damage reduction and more.</li>
+        <li>Starfall layers 0–99 with pulse animation and slider dragging.</li>
+      </ul>
+      <p style="color:var(--text-secondary);margin-top:14px">Full history and source code: <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p>
+    `
+  },
+  guide: {
+    title: 'How to Use',
+    html: `
+      <h3>Overview</h3>
+      <ul>
+        <li>This is a PvP damage calculator for <strong>Roco Kingdom: World</strong>, designed specifically for <strong>Starfall</strong>. It provides basic damage calculation, convenient Starfall layer adjustment, special support for some Jinies and skills, and a Challenge Mode to test your familiarity with Starfall kill thresholds.</li>
+        <li>The primary design goal is to stay clean and simple and avoid unnecessary complexity, so not every game mechanic is supported (and I'm too lazy to add them all, haha).</li>
+      </ul>
+
+      <h3>Basic Flow</h3>
+      <ol>
+        <li>Select an <strong>attacker</strong> and a <strong>defender</strong> Jinie (search or filter by class).</li>
+        <li>Adjust base stats, nature, IVs and other buffs.</li>
+        <li>Select an attacking skill (required) and a defending skill (optional).</li>
+        <li>Drag the central <strong>Starfall Layers</strong> slider (0–99) to see damage and remaining HP in real time.</li>
+        <li>Click "Damage Breakdown" to expand every multiplier in the full formula.</li>
+      </ol>
+
+      <h3>Special Support</h3>
+      <ul>
+        <li>Jinie traits, including the Relthor family, Centrina family, Swiftwing family, Eyralon family, Carnivark family, Framorn, Unicorn family, Tumblebug family, Puffly family, Squidle family and Duck Jiji family.</li>
+        <li>Skills that scale with Starfall layers, including Dimensional Strike and Celestial Accretion.</li>
+        <li>Attacking skills that can trigger special Reaction State effects through the defender's "Charge", including Iron Caltrop, Maelstrom, Pursuit, Scorching Wave, Swarm Strike, Blitz, Stealth Strike, Burst Charge, Tactical Strike, Shadow Kick, Sneak Attack, Freestyle Punch, Flurry Claws, Snowball Roll, Searing Breath, Earth Sink, Scorch Assault and Calamity, plus the 18-class Wishpower Strike.</li>
+        <li>Also supported: Gust, Gale Stab, Flash Strike, Sand Trap, Astral Scar and Quick Wit.</li>
+      </ul>
+
+      <h3>Challenge Mode</h3>
+      <p>A mini-game that tests your grasp of Starfall kill thresholds and helps you remember them.</p>
+      <ol>
+        <li>Click the "Challenge Mode" button at the top to enter the setup stage, where you can configure the Jinie pool, stats, skill selection and number of questions.</li>
+        <li>Click "Start Challenge" to begin. The system generates random questions based on your settings. Both Jinie panels are locked and damage calculation is paused; only Starfall layers can be adjusted. This is your answer area.</li>
+        <li>Based on the displayed Jinie states, decide how many Starfall layers the attacker needs to exactly kill the defender (damage over 100%), adjust the slider, then click "Submit Answer".</li>
+        <li>Damage is then calculated and you are scored according to the difference between your answer and the optimal answer.</li>
+        <li>Click "Next Question" to repeat from step 2 until all questions are answered.</li>
+        <li>At any stage you can click "Exit Challenge" to return to the calculator.</li>
+      </ol>
+
+      <h3>Data Source</h3>
+      <ul>
+        <li>Jinie and skill data come from <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a>.</li>
+        <li>Data updated on 2026-09-10.</li>
+      </ul>
+
+      <h3>About</h3>
+      <ul>
+        <li>Primary site: <a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
+        <li>Mirror: <a href="https://bartzh.github.io/roco-star-dmg/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></li>
+        <li>Source repository: <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">Bartzh/roco-star-dmg</a></li>
+        <li>Author's Bilibili page: <a href="https://space.bilibili.com/235905700" target="_blank" rel="noopener noreferrer">Bilibili Space</a></li>
+        <li>All code is open source under the WTFPL (Do What The Fuck You Want To Public License). Contributions and feedback are welcome.</li>
+      </ul>
+    `
+  }
+};
+
+const MODAL_CONTENT = { zh: MODAL_CONTENT_ZH, en: MODAL_CONTENT_EN };
+
 // 初始化弹窗：触发按钮、ESC、点击遮罩、底部确认按钮均可关闭。
 // 打开时锁定 body 滚动，关闭后恢复焦点到触发按钮。
 function initInfoModal() {
@@ -4846,7 +5001,7 @@ function initInfoModal() {
   let lastFocus = null;
 
   const open = (type) => {
-    const data = MODAL_CONTENT[type];
+    const data = MODAL_CONTENT[I18N.isEn() ? 'en' : 'zh'][type];
     if (!data) return;
     titleEl.textContent = data.title;
     bodyEl.innerHTML    = data.html;
