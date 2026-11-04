@@ -1705,7 +1705,7 @@ function _renderPickerOptionsHTML(side, list) {
            onclick="selectSpirit('${side}', '${id}')"
            onkeydown="onSpiritPickerOptionKey(event, '${side}', '${id}')">
         <div class="picker-image">${illus}</div>
-        <div class="picker-name">${name}</div>
+        <div class="picker-name" title="${name}">${name}</div>
         <div class="picker-types">${tagsHTML}</div>
       </div>
     `;
