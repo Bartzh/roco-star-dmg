@@ -601,6 +601,7 @@ textarea::placeholder {
 .spirit-picker-option .picker-types .type-icon {
   width: 18px;
   height: 18px;
+  padding: 0 2px;
 }
 
 /* 卡片 ↔ 选择器 切换时的过渡动画 */
@@ -902,6 +903,7 @@ textarea::placeholder {
   left: -6px;
   width: 22px;
   height: 22px;
+  padding: 0 2px;
   z-index: 2;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
   border-radius: 4px;
@@ -2389,7 +2391,7 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
 }
 .spirit-card .type-tag { font-size: 0.72rem; padding: 2px 10px; }
-.spirit-card .type-icon { width: 20px; height: 20px; }
+.spirit-card .type-icon { width: 20px; height: 20px; padding: 0 2px;}
 
 /* Stats: 5-column grid */
 .spirit-card .stats {
