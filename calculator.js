@@ -4887,7 +4887,7 @@ const MODAL_CONTENT_ZH = {
       <h3>数据来源</h3>
       <ul>
         <li>精灵与技能数据来自 <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
-        <li>数据更新于 2026-09-10。</li>
+        <li>数据更新于 2026-11-05。</li>
       </ul>
 
       <h3>关于</h3>
@@ -5050,7 +5050,7 @@ const MODAL_CONTENT_EN = {
       <h3>Data Source</h3>
       <ul>
         <li>Jinie and skill data come from <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a>.</li>
-        <li>Data updated on 2026-09-10.</li>
+        <li>Data updated on 2026-11-05.</li>
       </ul>
 
       <h3>About</h3>

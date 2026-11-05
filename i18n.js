@@ -114,7 +114,7 @@
 
       /* ---- Footer ---- */
       'footer.copyright': `© 2026 Bartzh · <a href='https://www.wtfpl.net/' target='_blank' rel='noopener noreferrer'>WTFPL</a> · <a href='https://github.com/Bartzh/roco-star-dmg' target='_blank' rel='noopener noreferrer'>开源仓库</a>`,
-      'footer.data': `精灵数据来自 <a href='https://wiki.biligame.com/nrc' target='_blank' rel='noopener noreferrer'>BWIKI</a> · 2026-09-10 同步`,
+      'footer.data': `精灵数据来自 <a href='https://wiki.biligame.com/nrc' target='_blank' rel='noopener noreferrer'>BWIKI</a> · 2026-11-05 同步`,
       'footer.license': `精灵立绘与游戏数据版权归官方及 <a href='https://wiki.biligame.com/nrc' target='_blank' rel='noopener noreferrer'>BWIKI</a> 贡献者所有`,
 
       /* ---- Modal shells ---- */
@@ -390,7 +390,7 @@
 
       /* ---- Footer ---- */
       'footer.copyright': `© 2026 Bartzh · <a href='https://www.wtfpl.net/' target='_blank' rel='noopener noreferrer'>WTFPL</a> · <a href='https://github.com/Bartzh/roco-star-dmg' target='_blank' rel='noopener noreferrer'>Source Repository</a>`,
-      'footer.data': `Jinie data from <a href='https://wiki.biligame.com/nrc' target='_blank' rel='noopener noreferrer'>BWIKI</a> · Synced 2026-09-10`,
+      'footer.data': `Jinie data from <a href='https://wiki.biligame.com/nrc' target='_blank' rel='noopener noreferrer'>BWIKI</a> · Synced 2026-11-05`,
       'footer.license': `Jinie artwork and game data are © the official game and <a href='https://wiki.biligame.com/nrc' target='_blank' rel='noopener noreferrer'>BWIKI</a> contributors.`,
 
       /* ---- Modal shells ---- */
