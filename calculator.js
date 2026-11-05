@@ -4743,6 +4743,11 @@ const MODAL_CONTENT_ZH = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>S5 数据更新 <span class="modal-date">· 2026-11-05</span></h3>
+      <ul>
+        <li>更新了 S5 的数据。</li>
+      </ul>
+      <hr>
       <h3>国际化支持 <span class="modal-date">· 2026-11-03</span></h3>
       <ul>
         <li>新增英文界面，可在页脚「中文 · English」处切换。</li>
@@ -4751,6 +4756,11 @@ const MODAL_CONTENT_ZH = {
         <li>精灵、技能和系别名称优先显示英文，缺少翻译时自动回退中文。</li>
         <li>新增星陨斩杀线层数提示，显示在星陨滑条下方。</li>
         <li>优化伤害圆环颜色，现在为真正的渐变色，而非之前的固定四个颜色。</li>
+      </ul>
+      <hr>
+      <h3>S4 数据更新 <span class="modal-date">· 2026-09-10</span></h3>
+      <ul>
+        <li>更新了 S4 的数据。</li>
       </ul>
       <hr>
       <h3>特别适配提示 <span class="modal-date">· 2026-08-11</span></h3>
@@ -4906,6 +4916,11 @@ const MODAL_CONTENT_EN = {
   announcement: {
     title: 'Update Announcement',
     html: `
+      <h3>S5 Data Update <span class="modal-date">· 2026-11-05</span></h3>
+      <ul>
+        <li>Updated S5 Jinie and skill data.</li>
+      </ul>
+      <hr>
       <h3>English Support <span class="modal-date">· 2026-11-03</span></h3>
       <ul>
         <li>Added an English UI. Switch languages via the footer links "中文 · English".</li>
@@ -4914,6 +4929,11 @@ const MODAL_CONTENT_EN = {
         <li>Jinie, skill and class names use English data when available and fall back to Chinese when missing.</li>
         <li>Added a Starfall kill-threshold layer hint, displayed below the Starfall slider.</li>
         <li>Improved the damage ring colors: it is now a true gradient instead of the previous four fixed colors.</li>
+      </ul>
+      <hr>
+      <h3>S4 Data Update <span class="modal-date">· 2026-09-10</span></h3>
+      <ul>
+        <li>Updated S4 Jinie and skill data.</li>
       </ul>
       <hr>
       <h3>Special Support Notes <span class="modal-date">· 2026-08-11</span></h3>
