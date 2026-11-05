@@ -196,8 +196,6 @@ for pet_id, pet_info in core.items():
             sprites[name]['name_en'] += ' (' + splited_title[1] + ')'
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
-# 排除剩下的一些精灵
-del sprites['幽影树（突变的样子）']
 # 按图鉴id排序
 def hb_id(item: tuple[str, dict]) -> int:
     sprite = item[1]

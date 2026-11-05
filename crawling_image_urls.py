@@ -4,10 +4,16 @@ import json
 import time
 import random
 
+crawling_core = False
+crawling_skill_catalog = False
+crawling_types = False
+crawling_s5_jinies = True
+crawling_s5_skills = True
+
 # 目标网站的 API 端点
 api_url = "https://wiki.biligame.com/nrc/api.php"
 headers = {
-    "User-Agent": "roco-star-dmg/2026.09.10 (https://stardmg.top/; https://github.com/Bartzh/roco-star-dmg; bartzh15115@foxmail.com)"
+    "User-Agent": "roco-star-dmg/2026.11.05 (https://stardmg.top/; https://github.com/Bartzh/roco-star-dmg; bartzh15115@foxmail.com)"
 }
 
 def reversed_dict(d: dict) -> dict:
@@ -78,36 +84,69 @@ def get_image_urls(file_name: str, owners_and_titles: dict[str, str], size: int 
     return urls
 
 
-
-with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
-    core = json.load(f)
-illustration_urls = get_image_urls(
-    'pet_illustration_urls',
-    {p_info['title']: f'文件:{p_info['image']['illustration']}' for p_info in core.values() if p_info.get('image')},
-    400
-)
-with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
-    json.dump(illustration_urls, f, indent=4, ensure_ascii=False)
-
-
-with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
-    skill_catalog = json.load(f)
-skill_urls = get_image_urls(
-    'skill_icon_urls',
-    {s_info['name']: f'文件:{s_info['icon']}' for s_info in skill_catalog.values() if s_info.get('icon')},
-    128
-)
-with open('datas/intermediate/skill_icon_urls.json', 'w', encoding='utf-8') as f:
-    json.dump(skill_urls, f, indent=4, ensure_ascii=False)
+if crawling_core:
+    with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
+        core = json.load(f)
+    illustration_urls = get_image_urls(
+        'pet_illustration_urls',
+        {p_info['title']: f'文件:{p_info['image']['illustration']}' for p_info in core.values() if p_info.get('image')},
+        400
+    )
+    with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
+        json.dump(illustration_urls, f, indent=4, ensure_ascii=False)
 
 
-with open('datas/final/types.json', 'r', encoding='utf-8') as f:
-    types = json.load(f)
-element_icon_urls = get_image_urls(
-    'element_icon_urls',
-    {e_id: f'文件:图标_宠物_属性_{e_id}.png' for e_id in types.keys()}
-)
-for e_id, icon_url in element_icon_urls.items():
-    types[e_id]['iconUrl'] = icon_url
-with open('datas/final/types.json', 'w', encoding='utf-8') as f:
-    json.dump(types, f, indent=4, ensure_ascii=False)
+if crawling_skill_catalog:
+    with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
+        skill_catalog = json.load(f)
+    skill_urls = get_image_urls(
+        'skill_icon_urls',
+        {s_info['name']: f'文件:{s_info['icon']}' for s_info in skill_catalog.values() if s_info.get('icon')},
+        128
+    )
+    with open('datas/intermediate/skill_icon_urls.json', 'w', encoding='utf-8') as f:
+        json.dump(skill_urls, f, indent=4, ensure_ascii=False)
+
+
+if crawling_types:
+    with open('datas/final/types.json', 'r', encoding='utf-8') as f:
+        types = json.load(f)
+    element_icon_urls = get_image_urls(
+        'element_icon_urls',
+        {e_id: f'文件:图标_宠物_属性_{e_id}.png' for e_id in types.keys()},
+        64
+    )
+    for e_id, icon_url in element_icon_urls.items():
+        types[e_id]['iconUrl'] = icon_url
+    with open('datas/final/types.json', 'w', encoding='utf-8') as f:
+        json.dump(types, f, indent=4, ensure_ascii=False)
+
+
+if crawling_s5_jinies:
+    with open('datas/intermediate/s5/jinies.json', 'r', encoding='utf-8') as f:
+        s5_jinies = json.load(f)
+    s5_jinies_urls = get_image_urls(
+        's5_jinies_urls',
+        {j_info['title']: f'文件:{j_info['image']['illustration']}' for j_info in s5_jinies.values() if j_info.get('image')},
+        400
+    )
+    with open('datas/intermediate/pet_illustration_urls.json', 'r', encoding='utf-8') as f:
+        illustration_urls = json.load(f)
+    illustration_urls.update(s5_jinies_urls)
+    with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
+        json.dump(illustration_urls, f, indent=4, ensure_ascii=False)
+
+
+if crawling_s5_skills:
+    with open('datas/intermediate/s5/skills.json', 'r', encoding='utf-8') as f:
+        s5_skills = json.load(f)
+    s5_skill_urls = get_image_urls(
+        's5_skill_urls',
+        {s_info['name']: f'文件:{s_info['icon']}' for s_info in s5_skills.values() if s_info.get('icon')},
+        128
+    )
+    with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f:
+        skill_urls = json.load(f)
+    skill_urls.update(s5_skill_urls)
+    with open('datas/intermediate/skill_icon_urls.json', 'w', encoding='utf-8') as f:
+        json.dump(skill_urls, f, indent=4, ensure_ascii=False)
