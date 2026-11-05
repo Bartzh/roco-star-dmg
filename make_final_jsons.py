@@ -143,6 +143,7 @@ def make_search_keys(name: str) -> tuple[str, str]:
 sprites = {}
 no_skills = []
 no_stats = []
+is_lord_evolution = []
 for pet_id, pet_info in core.items():
     # 没有图鉴，说明是未上线精灵
     if not pet_info.get('number'):
@@ -194,13 +195,15 @@ for pet_id, pet_info in core.items():
         sprites[name]['name_en'] = splited_title[0]
         if len(splited_title) > 1:
             sprites[name]['name_en'] += ' (' + splited_title[1] + ')'
+    if pet_info.get('is_lord_evolution'):
+        is_lord_evolution.append(name)
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
 # 按图鉴id排序
 def hb_id(item: tuple[str, dict]) -> int:
     sprite = item[1]
     result = sprite['hbid']*10
-    if sprite.get('is_lord_evolution'):
+    if item[0] in is_lord_evolution:
         result += 1
     return result
 sprites = dict(sorted(sprites.items(), key=hb_id))
