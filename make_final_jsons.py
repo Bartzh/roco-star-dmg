@@ -221,6 +221,7 @@ sprites['拼图'] = {
     'pinyin': 'pintu',
     'pinyin_initials': 'pt',
     'hbid': 789987,
+    'name_en': 'Puzzle'
 }
 
 for skill_id, skill_info in skill_catalog.items():
