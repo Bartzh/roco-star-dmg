@@ -409,6 +409,22 @@
   </div>
 </div>
 
+<!-- 手动技能数值调整弹窗：点击标题栏的 mod-icon 打开（如虫群鼓舞 / 虫群突袭）。
+     复用 .modal-overlay / .modal-card 样式，内容由 calculator.js 动态生成。 -->
+<div class="modal-overlay" id="mod-modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mod-modal-title">
+    <header class="modal-header">
+      <h2 class="modal-title" id="mod-modal-title" data-i18n="mod.modal.title">技能调整</h2>
+      <button type="button" class="modal-close" aria-label="关闭" data-i18n-attr="aria-label:modal.close.aria">×</button>
+    </header>
+    <div class="modal-body" id="mod-modal-body"></div>
+    <footer class="modal-footer">
+      <button type="button" class="modal-confirm modal-cancel" data-i18n="confirm.cancel">取消</button>
+      <button type="button" class="modal-confirm" id="mod-modal-confirm" data-i18n="confirm.ok">确认</button>
+    </footer>
+  </div>
+</div>
+
 <script src="./i18n.js" defer></script>
 <script src="./calculator.js" defer></script>
 
