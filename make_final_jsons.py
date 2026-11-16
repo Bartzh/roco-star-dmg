@@ -73,6 +73,7 @@ COMMON_ATTACKERS: list[str] = [
     '落陨星兔',
     '粉耳星兔',
     '怖哭菇',
+    '玳塔',
     '噼啪鸟',
     '锤头鹳',
     '翼龙',
@@ -997,6 +998,46 @@ attacker_random_pools: dict[str, RandomPool] = {
                 WeightedSkillCombo(
                     combo='先发制人',
                     weight=3
+                ),
+            ]
+        ),
+    ),
+    '玳塔': RandomPool(
+        stats=StatsPool(
+            default_weight=1,
+            combos=[
+                WeightedStatsCombo(
+                    combo=StatsCombo(
+                        nature=Nature(up='hp', down='atk'),
+                        ivs=['hp', 'matk', 'def']
+                    ),
+                    weight=18
+                ),
+            ]
+        ),
+        buffs=BuffsPool(
+            default_weight=40,
+            combos=[
+                WeightedBuffCombo(
+                    combo=[{'atk': 40, 'matk': 40}],
+                    weight=5
+                ),
+                WeightedBuffCombo(
+                    combo=[{'atk': 80, 'matk': 80}],
+                    weight=1
+                ),
+            ]
+        ),
+        skills=SkillsPool(
+            default_weight=1,
+            combos=[
+                WeightedSkillCombo(
+                    combo='突袭',
+                    weight=33
+                ),
+                WeightedSkillCombo(
+                    combo='__yuanli_萌__',
+                    weight=4
                 ),
             ]
         ),
