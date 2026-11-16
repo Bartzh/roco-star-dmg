@@ -2929,8 +2929,14 @@ function openSkillModModal(skill, side) {
   };
   // 失焦时把输入框回写为合法值（处理清空 / 越界后未回写的情况）
   const onNumberBlur = () => { numberEl.value = String(pending); };
+  // 拖动中反馈：按下时给滑条加 .is-dragging（松手 / 取消时移除）
+  const onRangePointerDown = () => rangeEl.classList.add('is-dragging');
+  const onRangePointerUp = () => rangeEl.classList.remove('is-dragging');
   syncRangeFill();
   rangeEl.addEventListener('input', onRangeInput);
+  rangeEl.addEventListener('pointerdown', onRangePointerDown);
+  window.addEventListener('pointerup', onRangePointerUp);
+  window.addEventListener('pointercancel', onRangePointerUp);
   numberEl.addEventListener('input', onNumberInput);
   numberEl.addEventListener('blur', onNumberBlur);
 
@@ -2945,7 +2951,11 @@ function openSkillModModal(skill, side) {
     overlay.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     // 清理一次性事件监听
+    rangeEl.classList.remove('is-dragging');
     rangeEl.removeEventListener('input', onRangeInput);
+    rangeEl.removeEventListener('pointerdown', onRangePointerDown);
+    window.removeEventListener('pointerup', onRangePointerUp);
+    window.removeEventListener('pointercancel', onRangePointerUp);
     numberEl.removeEventListener('input', onNumberInput);
     numberEl.removeEventListener('blur', onNumberBlur);
     closeBtn.removeEventListener('click', onClose);
