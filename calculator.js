@@ -148,7 +148,7 @@ const DEFAULT_IVS = {
 //     buff:    { atk, matk, spd, power, combo }    // attacker
 //            | { def, mdef, spd }                  // defender
 //     skillId: string                              // 攻击 / 防御技能 id
-//     skillModInputs: { skillKey: value, ... }     // 手动 mod 输入（如色散 toggle）
+//     skillModInputs: { skillKey: value, ... }     // 手动技能输入（如色散 toggle）
 //   }
 // JSON 表达清晰、**自然兼容旧版"只存 nature+ivs"的格式**：
 // 解析时缺 buff / skillId 字段会自动用该侧默认值（buff 全 0、
@@ -820,7 +820,7 @@ let state = {
   // attacker and defender panels.
   attackerSpeed: 0,
   defenderSpeed: 0,
-  // Per-side 手动 mod 输入：skillKey → 输入值（布尔 / 数字等）。
+  // Per-side 手动技能输入：skillKey → 输入值（布尔 / 数字等）。
   // 用于无法自动计算触发条件的技能适配（如色散：对混血精灵 +50%，
   // 计算器无法判断防御方是否混血）。用户点击 mod-icon 切换；
   // 亮 = 触发，灰 = 不触发。是否使用此值由 SKILL_MODS 函数的
@@ -2747,10 +2747,11 @@ function buildSkillModCtx(
 ) {
   const atkSpeedBonus = state.attackerSpeed;
   const defSpeedBonus = state.defenderSpeed;
-  const atkEffectiveSpeed = attacker
+  // 基线速度 = 性格/个体修正后的最终速度 + 速度 chip（百分比速度修正的基数）
+  const atkBaseSpeed = attacker
     ? getFinalStat(attacker, 'spd', attackerNature, attackerIVs) + atkSpeedBonus
     : 0;
-  const defEffectiveSpeed = defender
+  const defBaseSpeed = defender
     ? getFinalStat(defender, 'spd', defenderNature, defenderIVs) + defSpeedBonus
     : 0;
   return {
@@ -2765,8 +2766,11 @@ function buildSkillModCtx(
     defenderIVs,
     attackerSpeedBonus: atkSpeedBonus,
     defenderSpeedBonus: defSpeedBonus,
-    attackerEffectiveSpeed: atkEffectiveSpeed,
-    defenderEffectiveSpeed: defEffectiveSpeed,
+    // 基线速度（不含动态修正）与当前有效速度（会被 speedAdd/speedPctAdd 更新）
+    attackerBaseSpeed: atkBaseSpeed,
+    defenderBaseSpeed: defBaseSpeed,
+    attackerEffectiveSpeed: atkBaseSpeed,
+    defenderEffectiveSpeed: defBaseSpeed,
   };
 }
 
@@ -2787,7 +2791,7 @@ function getSkillEnergy(skill, starLayer = 0) {
 function isSkillModActive(skill, side) {
   if (!skill || !hasSkillMod(skill)) return false;
   const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
-  // 手动 mod：触发状态由用户输入决定，不运行时计算
+  // 手动技能：触发状态由用户输入决定，不运行时计算
   if (fn.manual) {
     return !!getSkillModInput(skill, side);
   }
@@ -2831,6 +2835,148 @@ function toggleSkillModInput(skill, side) {
   saveSpiritConfig(side);
 }
 
+// 读取手动技能的注册配置（SKILL_MODS_MANUAL）；非手动技能返回 null。
+function getSkillModManualConfig(skill) {
+  if (!skill) return null;
+  const key = skill.modKey || skill.id;
+  return SKILL_MODS_MANUAL[key] || null;
+}
+
+// 该手动技能是否需要弹窗输入数值（不是简单开关）。
+// inputType === 'number' 的手动技能点击 icon 时打开 #mod-modal 选择数值；
+// 其余（布尔）仍直接 toggle。
+function skillModUsesModal(skill) {
+  const cfg = getSkillModManualConfig(skill);
+  return !!(cfg && cfg.inputType === 'number');
+}
+
+// 设置数字型手动技能的输入值（按配置 min/max clamp），并持久化。
+function setSkillModInput(skill, side, value) {
+  const cfg = getSkillModManualConfig(skill);
+  if (!cfg || cfg.inputType !== 'number') return;
+  const clamped = Math.max(cfg.min, Math.min(cfg.max, Math.round(Number(value) || 0)));
+  const skillKey = skill.modKey || skill.id;
+  state.skillModInputs[side][skillKey] = clamped;
+  saveSpiritConfig(side);
+}
+
+// mod-icon 的 tooltip 文案。手动技能额外提示交互方式；数字型带上当前数值。
+function getModIconTitle(skill, side) {
+  if (!skill) return '';
+  let title = `${skill.name}：${skill.desc}`;
+  const cfg = getSkillModManualConfig(skill);
+  if (!cfg) return title;
+  if (cfg.inputType === 'number') {
+    const val = getSkillModInput(skill, side);
+    const unit = cfg.unit ? ` ${cfg.unit}` : '';
+    title += `\n（当前 ${val}${unit} · 点击调整）`;
+  } else {
+    title += '\n（点击切换是否触发）';
+  }
+  return title;
+}
+
+// 手动技能数值调整弹窗（复用 .modal-overlay / .modal-card 样式）。
+// 用于"不是一个开关就能调整"的手动技能（inputType === 'number'），
+// 如虫群鼓舞 / 虫群突袭：选择队伍中其他虫系精灵数量（0~5）。
+function openSkillModModal(skill, side) {
+  const cfg = getSkillModManualConfig(skill);
+  const overlay = document.getElementById('mod-modal');
+  if (!cfg || cfg.inputType !== 'number' || !overlay) return;
+  const titleEl    = document.getElementById('mod-modal-title');
+  const bodyEl     = document.getElementById('mod-modal-body');
+  const closeBtn   = overlay.querySelector('.modal-close');
+  const cancelBtn  = overlay.querySelector('.modal-cancel');
+  const confirmBtn = document.getElementById('mod-modal-confirm');
+  if (!titleEl || !bodyEl || !closeBtn || !cancelBtn || !confirmBtn) return;
+
+  // pending 为弹窗内的临时选择，确认后才写入 state（取消 / 关闭不生效）
+  let pending = Number(getSkillModInput(skill, side)) || 0;
+  const clampValue = (v) => Math.max(cfg.min, Math.min(cfg.max, Math.round(Number(v) || 0)));
+
+  titleEl.textContent = skill.name;
+  bodyEl.innerHTML = `
+    <p class="mod-modal-desc">${skill.desc}</p>
+    <div class="mod-modal-label">${cfg.label}（${cfg.min}~${cfg.max}）</div>
+    <div class="mod-modal-slider">
+      <input type="range" class="mod-modal-range" min="${cfg.min}" max="${cfg.max}" step="1"
+             value="${pending}" aria-label="${cfg.label}">
+      <input type="number" class="mod-modal-number" min="${cfg.min}" max="${cfg.max}" step="1"
+             value="${pending}" inputmode="numeric" aria-label="${cfg.label}（可手动输入）">
+    </div>
+  `;
+  const rangeEl  = bodyEl.querySelector('.mod-modal-range');
+  const numberEl = bodyEl.querySelector('.mod-modal-number');
+  // 滑条已填充部分用 CSS 变量驱动（跨浏览器一致的进度色，iOS 也生效）
+  const syncRangeFill = () => {
+    const span = cfg.max - cfg.min;
+    const pct = span > 0 ? ((pending - cfg.min) / span) * 100 : 0;
+    rangeEl.style.setProperty('--range-pct', `${pct}%`);
+  };
+  const onRangeInput = () => {
+    pending = clampValue(rangeEl.value);
+    numberEl.value = String(pending);
+    syncRangeFill();
+  };
+  const onNumberInput = () => {
+    // 输入框清空 / 中间态（如先输入 "-"）时保留文本，等待用户继续输入
+    if (numberEl.value === '') return;
+    const n = Number(numberEl.value);
+    if (Number.isNaN(n)) return;
+    pending = clampValue(n);
+    rangeEl.value = String(pending);
+    syncRangeFill();
+  };
+  // 失焦时把输入框回写为合法值（处理清空 / 越界后未回写的情况）
+  const onNumberBlur = () => { numberEl.value = String(pending); };
+  syncRangeFill();
+  rangeEl.addEventListener('input', onRangeInput);
+  numberEl.addEventListener('input', onNumberInput);
+  numberEl.addEventListener('blur', onNumberBlur);
+
+  const lastFocus = document.activeElement;
+  const open = () => {
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  };
+  const close = () => {
+    overlay.classList.remove('is-open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    // 清理一次性事件监听
+    rangeEl.removeEventListener('input', onRangeInput);
+    numberEl.removeEventListener('input', onNumberInput);
+    numberEl.removeEventListener('blur', onNumberBlur);
+    closeBtn.removeEventListener('click', onClose);
+    cancelBtn.removeEventListener('click', onClose);
+    confirmBtn.removeEventListener('click', onConfirmClick);
+    overlay.removeEventListener('click', onOverlayClick);
+    document.removeEventListener('keydown', onKeydown);
+    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+  };
+  const onClose = () => close();
+  const onConfirmClick = () => {
+    setSkillModInput(skill, side, pending);
+    close();
+    calculateDamage();
+  };
+  const onOverlayClick = (e) => { if (e.target === overlay) close(); };
+  const onKeydown = (e) => {
+    if (overlay.classList.contains('is-open') && e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  };
+
+  closeBtn.addEventListener('click', onClose);
+  cancelBtn.addEventListener('click', onClose);
+  confirmBtn.addEventListener('click', onConfirmClick);
+  overlay.addEventListener('click', onOverlayClick);
+  document.addEventListener('keydown', onKeydown);
+  open();
+}
+
 // 挑战模式生成题目时，从 localStorage 加载 skillModInputs 并按 category 过滤：
 //   - 特性（category === '特性'）跟随 useMemoryStats（属性配置记忆）
 //   - 非特性技能跟随 useMemorySkill（技能选择记忆）
@@ -2862,18 +3008,26 @@ function buildModIconNode(skill, active, side) {
   const el = elOf(skill.element);
   const span = document.createElement('span');
   span.className = `mod-icon ${active ? 'active' : 'inactive'} enter`;
-  span.title = `${skill.name}：${skill.desc}`;
-  // 可点击的 manual mod：附加点击 / 键盘交互 + 悬停样式
+  span.title = getModIconTitle(skill, side);
+  // 可点击的 manual mod：附加点击 / 键盘交互 + 悬停样式。
+  // 数字型（skillModUsesModal）点击打开 #mod-modal；布尔型直接 toggle。
   if (isSkillModManual(skill)) {
     span.classList.add('clickable');
     span.setAttribute('role', 'button');
     span.setAttribute('tabindex', '0');
-    span.setAttribute('aria-pressed', active ? 'true' : 'false');
-    span.title = `${skill.name}：${skill.desc}\n（点击切换是否触发）`;
+    if (skillModUsesModal(skill)) {
+      span.setAttribute('aria-haspopup', 'dialog');
+    } else {
+      span.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
     const onClick = (e) => {
       e.stopPropagation();
       // 挑战模式答题期间面板锁定，不应响应键盘 / 点击
       if (state.challenge.running) return;
+      if (skillModUsesModal(skill)) {
+        openSkillModModal(skill, side);
+        return;
+      }
       toggleSkillModInput(skill, side);
       calculateDamage();
     };
@@ -2908,6 +3062,13 @@ function buildModIconNode(skill, active, side) {
     ph.textContent = el.emoji;
     span.appendChild(ph);
   }
+  // 数字型手动技能：图标右下角显示当前数值
+  if (skillModUsesModal(skill)) {
+    const badge = document.createElement('span');
+    badge.className = 'mod-icon-badge';
+    badge.textContent = String(getSkillModInput(skill, side));
+    span.appendChild(badge);
+  }
   return span;
 }
 
@@ -2937,11 +3098,19 @@ function renderModIcons(side) {
     if (skillHasMod) desired.push({ skill: selectedSkill, active: skillActive });
   }
 
-  // 结构 key（仅 skill id）与状态 key（active 标记）分离：
+  // 结构 key（仅 skill id）与状态 key 分离：
   //   - 状态变化时复用 DOM、仅切换 class 触发过渡；
   //   - 合并 key 用于完全无变化时的早返回（避免 iOS Safari 图片闪烁）。
+  // 数字型手动技能把当前数值纳入状态 key：数值变化（如 2→3）时也走复用
+  // 分支刷新 tooltip，避免显示旧值。
   const structureKey = desired.map(d => d.skill.id).join('|');
-  const stateKey = desired.map(d => d.active ? 1 : 0).join('|');
+  const stateKey = desired.map(d => {
+    const cfg = getSkillModManualConfig(d.skill);
+    if (cfg && cfg.inputType === 'number') {
+      return String(getSkillModInput(d.skill, side));
+    }
+    return d.active ? 1 : 0;
+  }).join('|');
   const modKey = structureKey + '@' + stateKey;
 
   // 1. 完全无变化：早返回
@@ -2964,6 +3133,10 @@ function renderModIcons(side) {
       if (icon.hasAttribute('aria-pressed')) {
         icon.setAttribute('aria-pressed', desired[i].active ? 'true' : 'false');
       }
+      // 数字型手动技能的 tooltip / 右下角数值徽标含当前值，复用 DOM 时同步刷新
+      icon.title = getModIconTitle(desired[i].skill, side);
+      const badge = icon.querySelector('.mod-icon-badge');
+      if (badge) badge.textContent = String(getSkillModInput(desired[i].skill, side));
     });
     container.dataset.modKey = modKey;
     return;
@@ -3427,11 +3600,12 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 
 // ============================================================
 // DYNAMIC SKILL MODIFIERS: skill-id-keyed function dictionary.
-// Each entry takes (ctx, fromAttacker) and returns either null or
+// Each entry takes (ctx, fromAttacker, input) and returns either null or
 //   {
 //     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
 //     ignoreResist?: boolean, elementOverride?: string,
-//     matkAdd?: number, speedAdd?: number,
+//     matkAdd?: number, atkPctAdd?: number, defPctAdd?: number,
+//     speedAdd?: number, speedPctAdd?: number,
 //     notes?: string[],
 //   }.
 // ignoreResist: true ⇒ the defender's type resistance (effectiveness < 1)
@@ -3442,11 +3616,21 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 // matkAdd: flat percentage points added to the attacker's 魔攻 buff
 //   (additive with the user's chip buff). Only takes effect when the
 //   skill deals magic damage (isMagic === true).
+// atkPctAdd: percentage points added to the attacker's attack buff
+//   (物攻/魔攻通用，与 chip buff 相加)。只对攻击方（fromAttacker）生效。
+// defPctAdd: percentage points added to the defender's defense buff
+//   (物防/魔防通用，与 chip buff 相加)。只对防御方生效。
 // speedAdd: flat speed points added to the attacker's (or defender's,
 //   depending on fromAttacker) effective speed. Applied in-place to
 //   ctx.attackerEffectiveSpeed / ctx.defenderEffectiveSpeed during the
 //   apply loop, so subsequent isFirstStrike checks (顺风, 疾风刺, etc.)
 //   see the updated speed.
+// speedPctAdd: percentage of the baseline speed (final stat + speed chip)
+//   added to that side's effective speed. 手动技能的速度修正在主循环前
+//   统一预应用（见 computeSkillDynamicModifiers），保证先手判定读到双方
+//   特性的最终速度。
+// input: 手动技能的用户输入值（fn.manual=true 时由 state 读取），
+//   布尔型为 true/false，数字型为 number；自动 mod 为 undefined。
 // The aggregator (computeSkillDynamicModifiers) merges them.
 //
 // The ctx object always carries:
@@ -3916,7 +4100,7 @@ const SKILL_MODS = {
   },
   // 色散：对混血精灵造成伤害+50%。计算器无法判断防御方是否混血，
   // 由用户手动点击 mod-icon 切换（input=true 表示防御方是混血）。
-  // 这是"手动 mod"——fn.manual=true，触发状态由 state.skillModInputs
+  // 这是"手动技能"——fn.manual=true，触发状态由 state.skillModInputs
   // 决定，而非运行时自动计算。详见 SKILL_MODS_MANUAL。
   色散(ctx, fromAttacker, input) {
     if (!fromAttacker) return null;
@@ -3936,6 +4120,35 @@ const SKILL_MODS = {
     return {
       powerMult: 0.6,
       notes: ['受到伤害 -40%（攻击系别匹配携带技能）'],
+    };
+  },
+  // 虫群鼓舞（特性）：队伍中每有 1 只其他虫系精灵，自己入场时攻防速 +10%。
+  // 计算器没有队伍概念，由用户点击 mod-icon 在弹窗中选择数量（0~5）。
+  // input = 其他虫系精灵数量；攻/防/速均为百分比加成：
+  //   atkPctAdd  → 攻击方持有的攻击（物攻/魔攻通用）
+  //   defPctAdd  → 防御方持有的防御（物防/魔防通用）
+  //   speedPctAdd→ 影响先手判定（顺风 / 破空 / 扇风 / 疾风刺 / 闪击）
+  虫群鼓舞(ctx, fromAttacker, input) {
+    const count = Number(input) || 0;
+    if (count <= 0) return null;
+    const pct = 10 * count;
+    return {
+      atkPctAdd: pct,
+      defPctAdd: pct,
+      speedPctAdd: pct,
+      notes: [`攻防速 +${pct}%（其他虫系精灵 ${count} 只 ×10%）`],
+    };
+  },
+  // 虫群突袭（特性）：机制同虫群鼓舞，每只其他虫系精灵 +15%。
+  虫群突袭(ctx, fromAttacker, input) {
+    const count = Number(input) || 0;
+    if (count <= 0) return null;
+    const pct = 15 * count;
+    return {
+      atkPctAdd: pct,
+      defPctAdd: pct,
+      speedPctAdd: pct,
+      notes: [`攻防速 +${pct}%（其他虫系精灵 ${count} 只 ×15%）`],
     };
   },
   // Add more skills here as they're introduced.
@@ -3964,8 +4177,8 @@ const SKILL_MODS_SIDES = {
   共鸣: 'attacker', 齐鸣: 'attacker', 涂鸦: 'attacker', 色散: 'attacker',
   // 只在防御方触发
   狂欢开始: 'defender', 绝对秩序: 'defender', 偏振: 'defender',
-  // 双方都可能触发
-  展翅: 'both',
+  // 双方都可能触发（特性随持有者在哪一侧生效）
+  展翅: 'both', 虫群鼓舞: 'both', 虫群突袭: 'both',
 };
 SKILL_MODS_SIDES["“国王”的威严"] = 'attacker';
 // 把 sides 挂到对应函数上，isSkillModRelevant 通过 fn.sides 查询
@@ -3975,14 +4188,36 @@ for (const [key, sides] of Object.entries(SKILL_MODS_SIDES)) {
 
 // 标注需要"手动输入"的 mod：触发条件无法自动计算（如色散无法判断防御方
 // 是否混血、偏振无法判断防御方实际携带了哪些技能），由用户点击 mod-icon
-// 切换。fn.manual=true 时：
+// 调整。fn.manual=true 时：
 //   - mod-icon 可点击（带 .clickable 类 + 悬停动画）
 //   - 触发状态由 state.skillModInputs[side][skillKey] 决定，而非运行时计算
-//   - fn.defaultInput 为用户未点击时的默认值（通常 false = 不触发）
-// 未来需要数字输入的 mod 可在此注册 { defaultInput: 0 }，并扩展 toggle 逻辑。
+//   - fn.defaultInput 为用户未操作时的默认值
+// inputType:
+//   - 'toggle'（默认）：布尔开关，点击 icon 直接切换
+//   - 'number'：数值输入（min~max），点击 icon 打开 #mod-modal 弹窗选择
+// 只要不是简单开关的 mod，都通过 inputType/扩展字段走弹窗，后续新增同类
+// 特性时只需在这里登记配置，无需改交互代码。
 const SKILL_MODS_MANUAL = {
   色散: { defaultInput: false },
   偏振: { defaultInput: false },
+  // 虫群系列：队伍中每有 1 只其他虫系精灵，入场时攻防速 +10% / +15%。
+  // 队伍最多 6 只，其他虫系精灵数量范围 0~5。
+  虫群鼓舞: {
+    defaultInput: 0,
+    inputType: 'number',
+    min: 0,
+    max: 5,
+    label: '队伍中其他虫系精灵数量',
+    unit: '只',
+  },
+  虫群突袭: {
+    defaultInput: 0,
+    inputType: 'number',
+    min: 0,
+    max: 5,
+    label: '队伍中其他虫系精灵数量',
+    unit: '只',
+  },
 };
 for (const [key, cfg] of Object.entries(SKILL_MODS_MANUAL)) {
   if (SKILL_MODS[key]) {
@@ -4011,8 +4246,11 @@ const LAST_STRIKE_SKILLS = {
 //   - starLayer, attackSkill, attacker, defender, defenseSkill
 //   - attackerNature, defenderNature, attackerIVs, defenderIVs
 //   - attackerSpeedBonus, defenderSpeedBonus   (the 速度 chip values)
+//   - attackerBaseSpeed, defenderBaseSpeed
+//     (finalSpeed from stat-block + speed chip; percentage speed mods use
+//      this as their baseline)
 //   - attackerEffectiveSpeed, defenderEffectiveSpeed
-//     (finalSpeed from stat-block + speed chip; this is the value
+//     (baseline speed + dynamic speedAdd / speedPctAdd; this is the value
 //      used by 顺风 / FIRST_STRIKE logic to decide who moves first)
 function computeSkillDynamicModifiers(
   attacker, attackSkill,  attackerNature, attackerIVs,
@@ -4024,28 +4262,74 @@ function computeSkillDynamicModifiers(
     defender, defenseSkill, defenderNature, defenderIVs,
     starLayer
   );
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, matkAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, matkAdd: 0, atkPctAdd: 0, defPctAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
+
+  // 取精灵的特性技能（skills 中第一个 category === '特性'）。
+  const getAbility = (spirit) => {
+    for (const sid of ((spirit && spirit.skills) || [])) {
+      const sk = SKILLS[sid];
+      if (sk && sk.category === '特性') return sk;
+    }
+    return null;
+  };
+
+  // 速度修正应用到 ctx（影响后续 isFirstStrike 判定）：
+  //   speedAdd    → 固定值（+N 速度）
+  //   speedPctAdd → 基线速度的百分比（基线 = stat + 速度 chip，不含动态修正）
+  const applySpeedMod = (mod, fromAttacker) => {
+    if (mod.speedAdd) {
+      if (fromAttacker) ctx.attackerEffectiveSpeed += mod.speedAdd;
+      else              ctx.defenderEffectiveSpeed += mod.speedAdd;
+    }
+    if (mod.speedPctAdd) {
+      const base = fromAttacker ? ctx.attackerBaseSpeed : ctx.defenderBaseSpeed;
+      const add = Math.round(base * mod.speedPctAdd / 100);
+      if (fromAttacker) ctx.attackerEffectiveSpeed += add;
+      else              ctx.defenderEffectiveSpeed += add;
+    }
+  };
+
+  // 手动技能的速度修正预应用：手动技能的返回值只由用户输入决定（不读
+  // 运行时 ctx），可以安全地在主循环前计算。必须提前应用——特性 apply 顺序
+  // 中防御方特性晚于攻击技能，否则攻击技能的 isFirstStrike 判定会读到
+  // 未计入防御方特性加速的速度。
+  const preApplyManualSpeed = (skill, fromAttacker) => {
+    const fn = SKILL_MODS[skill?.modKey] || SKILL_MODS[skill?.id];
+    if (!fn || !fn.manual) return;
+    const input = getSkillModInput(skill, fromAttacker ? 'attacker' : 'defender');
+    const mod = fn(ctx, fromAttacker, input);
+    if (!mod) return;
+    if (mod.speedAdd) result.speedAdd += mod.speedAdd;
+    applySpeedMod(mod, fromAttacker);
+  };
+
+  // (0) 手动技能速度修正：双方特性 + 攻击技能，先于所有先手判定生效。
+  preApplyManualSpeed(getAbility(attacker), true);
+  preApplyManualSpeed(getAbility(defender), false);
+  preApplyManualSpeed(attackSkill, true);
 
   const apply = (skill, fromAttacker) => {
     // 优先用 modKey（用于把多个"同族"技能共享到同一条 SKILL_MODS），
     // 找不到时回退到 skill.id。
     const fn = SKILL_MODS[skill?.modKey] || SKILL_MODS[skill?.id];
     if (!fn) return;
-    // 手动 mod：传入用户输入值（fn.manual=true 时从 state 读取）；
+    // 手动技能：传入用户输入值（fn.manual=true 时从 state 读取）；
     // 自动 mod：第3参数为 undefined（fn 不使用它）。
     const input = fn.manual
       ? getSkillModInput(skill, fromAttacker ? 'attacker' : 'defender')
       : undefined;
     const mod = fn(ctx, fromAttacker, input);
     if (!mod) return;
-    // speedAdd 必须在其它依赖速度的修正（isFirstStrike）之前应用到 ctx：
-    // apply 顺序是 攻击方特性 → 攻击技能 → 防御方特性，所以攻击方特性的
-    // speedAdd 会先于攻击技能的 isFirstStrike 检查生效。
-    if (mod.speedAdd) {
-      result.speedAdd += mod.speedAdd;
-      if (fromAttacker) ctx.attackerEffectiveSpeed += mod.speedAdd;
-      else              ctx.defenderEffectiveSpeed += mod.speedAdd;
+    // 速度修正：手动技能已在主循环前预应用（见 preApplyManualSpeed），
+    // 这里只处理自动 mod，避免重复累加。
+    if (!fn.manual) {
+      if (mod.speedAdd) result.speedAdd += mod.speedAdd;
+      applySpeedMod(mod, fromAttacker);
     }
+    // 攻/防百分比加成：atkPctAdd 只作用于攻击方自身的攻击，
+    // defPctAdd 只作用于防御方自身的防御，避免双方特性互相串扰。
+    if (mod.atkPctAdd && fromAttacker)  result.atkPctAdd += mod.atkPctAdd;
+    if (mod.defPctAdd && !fromAttacker) result.defPctAdd += mod.defPctAdd;
     if (mod.comboAdd)     result.comboAdd     += mod.comboAdd;
     if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
     if (mod.powerMultAdd) result.powerMultAdd += mod.powerMultAdd;
@@ -4059,26 +4343,14 @@ function computeSkillDynamicModifiers(
     }
   };
 
-  // (1) Attacker's 特性 (characteristics).
-  for (const sid of (attacker.skills || [])) {
-    const sk = SKILLS[sid];
-    if (!sk || sk.category !== '特性') continue;
-    apply(sk, true);
-    // 只存在一个特性
-    break;
-  }
+  // (1) Attacker's 特性 (characteristics). 只存在一个特性。
+  apply(getAbility(attacker), true);
 
   // (2) Attack skill self-modifier.
   apply(attackSkill, true);
 
-  // (3) Defender's 特性 (characteristics).
-  for (const sid of (defender.skills || [])) {
-    const sk = SKILLS[sid];
-    if (!sk || sk.category !== '特性') continue;
-    apply(sk, false);
-    // 只存在一个特性
-    break;
-  }
+  // (3) Defender's 特性 (characteristics). 只存在一个特性。
+  apply(getAbility(defender), false);
 
   // (4) Power multiplier.
   result.powerMult = result.powerMultAdd * result.powerMult;
@@ -4132,14 +4404,18 @@ function computeFinalDamage(ctx) {
 
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
   // nonsensical negative stats from extreme debuffs. Dynamic stat modifiers
-  // (dyn.matkAdd) are additive with the chip buff.
+  // are additive with the chip buff:
+  //   - matkAdd  : 仅魔攻（历史字段，如 和弦共振）
+  //   - atkPctAdd: 物攻/魔攻通用（如 虫群鼓舞的攻 +N%）
+  //   - defPctAdd: 物防/魔防通用（如 虫群鼓舞作为防御方特性时的防 +N%）
   const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
-  const atkAddPct  = isMagic ? (dyn.matkAdd || 0) : 0;
+  const atkAddPct  = (isMagic ? (dyn.matkAdd || 0) : 0) + (dyn.atkPctAdd || 0);
   const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
+  const defAddPct  = dyn.defPctAdd || 0;
   const atkStatBase = isMagic ? matkBaseNoBuff : atkBaseNoBuff;
   const defStatBase = getFinalStat(def, defStatKey, defNature, defIVs);
   const atkStat = Math.max(0, Math.round(atkStatBase * (1 + (atkBuffPct + atkAddPct) / 100)));
-  const defStat = Math.max(0, Math.round(defStatBase * (1 + defBuffPct / 100)));
+  const defStat = Math.max(0, Math.round(defStatBase * (1 + (defBuffPct + defAddPct) / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
   const defHP = getFinalStat(def, 'hp', defNature, defIVs);
   // 威力 chip — flat addition to base power (always shown).
@@ -4195,7 +4471,7 @@ function computeFinalDamage(ctx) {
     isSkillIllusion, starTriggered, n,
     atkStat, defStat, isMagic, dyn,
     atkStatBase, defStatBase,
-    atkBuffPct, atkAddPct, defBuffPct,
+    atkBuffPct, atkAddPct, defBuffPct, defAddPct,
     powerBoost, attackerCombo, hasCombo
   };
 }
@@ -4533,7 +4809,7 @@ function renderBreakdownList(breakdownList, data) {
     return `${base} × (1 ${terms.join(' ')}) = ${finalStat}`;
   };
   const atkStatText = formatStatText(data.atkStatBase, data.atkBuffPct, data.atkAddPct, data.atkStat);
-  const defStatText = formatStatText(data.defStatBase, data.defBuffPct, 0, data.defStat);
+  const defStatText = formatStatText(data.defStatBase, data.defBuffPct, data.defAddPct || 0, data.defStat);
   const ignoredResist = (dynMods.ignoreResist || (data.dyn && data.dyn.ignoreResist))
     && (data.skillEffRaw ?? 1) < 1;
   const effExpr = ignoredResist
@@ -5596,7 +5872,7 @@ function buildQuestionSnapshot(_index) {
   const atkSkId  = buildSkillRng('attacker')(attacker);
   const defSkId  = buildSkillRng('defender')(defender);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
-  // 手动 mod 输入按 category 分别跟随记忆开关：
+  // 手动技能输入按 category 分别跟随记忆开关：
   //   - 特性（如偏振）跟随 useMemoryStats（属性配置记忆）
   //   - 非特性技能（如色散）跟随 useMemorySkill（技能选择记忆）
   // 对应开关关闭时，该 category 的 mod 走 defaultInput（通常 false = 不触发）。
@@ -5622,7 +5898,7 @@ function buildQuestionSnapshot(_index) {
     attackerCombo: atkStats.combo,
     attackSkillId: atkSkId,
     defenseSkillId: defSkId,
-    // 手动 mod 输入（如色散 toggle），applyQuestion 会写入 state 供伤害计算使用
+    // 手动技能输入（如色散 toggle），applyQuestion 会写入 state 供伤害计算使用
     attackerModInputs: atkModInputs,
     defenderModInputs: defModInputs,
     defHP,
@@ -5927,7 +6203,7 @@ function applyQuestion(index) {
   // 威力 / 连击：题目配置的一部分（与双攻/双防/速度同级），不再每题重置
   state.attackerPowerBoost = q.attackerPowerBoost;
   state.attackerCombo = q.attackerCombo;
-  // 手动 mod 输入（如色散 toggle）：从题目快照恢复，供伤害计算与 mod-icon 显示使用
+  // 手动技能输入（如色散 toggle）：从题目快照恢复，供伤害计算与 mod-icon 显示使用
   state.skillModInputs.attacker = { ...(q.attackerModInputs || {}) };
   state.skillModInputs.defender = { ...(q.defenderModInputs || {}) };
   state.spiritPicking.attacker = false;

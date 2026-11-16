@@ -260,7 +260,10 @@ textarea::placeholder {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  overflow: hidden;
+  /* 数值徽标需要溢出到图标右下角外侧，故不用 overflow:hidden；
+     图片 / 占位块各自用 border-radius 裁成圆形。 */
+  overflow: visible;
+  position: relative;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -275,6 +278,7 @@ textarea::placeholder {
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 50%;
 }
 .mod-icon .mod-icon-placeholder {
   width: 100%;
@@ -284,8 +288,22 @@ textarea::placeholder {
   justify-content: center;
   font-size: 0.85rem;
   font-weight: 700;
+  border-radius: 50%;
   background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
   color: rgba(255,255,255,0.95);
+}
+/* 数字型手动技能的当前数值：图标右下角的小字（无底色无边框，仅数字） */
+.mod-icon-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  /* 纯数字在任意图标上都可读 */
+  text-shadow: 0 0 2px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.7);
+  pointer-events: none;
 }
 /* 未生效：黑白/灰度 */
 .mod-icon.inactive {
@@ -2925,6 +2943,112 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
 }
 .data-mgr-switch:active input:checked + .data-mgr-switch-track::before {
   transform: translateX(18px) scale(1.15);
+}
+
+/* ============ Mod Input Modal（手动技能数值调整） ============
+   点击标题栏的 mod-icon 打开（如虫群鼓舞 / 虫群突袭：选择队伍中其他虫系
+   精灵数量 0~5）。复用 .modal-overlay / .modal-card 样式，卡片收窄。 */
+#mod-modal .modal-card {
+  width: min(440px, 100%);
+}
+.mod-modal-desc {
+  margin: 0 0 14px;
+  color: rgba(255,255,255,0.88);
+}
+.mod-modal-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.mod-modal-slider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+/* 滑条：完全自绘（原生 accent-color 在 iOS Safari 上会回退成系统蓝），
+   轨道填充比例由 JS 写入 --range-pct，跨浏览器颜色一致。 */
+.mod-modal-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;                /* 扩大触控热区 */
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+/* WebKit 内核（Chrome / Edge / Safari / iOS Safari） */
+.mod-modal-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent-primary) 0 var(--range-pct, 0%),
+    rgba(255,255,255,0.18) var(--range-pct, 0%) 100%
+  );
+}
+.mod-modal-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;            /* (16 - 4) / 2：滑块在轨道上垂直居中 */
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 55%, transparent);
+}
+/* Firefox */
+.mod-modal-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.18);
+}
+.mod-modal-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent-primary);
+}
+.mod-modal-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-primary);
+}
+/* 数值输入框：与滑条联动，可直接键入具体数字。
+   隐藏浏览器原生上下箭头（Edge / Chrome 的白色箭头在深色弹窗里很突兀）。 */
+.mod-modal-number {
+  flex: 0 0 64px;
+  width: 64px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 7px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+  -moz-appearance: textfield;
+  appearance: textfield;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.mod-modal-number::-webkit-outer-spin-button,
+.mod-modal-number::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.mod-modal-range:focus-visible,
+.mod-modal-number:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.mod-modal-number:focus {
+  border-color: color-mix(in srgb, var(--accent-primary) 70%, transparent);
+  background: rgba(255,255,255,0.12);
 }
 
 /* 移动端：弹窗占满宽度的安全边距更小 */
