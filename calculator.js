@@ -21,7 +21,18 @@ const ELEMENTS = {
   '机械': { name: '机械', emoji: '⚙️', color: '#40cba9' },
   '幻':   { name: '幻',   emoji: '🔮', color: '#9fa7f8' }
 };
-const FALLBACK_EL = { name: '无', emoji: '❔', color: '#666666' };
+const FALLBACK_EL = { name: '无', name_en: 'None', emoji: '❔', color: '#666666' };
+
+// i18n 入口（i18n.js 在 calculator.js 之前以 defer 加载）
+const I18N = window.I18N || {
+  locale: 'zh-CN',
+  t: (key) => key,
+  isEn: () => false,
+  switchLocale: () => {},
+  applyI18n: () => {}
+};
+const t = I18N.t;
+const isEn = I18N.isEn;
 
 // 自定义技能槽 sentinel index：表示"自定义技能槽"被选中。
 // renderSkills 把自定义槽渲染为 data-idx="custom" 的最后一项；
@@ -50,6 +61,29 @@ function stripXi(name) {
 function elOf(rawName) {
   if (rawName == null) return FALLBACK_EL;
   return ELEMENT_BY_RAW.get(rawName) || FALLBACK_EL;
+}
+
+// ---- 显示层 helper：数据键 / 中文名保持原样，只切换展示文案 ----
+function displayName(item) {
+  if (!item) return '';
+  return isEn() ? (item.name_en || item.name || '') : (item.name || item.name_en || '');
+}
+function displayDesc(item) {
+  if (!item) return '';
+  return isEn() ? (item.desc_en || item.desc || '') : (item.desc || item.desc_en || '');
+}
+function displayEl(el) {
+  if (!el) return displayEl(FALLBACK_EL);
+  return isEn() ? (el.name_en || el.name) : (el.name || el.name_en);
+}
+function elLabel(rawName) {
+  return displayEl(elOf(rawName));
+}
+function displayDamageClass(value) {
+  if (value === '物攻') return t('badge.atk');
+  if (value === '魔攻') return t('badge.matk');
+  if (value === '自适应') return t('badge.auto');
+  return value || '?';
 }
 
 // ============================================================
@@ -94,21 +128,28 @@ async function loadData() {
 // Merge iconUrl from TYPES into ELEMENTS (so elOf(...).iconUrl works for skill-card overlays)
 function augmentElementsWithTypes() {
   for (const key of Object.keys(TYPES || {})) {
-    if (ELEMENTS[key] && TYPES[key] && TYPES[key].iconUrl) {
-      ELEMENTS[key].iconUrl = TYPES[key].iconUrl;
-    }
+    if (!ELEMENTS[key] || !TYPES[key]) continue;
+    if (TYPES[key].iconUrl) ELEMENTS[key].iconUrl = TYPES[key].iconUrl;
+    if (TYPES[key].name_en) ELEMENTS[key].name_en = TYPES[key].name_en;
   }
 }
 
 // Build skill arrays (ATTACK / DEFENSE category index)
 const ATTACK_SKILLS = {};
 const DEFENSE_SKILLS = {};
+// 英文技能名 → 中文技能 id，供自定义技能槽输入使用。
+const SKILL_ID_BY_NAME_EN = {};
+function normalizeSkillInputName(name) {
+  return (name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
 function buildSkillIndices() {
   ATTACK_SKILLS && Object.keys(ATTACK_SKILLS).forEach(k => delete ATTACK_SKILLS[k]);
   DEFENSE_SKILLS && Object.keys(DEFENSE_SKILLS).forEach(k => delete DEFENSE_SKILLS[k]);
+  Object.keys(SKILL_ID_BY_NAME_EN).forEach(k => delete SKILL_ID_BY_NAME_EN[k]);
   for (const [id, s] of Object.entries(SKILLS)) {
     if (s.category === '攻击') ATTACK_SKILLS[id] = s;
     else if (s.category === '防御') DEFENSE_SKILLS[id] = s;
+    if (s.name_en) SKILL_ID_BY_NAME_EN[normalizeSkillInputName(s.name_en)] = id;
   }
 }
 
@@ -117,7 +158,6 @@ function buildSkillIndices() {
 // ============================================================
 // Stat keys in display order
 const STAT_KEYS = ['hp', 'atk', 'matk', 'def', 'mdef', 'spd'];
-const STAT_LABELS = { hp: '生命', atk: '物攻', matk: '魔攻', def: '物防', mdef: '魔防', spd: '速度' };
 const MAX_IV = 3;
 const IV_BONUS = 60;
 
@@ -370,10 +410,10 @@ function toggleFavorite(side) {
 // 重置该侧"常见"列表为 others.json 中的预定义列表，刷新 picker grid。
 // 先弹确认窗，用户确认后才执行重置。
 function resetFavorites(side) {
-  const sideText = side === 'attacker' ? '攻击方' : '防御方';
+  const sideText = t(side === 'attacker' ? 'side.attacker' : 'side.defender');
   showConfirmDialog(
-    '重置收藏列表',
-    `<div style="line-height:1.7">确认要将 <strong>${sideText}</strong> 的收藏列表重置为默认吗？</div>`,
+    t('confirm.resetFavorites.title'),
+    t('confirm.resetFavorites.body', { side: sideText }),
     () => {
       _favoritesCache[side] = _defaultCommonList(side).slice();
       _saveFavorites(side);
@@ -502,9 +542,8 @@ function exportData() {
 // 删除全部记忆配置（带二次确认）。
 function clearAllMemory() {
   showConfirmDialog(
-    '删除记忆',
-    `<div style="line-height:1.7">确认删除 <strong>所有精灵的自动记忆配置</strong>吗？</div>
-     <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">删除后，下次选择精灵时将使用默认配置。当前已选精灵的显示不受影响。</div>`,
+    t('confirm.clearMemory.title'),
+    t('confirm.clearMemory.body'),
     () => {
       _clearAllSpiritConfigs();
     }
@@ -514,9 +553,8 @@ function clearAllMemory() {
 // 删除全部收藏（带二次确认；等价于双侧重置收藏）。
 function clearAllFavorites() {
   showConfirmDialog(
-    '删除收藏',
-    `<div style="line-height:1.7">确认清空 <strong>攻击方与防御方的收藏列表</strong>吗？</div>
-     <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">此操作与精灵面板中的「重置收藏」等价，将恢复为默认列表。</div>`,
+    t('confirm.clearFav.title'),
+    t('confirm.clearFav.body'),
     () => {
       _clearAllFavorites();
       refreshPickerGrid('attacker');
@@ -536,17 +574,17 @@ function importData(file) {
     try {
       data = JSON.parse(e.target.result);
     } catch (_) {
-      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件不是有效的 JSON，请检查文件内容。</div>', null);
+      showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.json')}</div>`, null);
       return;
     }
     if (!data || typeof data !== 'object' || data.version !== 1) {
-      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件格式不正确或版本不兼容。</div>', null);
+      showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.format')}</div>`, null);
       return;
     }
     const hasFavorites = data.favorites && typeof data.favorites === 'object';
     const hasConfigs = data.spiritConfigs && typeof data.spiritConfigs === 'object';
     if (!hasFavorites && !hasConfigs) {
-      showConfirmDialog('导入失败', '<div style="line-height:1.7">文件中未包含任何可导入的数据。</div>', null);
+      showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.empty')}</div>`, null);
       return;
     }
     const favCount = hasFavorites
@@ -555,16 +593,14 @@ function importData(file) {
       : 0;
     const cfgCount = hasConfigs ? Object.keys(data.spiritConfigs).length : 0;
     showConfirmDialog(
-      '确认导入',
-      `<div style="line-height:1.7">即将导入：<br>
-       ・收藏精灵 <strong>${favCount}</strong> 个<br>
-       ・记忆配置 <strong>${cfgCount}</strong> 条</div>
-       <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">导入将覆盖现有数据，页面将自动刷新。</div>`,
+      t('import.confirm.title'),
+      `<div style="line-height:1.7">${t('import.confirm.body', { fav: favCount, cfg: cfgCount })}</div>
+       <div style="color:var(--text-secondary);margin-top:8px;font-size:0.88em">${t('import.confirm.note')}</div>`,
       () => _applyImportedData(data, hasFavorites, hasConfigs)
     );
   };
   reader.onerror = () => {
-    showConfirmDialog('导入失败', '<div style="line-height:1.7">读取文件失败，请重试。</div>', null);
+    showConfirmDialog(t('import.error.title'), `<div style="line-height:1.7">${t('import.error.read')}</div>`, null);
   };
   reader.readAsText(file);
 }
@@ -667,7 +703,8 @@ function _refreshFavoriteBtn(side) {
   const fav = spirit ? isFavorite(side, spirit.id) : false;
   btn.classList.toggle('is-fav', fav);
   btn.innerHTML = fav ? _FAV_ICON_FILLED : _FAV_ICON_OUTLINE;
-  btn.title = fav ? '取消收藏' : '加入收藏';
+  btn.title = t(fav ? 'favorite.remove.title' : 'favorite.add.title');
+  btn.setAttribute('aria-label', t(fav ? 'favorite.remove.aria' : 'favorite.add.aria'));
   btn.setAttribute('aria-pressed', fav ? 'true' : 'false');
 }
 
@@ -909,20 +946,22 @@ function formatBuff(val) {
 const YUANLI_SKILLS = Object.keys(ELEMENTS).map(el => ({
   id: '__yuanli_' + el + '__',
   name: '愿力冲击',
+  name_en: 'Wishpower Blast',
   category: '攻击',
   element: el + '系',
   damage_class: '自适应',
   power: 80,
   modKey: '__yuanli__',
   desc: '造成伤害，伤害类型取决于精灵双攻更高的一项，应对状态：本次威力+150%。',
+  desc_en: "Deals damage. The damage type is determined by the spirit's higher Attack or Magic Attack. Counter: this skill's Power +150%.",
   icon_url: `./images/愿力冲击_${el}.webp`
 }));
 
 // Build defense skill list for a given defender (defense category only, plus "无" pseudo)
 function getDefenseSkillOptions(defender) {
   const opts = [
-    { id: '__none__', name: '无', reduction: 1, _pseudo: true },
-    { id: '__state__', name: '聚能', category: '状态', desc: '用于使攻击方能够应对状态。', icon_url: './images/聚能.webp' }
+    { id: '__none__', name: '无', name_en: 'None', reduction: 1, _pseudo: true },
+    { id: '__state__', name: '聚能', name_en: 'Rest', category: '状态', desc: '用于使攻击方能够应对状态。', desc_en: "Used to let the attacker trigger Counter effects.", icon_url: './images/聚能.webp' }
   ];
   if (!defender) return opts;
   for (const sid of (defender.skills || [])) {
@@ -950,9 +989,13 @@ function getAttackSkillOptions(attacker) {
 function findSkillByName(name, category) {
   const trimmed = (name || '').trim();
   if (!trimmed) return null;
-  const s = SKILLS[trimmed];
+  // 中文名优先（数据 id === 中文名），其次按官方英文名反查。
+  const id = SKILLS[trimmed]
+    ? trimmed
+    : SKILL_ID_BY_NAME_EN[normalizeSkillInputName(trimmed)];
+  const s = id ? SKILLS[id] : null;
   if (s && s.category === category) {
-    return { id: trimmed, ...s };
+    return { id, ...s };
   }
   return null;
 }
@@ -1652,29 +1695,35 @@ function escapeAttr(s) {
 function _renderPickerOptionsHTML(side, list) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   if (list.length === 0) {
-    return `<div class="spirit-picker-empty">没有匹配的精灵<button type="button" onclick="resetPickerFilter('${side}')">清除筛选</button></div>`;
+    return `<div class="spirit-picker-empty">${t('picker.empty')}<button type="button" onclick="resetPickerFilter('${side}')">${t('picker.clearFilter')}</button></div>`;
   }
   return list.map(([id, s]) => {
-    const types = (s.types || []).map(t => elOf(t));
+    const name = displayName(s);
+    const initial = escapeAttr(name.slice(0, 1));
+    const types = (s.types || []).map(raw => elOf(raw));
     const primaryColor = types[0]?.color || '#888';
-    const tagsHTML = types.map(t =>
-      t.iconUrl
-        ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
-        : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+    const tagsHTML = types.map(el =>
+      el.iconUrl
+        ? `<img class="type-icon" src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}">`
+        : `<span class="type-tag" style="--tag-color:${el.color};--tag-bg:${el.color}20;">${el.emoji} ${displayEl(el)}</span>`
     ).join('');
     const illus = s.illustration_url
-      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(s.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
-      : `<div class="placeholder" style="--el-color:${primaryColor}">${(s.name||'').slice(0,1)}</div>`;
+      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${initial}',style:'--el-color:${primaryColor}'}))">`
+      : `<div class="placeholder" style="--el-color:${primaryColor}">${initial}</div>`;
     const isCurrent = !!(spirit && spirit.id === id);
+    const optionAria = t('picker.option.aria', {
+      name,
+      current: isCurrent ? t('picker.option.current') : ''
+    });
     return `
       <div class="spirit-picker-option ${isCurrent ? 'current' : ''}" role="button" tabindex="0"
-           aria-label="选择 ${s.name}${isCurrent ? '（当前）' : ''}"
+           aria-label="${escapeAttr(optionAria)}"
            data-spirit-id="${id}"
            style="--el-color:${primaryColor}"
            onclick="selectSpirit('${side}', '${id}')"
            onkeydown="onSpiritPickerOptionKey(event, '${side}', '${id}')">
         <div class="picker-image">${illus}</div>
-        <div class="picker-name">${s.name}</div>
+        <div class="picker-name" title="${name}">${name}</div>
         <div class="picker-types">${tagsHTML}</div>
       </div>
     `;
@@ -1714,9 +1763,10 @@ function filterSpirits(side, filter) {
     }
     if (text) {
       const name = stripSpaces(normParens(s.name || '')).toLowerCase();
+      const nameEn = stripSpaces(normParens(s.name_en || '')).toLowerCase();
       const py = stripSpaces(normParens(s.pinyin || ''));
       const ini = stripSpaces(normParens(s.pinyin_initials || ''));
-      let matched = name.includes(text) || py.includes(text) || ini.includes(text);
+      let matched = name.includes(text) || nameEn.includes(text) || py.includes(text) || ini.includes(text);
       // 纯数字输入时，也按图鉴 id (hbid) 搜索
       if (!matched && /^\d+$/.test(text)) {
         matched = String(s.hbid ?? '').includes(text);
@@ -1737,14 +1787,18 @@ function renderPickerToolbar(side, filter) {
     const el = ELEMENTS[key];
     if (!el) return '';
     const isActive = filter.elements.has(key);
+    const elName = displayEl(el);
     const iconHTML = el.iconUrl
-      ? `<img class="chip-icon" src="${el.iconUrl}" loading="lazy" alt="${el.name}">`
+      ? `<img class="chip-icon" src="${el.iconUrl}" loading="lazy" alt="${elName}">`
       : `<span class="chip-emoji" aria-hidden="true">${el.emoji}</span>`;
+    const tipKey = filter.elements.has(key)
+      ? 'picker.element.cancel'
+      : (filter.elements.size >= 2 ? 'picker.element.max' : 'picker.element.filter');
     return `<button type="button" class="spirit-picker-chip element-chip${isActive ? ' active' : ''}"
               data-element="${key}"
               onclick="togglePickerElement('${side}', '${key}')"
               aria-pressed="${isActive ? 'true' : 'false'}"
-              title="${el.name}（${filter.elements.has(key) ? '点击取消' : (filter.elements.size >= 2 ? '最多选 2 个系别' : '点击筛选')}）">${iconHTML}</button>`;
+              title="${t('picker.element.title', { element: elName, tip: t(tipKey) })}">${iconHTML}</button>`;
   }).join('');
 
   const searchVal = escapeAttr(filter.text || '');
@@ -1758,13 +1812,13 @@ function renderPickerToolbar(side, filter) {
         <input id="${side}-picker-search" type="text" inputmode="search"
                value="${searchVal}"
                oninput="onPickerSearchInput('${side}', this.value)"
-               placeholder="搜索：名称 / 拼音 / 首字母 / 图鉴编号"
-               aria-label="搜索精灵">
+               placeholder="${t('picker.search.placeholder')}"
+               aria-label="${t('picker.search.aria')}">
       </div>
       <button type="button" class="spirit-picker-chip common${commonActive}"
               onclick="togglePickerCommon('${side}')"
               aria-pressed="${filter.common ? 'true' : 'false'}"
-              title="${filter.common ? '取消"收藏"筛选' : '只显示收藏精灵'}">
+              title="${filter.common ? t('picker.common.on') : t('picker.common.off')}">
         <svg class="chip-icon" xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"></path></svg>
       </button>
       ${elementChips}
@@ -1920,10 +1974,10 @@ function renderSpiritPicker(side, opts) {
   skillsSection.style.display = 'none';
   statsSection.style.display = 'none';
 
-  const titleText = side === 'attacker' ? '选择攻击方精灵' : '选择防御方精灵';
+  const titleText = t(side === 'attacker' ? 'picker.title.attacker' : 'picker.title.defender');
   // 始终渲染“取消”按钮，未选精灵时用 is-hidden 保留占位，避免排版跳动
   const cancelHiddenCls = spirit ? '' : ' is-hidden';
-  const cancelBtn = `<button class="picker-btn${cancelHiddenCls}" type="button" onclick="exitSpiritPicker('${side}')" aria-label="取消更换" tabindex="${spirit ? 0 : -1}">取消</button>`;
+  const cancelBtn = `<button class="picker-btn${cancelHiddenCls}" type="button" onclick="exitSpiritPicker('${side}')" aria-label="${t('picker.cancel.aria')}" tabindex="${spirit ? 0 : -1}">${t('picker.cancel')}</button>`;
 
   const filter = state.spiritPickerFilter[side];
   const toolbarHTML = renderPickerToolbar(side, filter);
@@ -1974,8 +2028,8 @@ function refreshPickerToolbar(side) {
     commonChip.classList.toggle('active', filter.common);
     commonChip.setAttribute('aria-pressed', filter.common ? 'true' : 'false');
     commonChip.title = filter.common
-      ? '点击取消"收藏"筛选'
-      : '点击只显示收藏精灵';
+      ? t('picker.common.on')
+      : t('picker.common.off');
   }
 
   // 系别 chip
@@ -1986,10 +2040,10 @@ function refreshPickerToolbar(side) {
     const active = filter.elements.has(key);
     chip.classList.toggle('active', active);
     chip.setAttribute('aria-pressed', active ? 'true' : 'false');
-    const tip = active
-      ? '点击取消'
-      : (filter.elements.size >= 2 ? '最多选 2 个系别' : '点击筛选');
-    chip.title = `${el.name}（${tip}）`;
+    const tipKey = active
+      ? 'picker.element.cancel'
+      : (filter.elements.size >= 2 ? 'picker.element.max' : 'picker.element.filter');
+    chip.title = t('picker.element.title', { element: displayEl(el), tip: t(tipKey) });
   });
 }
 
@@ -2035,30 +2089,36 @@ function renderSpiritCard(side, opts) {
   if (!spirit) return;
   const selectArea = document.getElementById(`${side}-select-area`);
   const skillsSection = document.getElementById(`${side}-skills`);
-  const types = (spirit.types || []).map(t => elOf(t));
+  const types = (spirit.types || []).map(raw => elOf(raw));
   const primaryColor = types[0]?.color || '#888';
-  const tagsHTML = types.map(t =>
-    t.iconUrl
-      ? `<img class="type-icon" src="${t.iconUrl}" loading="lazy" alt="${t.name}">`
-      : `<span class="type-tag" style="--tag-color:${t.color};--tag-bg:${t.color}20;">${t.emoji} ${t.name}</span>`
+  const tagsHTML = types.map(el =>
+    el.iconUrl
+      ? `<img class="type-icon" src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}">`
+      : `<span class="type-tag" style="--tag-color:${el.color};--tag-bg:${el.color}20;">${el.emoji} ${displayEl(el)}</span>`
   ).join('');
+  const spiritName = displayName(spirit);
+  const initial = escapeAttr(spiritName.slice(0, 1));
   const illus = spirit.illustration_url
-    ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${(spirit.name||'').slice(0,1)}',style:'--el-color:${primaryColor}'}))">`
-    : `<div class="placeholder" style="--el-color:${primaryColor}">${(spirit.name||'').slice(0,1)}</div>`;
+    ? `<img src="${spirit.illustration_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${initial}',style:'--el-color:${primaryColor}'}))">`
+    : `<div class="placeholder" style="--el-color:${primaryColor}">${initial}</div>`;
   // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
   // 比 body class 路线可靠（见 renderSpiritPicker 注释）。
   const skipAnim = !!(opts && opts.skipAnimation);
   const animStyle = skipAnim ? '; animation: none' : '';
+  const changeAria = t('spirit.changeAria', {
+    side: t(side === 'attacker' ? 'side.attacker' : 'side.defender'),
+    name: spiritName
+  });
   selectArea.innerHTML = `
     <div class="spirit-card" role="button" tabindex="0"
-         aria-label="更换${side === 'attacker' ? '攻击方' : '防御方'}精灵（当前：${spirit.name}）"
+         aria-label="${escapeAttr(changeAria)}"
          onclick="enterSpiritPicker('${side}')"
          onkeydown="onSpiritCardKey(event, '${side}')"
          style="--el-color:${primaryColor}${animStyle}">
       <div class="spirit-image">${illus}</div>
-      <div class="name">${spirit.name}</div>
+      <div class="name">${spiritName}</div>
       <div class="type-tags">${tagsHTML}</div>
-      <div class="change-hint">点击更换</div>
+      <div class="change-hint">${t('spirit.changeHint')}</div>
     </div>
   `;
   skillsSection.style.display = 'block';
@@ -2132,7 +2192,7 @@ function selectSpirit(side, id) {
         state.attackSkill    = { id: savedA.skillId, ...customSk };
         state.attackSkillIdx = CUSTOM_SKILL_IDX;
         state.customSkillResolved.attacker = state.attackSkill;
-        state.customSkillInput.attacker    = customSk.name;
+        state.customSkillInput.attacker    = displayName(customSk);
       } else {
         state.attackSkill    = opts[0] || null;
         state.attackSkillIdx = state.attackSkill ? 0 : -1;
@@ -2183,7 +2243,7 @@ function selectSpirit(side, id) {
         state.defenseSkill    = { id: savedD.skillId, ...customSk };
         state.defenseSkillIdx = CUSTOM_SKILL_IDX;
         state.customSkillResolved.defender = state.defenseSkill;
-        state.customSkillInput.defender    = customSk.name;
+        state.customSkillInput.defender    = displayName(customSk);
       } else {
         state.defenseSkill    = opts[0]; // "无"
         state.defenseSkillIdx = 0;
@@ -2237,6 +2297,13 @@ function renderStatsConfig(side) {
     const isDown = nature.down === statKey;
     const hasIV  = ivs.includes(statKey);
     const finalVal = getFinalStat(spirit, statKey, nature, ivs);
+    const statLabel = t(`stat.${statKey}`);
+    const natureState = t(isUp ? 'nature.up' : isDown ? 'nature.down' : 'nature.unset');
+    const ivState = t(hasIV ? 'iv.selected' : 'iv.unselected');
+    const natureAria = t('stat.nature.aria', { stat: statLabel, state: natureState });
+    const natureTitle = t('stat.nature.title', { state: natureState });
+    const ivAria = t('stat.iv.aria', { stat: statLabel, state: ivState });
+    const ivTitle = t('stat.iv.title', { state: ivState });
     // Determine if this slot can be assigned (only if both natures are not yet set, and slot is empty)
     // The slot is "available" if: (no up and no down) OR (only up set and this slot is not the up) OR (only down set and this slot is not the down)
     const noNature = !nature.up && !nature.down;
@@ -2250,22 +2317,22 @@ function renderStatsConfig(side) {
       <div class="stat-cell" data-stat="${statKey}">
         <div class="nature-slot ${isUp ? 'up' : ''} ${isDown ? 'down' : ''} ${!isUp && !isDown && !natureAvailable ? 'disabled' : ''}"
              role="button" tabindex="${(!isUp && !isDown && !natureAvailable) ? -1 : 0}"
-             aria-label="${STAT_LABELS[statKey]} 性格：${isUp ? '正面' : isDown ? '负面' : '未设置'}（点击切换）"
+             aria-label="${escapeAttr(natureAria)}"
              aria-pressed="${(isUp || isDown) ? 'true' : 'false'}"
-             title="性格: ${isUp ? '正面' : isDown ? '负面' : '未设置'}"
+             title="${escapeAttr(natureTitle)}"
              onclick="onNatureSlotClick('${side}', '${statKey}', event)"
              onkeydown="onNatureSlotKey(event, '${side}', '${statKey}')">
           ${isUp ? '▲' : isDown ? '▼' : ''}
         </div>
         <div class="stat-center">
-          <div class="stat-label">${STAT_LABELS[statKey]}</div>
+          <div class="stat-label">${statLabel}</div>
           <div class="stat-value">${finalVal}</div>
         </div>
         <div class="iv-slot ${hasIV ? 'active' : ''} ${!hasIV && !ivAddable ? 'disabled' : ''}"
              role="button" tabindex="${!hasIV && !ivAddable ? -1 : 0}"
-             aria-label="${STAT_LABELS[statKey]} 个体值：${hasIV ? '已选' : '未选'}（点击切换）"
+             aria-label="${escapeAttr(ivAria)}"
              aria-pressed="${hasIV ? 'true' : 'false'}"
-             title="个体值: ${hasIV ? '已选' : '未选'}"
+             title="${escapeAttr(ivTitle)}"
              onclick="onIVSlotClick('${side}', '${statKey}', event)"
              onkeydown="onIVSlotKey(event, '${side}', '${statKey}')">
           ${hasIV ? '(+60)' : ''}
@@ -2435,8 +2502,8 @@ function attachChipDrag(chip, opts) {
 // (or def/mdef) stat by ±10% per 8px; double-click to reset.
 // ============================================================
 const BUFF_STAT_CONFIGS = {
-  attacker: [{ key: 'atk',  label: '物攻' }, { key: 'matk', label: '魔攻' }],
-  defender: [{ key: 'def',  label: '物防' }, { key: 'mdef', label: '魔防' }]
+  attacker: [{ key: 'atk' }, { key: 'matk' }],
+  defender: [{ key: 'def' }, { key: 'mdef' }]
 };
 const BUFF_DRAG_PX_PER_STEP = 8;   // 8px → 10% step
 const BUFF_STEP_PCT = 10;
@@ -2456,18 +2523,20 @@ function renderBuffChips(side) {
   // atk/matk (or def/mdef) chips. Always present on both sides.
   const val = getSpeed(side);
   const cls = _buffChipClass(val);
+  const speedLabel = t('buffLabel.speed');
   const speedHTML = `<div class="buff-chip ${cls}"
-                          aria-label="${SPEED_LABEL} 调整（当前 ${formatSpeed(val)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                          aria-label="${escapeAttr(t('buff.adjust.aria', { label: speedLabel, value: formatSpeed(val) }))}"
                           data-side="${side}" data-stat="speed"
-                          title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${SPEED_LABEL} <span class="buff-val">${formatSpeed(val)}</span></div>`;
+                          title="${escapeAttr(t('buff.title'))}">${speedLabel} <span class="buff-val">${formatSpeed(val)}</span></div>`;
 
   const buffsHTML = configs.map(c => {
     const bv = getBuff(side, c.key);
     const bcls = _buffChipClass(bv);
+    const label = t(`buffLabel.${c.key}`);
     return `<div class="buff-chip ${bcls}"
-                 aria-label="${c.label} 调整（当前 ${formatBuff(bv)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                 aria-label="${escapeAttr(t('buff.adjust.aria', { label, value: formatBuff(bv) }))}"
                  data-side="${side}" data-stat="${c.key}"
-                 title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${c.label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
+                 title="${escapeAttr(t('buff.title'))}">${label} <span class="buff-val">${formatBuff(bv)}</span></div>`;
   }).join('');
 
   container.innerHTML = speedHTML + buffsHTML;
@@ -2532,13 +2601,11 @@ function renderBuffChips(side) {
 //   single always-visible 威力 chip, and adds a symmetric
 //   连击数 chip for adjusting the hit count.
 // ============================================================
-const POWER_LABEL = '威力';
 const POWER_MIN = -990;
 const POWER_MAX = 990;
 const POWER_STEP = 10;
 const POWER_DRAG_PX_PER_STEP = 8;
 
-const COMBO_LABEL = '连击';
 const COMBO_MIN = -99;
 const COMBO_MAX = 99;
 const COMBO_STEP = 1;
@@ -2578,18 +2645,20 @@ function renderPowerBoostChip() {
   // 连击数 chip — rendered first so it sits to the LEFT of 威力.
   const comboVal = getComboBoost();
   const comboCls = _buffChipClass(comboVal);
+  const comboLabel = t('buffLabel.combo');
   const comboHTML = `<div class="buff-chip ${comboCls}"
-                            aria-label="${COMBO_LABEL} 调整（当前 ${formatComboBoost(comboVal)}，左右拖动或滚轮调整 / 双击重置）"
+                            aria-label="${escapeAttr(t('buff.adjust.aria.combo', { label: comboLabel, value: formatComboBoost(comboVal) }))}"
                             data-stat="combo"
-                            title="左右拖动或滚轮调整 · 双击重置">${COMBO_LABEL} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
+                            title="${escapeAttr(t('buff.title.combo'))}">${comboLabel} <span class="buff-val">${formatComboBoost(comboVal)}</span></div>`;
 
   // 威力 chip.
   const powerVal = getPowerBoost();
   const powerCls = _buffChipClass(powerVal);
+  const powerLabel = t('buffLabel.power');
   const powerHTML = `<div class="buff-chip ${powerCls}"
-                            aria-label="${POWER_LABEL} 调整（当前 ${formatPowerBoost(powerVal)}，左右拖动或滚轮调整 / shift+滚轮精细调整 / 双击重置）"
+                            aria-label="${escapeAttr(t('buff.adjust.aria', { label: powerLabel, value: formatPowerBoost(powerVal) }))}"
                             data-stat="power"
-                            title="左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置">${POWER_LABEL} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
+                            title="${escapeAttr(t('buff.title'))}">${powerLabel} <span class="buff-val">${formatPowerBoost(powerVal)}</span></div>`;
 
   container.innerHTML = comboHTML + powerHTML;
 
@@ -2642,7 +2711,6 @@ function renderPowerBoostChip() {
 // behaviour mirrors the buff chips (press-and-drag horizontal,
 // wheel, dblclick to reset). Range [-990, +990], step 10.
 // ============================================================
-const SPEED_LABEL = '速度';
 const SPEED_MIN = -990;
 const SPEED_MAX = 990;
 const SPEED_STEP = 10;
@@ -2706,7 +2774,7 @@ function renderSkillIconHTML(sk, el) {
   // Element icon overlay at top-left corner (only when an iconUrl is available)
   let elOverlay = '';
   if (el && el.iconUrl) {
-    elOverlay = `<div class="el-overlay"><img src="${el.iconUrl}" loading="lazy" alt="${el.name}"></div>`;
+    elOverlay = `<div class="el-overlay"><img src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}"></div>`;
   }
   return main + elOverlay;
 }
@@ -3040,6 +3108,8 @@ function buildModIconNode(skill, active, side) {
   const el = elOf(skill.element);
   const span = document.createElement('span');
   span.className = `mod-icon ${active ? 'active' : 'inactive'} enter`;
+  // 待适配本地化
+  // span.title = t('mod.title', { name: displayName(skill), desc: displayDesc(skill) });
   span.title = getModIconTitle(skill, side);
   // 可点击的 manual mod：附加点击 / 键盘交互 + 悬停样式。
   // 数字型（skillModUsesModal）点击打开 #mod-modal；布尔型直接 toggle。
@@ -3078,7 +3148,7 @@ function buildModIconNode(skill, active, side) {
     const img = document.createElement('img');
     img.src = skill.icon_url;
     img.loading = 'lazy';
-    img.alt = skill.name;
+    img.alt = displayName(skill);
     img.onerror = () => {
       const ph = document.createElement('div');
       ph.className = 'mod-icon-placeholder';
@@ -3235,32 +3305,65 @@ function refreshAllModIcons() {
   renderModIcons('defender');
 }
 
-// Build the badge row (物攻/魔攻 + 威力 * 减伤) — multiple badges
+// Build the badge row (伤害类型 + 威力，或减伤) — 单行显示
 // `powerClass` optionally adds 'super-effective' / 'not-effective' to the power badge
 function renderInlineBadge(sk, powerClass = '') {
   if (sk._pseudo) return '';
   const badges = [];
-  if (sk.damage_class === '物攻') {
-    badges.push(`<span class="skill-badge atk">物攻</span>`);
-  } else if (sk.damage_class === '魔攻') {
-    badges.push(`<span class="skill-badge matk">魔攻</span>`);
-  } else if (sk.damage_class === '自适应') {
-    // 愿力冲击：伤害类型由精灵当前最终物攻/魔攻中较高者决定
-    badges.push(`<span class="skill-badge auto">自适应</span>`);
-  }
   if (sk.damage_class) {
-    // attack skill: show power
-    const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
+    // 伤害类型与威力合并成一枚徽章（中英文同一套渲染逻辑）：
+    //   zh: 物攻 100 / 魔攻 100 / 自适应 100
+    //   en: PHYS 100 / MAG 100 / ADP 100
+    // 合并后宽度足够放进技能卡右侧文本列，不会再压到左侧 48px icon。
+    const dcKey = sk.damage_class === '物攻' ? 'atk'
+                : sk.damage_class === '魔攻' ? 'matk'
+                : sk.damage_class === '自适应' ? 'auto'
+                : '';
     const comboSuffix = sk.combo != null ? `x${sk.combo}` : '';
-    badges.push(`<span class="${cls}">威力 ${sk.power}${comboSuffix}</span>`);
+    const powerValue = `${sk.power}${comboSuffix}`;
+    const cls = powerClass ? `skill-badge power ${powerClass}` : 'skill-badge power';
+    const label = dcKey
+      ? `${t(`badge.${dcKey}Short`)} ${powerValue}`
+      : t('badge.power', { power: powerValue });
+    const title = dcKey
+      ? `${t(`badge.${dcKey}`)} · ${t('badge.power', { power: powerValue })}`
+      : label;
+    badges.push(`<span class="${cls}" title="${escapeAttr(title)}">${label}</span>`);
   }
   if (sk.reduction !== undefined) {
     // defense skill: show reduction
     const pct = Math.round((1 - (sk.reduction ?? 0)) * 100);
-    badges.push(`<span class="skill-badge reduction">减伤 ${pct}%</span>`);
+    badges.push(
+      `<span class="skill-badge reduction" title="${escapeAttr(t('badge.reductionTitle', { pct }))}">${t('badge.reduction', { pct })}</span>`
+    );
   }
   return badges.join('');
 }
+
+// 技能名自动缩字：.skill-name 在 CSS 中限制为最多两行。
+// 两行仍放不下（极长英文名 / 窄屏）时逐级缩小字号，最低 10.5px
+// （保证 375px 屏的 "Super Acceleration" 这类长单词也能完整放进两行）；
+// 仍未放下则由 -webkit-line-clamp 显示省略号。
+const SKILL_NAME_MIN_FONT = 10.5;
+function fitSkillNamesIn(scope) {
+  if (!scope) return;
+  scope.querySelectorAll('.skill-name').forEach(el => {
+    if (!el.clientWidth || !el.clientHeight) return;   // 隐藏状态不测量
+    el.style.fontSize = '';
+    const maxSize = parseFloat(getComputedStyle(el).fontSize);
+    let size = maxSize;
+    while (el.scrollHeight > el.clientHeight + 1 && size > SKILL_NAME_MIN_FONT) {
+      size = Math.max(SKILL_NAME_MIN_FONT, size - 0.5);
+      el.style.fontSize = `${size}px`;
+    }
+  });
+}
+
+// 面板宽度随断点/布局变化时重新适配。.skill-list-inner 在 renderSkills
+// 中复用，重复 observe 同一元素是幂等的，不会产生重复回调。
+const _skillNameRO = typeof ResizeObserver === 'function'
+  ? new ResizeObserver(entries => entries.forEach(entry => fitSkillNamesIn(entry.target)))
+  : null;
 
 function renderSkills(side) {
   // .skill-list 是外层（高度对齐 + 宽度补偿），实际 grid 在
@@ -3272,7 +3375,7 @@ function renderSkills(side) {
     const inner = _inner(list);
     const opts = getAttackSkillOptions(state.attacker);
     if (!opts.length) {
-      inner.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">无可用攻击技能</div>`;
+      inner.innerHTML = `<div style="grid-column:1/-1;color:var(--text-secondary);font-size:0.8rem;padding:8px;">${t('skills.noAttackSkills')}</div>`;
       return;
     }
     // For each attack skill, determine power-badge color based on
@@ -3294,14 +3397,16 @@ function renderSkills(side) {
         <button class="skill-btn ${idx === state.attackSkillIdx ? 'active' : ''}"
                 data-idx="${idx}"
                 onclick="selectAttackSkill(${idx})">
-          <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
+          <div class="skill-icon"${displayDesc(sk) ? ` title="${escapeAttr(displayDesc(sk))}"` : ''}>${renderSkillIconHTML(sk, el)}</div>
           <div class="skill-content">
-            <span class="skill-name">${sk.name}</span>
+            <span class="skill-name" title="${escapeAttr(displayName(sk))}">${displayName(sk)}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk, powerClass)}</div>
           </div>
         </button>
       `;
     }).join('') + _buildCustomSkillSlotHTML('attacker');
+    fitSkillNamesIn(inner);
+    if (_skillNameRO) _skillNameRO.observe(inner);
   } else {
     const list = document.getElementById('defender-skill-list');
     const inner = _inner(list);
@@ -3316,14 +3421,16 @@ function renderSkills(side) {
         <button class="skill-btn ${idx === state.defenseSkillIdx ? 'active' : ''}"
                 data-idx="${idx}"
                 onclick="selectDefenseSkill(${idx})">
-          <div class="skill-icon"${sk.desc ? ` title="${sk.desc}"` : ''}>${iconHTML}</div>
+          <div class="skill-icon"${displayDesc(sk) ? ` title="${escapeAttr(displayDesc(sk))}"` : ''}>${iconHTML}</div>
           <div class="skill-content">
-            <span class="skill-name">${isNone ? '无' : sk.name}</span>
+            <span class="skill-name" title="${escapeAttr(isNone ? t('skills.none') : displayName(sk))}">${isNone ? t('skills.none') : displayName(sk)}</span>
             <div class="skill-badges-row">${renderInlineBadge(sk)}</div>
           </div>
         </button>
       `;
     }).join('') + _buildCustomSkillSlotHTML('defender');
+    fitSkillNamesIn(inner);
+    if (_skillNameRO) _skillNameRO.observe(inner);
   }
 }
 
@@ -3386,7 +3493,8 @@ function _buildCustomSkillSlotHTML(side) {
     badgesHTML = renderInlineBadge(resolved, powerClass);
   }
 
-  const titleAttr = resolved && resolved.desc ? ` title="${resolved.desc}"` : '';
+  const resolvedDesc = resolved ? displayDesc(resolved) : '';
+  const titleAttr = resolvedDesc ? ` title="${escapeAttr(resolvedDesc)}"` : '';
   const disabledAttr = state.challenge.running ? ' disabled' : '';
 
   return `
@@ -3398,7 +3506,7 @@ function _buildCustomSkillSlotHTML(side) {
         <input class="custom-skill-input"
                type="text"
                value="${escapedInput}"
-               placeholder="自定义技能"
+               placeholder="${escapeAttr(t('skills.custom.placeholder'))}"
                ${disabledAttr}
                onclick="event.stopPropagation()"
                oninput="onCustomSkillInput('${side}', this.value)">
@@ -3429,7 +3537,8 @@ function _renderCustomSkillSlot(side) {
     if (resolved) {
       const el = elOf(resolved.element);
       iconEl.innerHTML = renderSkillIconHTML(resolved, el);
-      if (resolved.desc) iconEl.setAttribute('title', resolved.desc);
+      const desc = displayDesc(resolved);
+      if (desc) iconEl.setAttribute('title', desc);
       else iconEl.removeAttribute('title');
     } else {
       iconEl.innerHTML = `<div class="placeholder custom-skill-placeholder" style="--el-color:#666">?</div>`;
@@ -3680,14 +3789,23 @@ function isFirstStrike(ctx) {
   const lastStrike = !!LAST_STRIKE_SKILLS[ctx.attackSkill.id];
   const faster = ctx.attackerEffectiveSpeed > ctx.defenderEffectiveSpeed;
   const reacted = ctx.attackSkill.desc.includes('应对状态：') && ctx.defenseSkill.category === '状态';
-  if (ctx.defenseSkill.category === '防御' || lastStrike) return [false, ''];
-  if (!(firstStrike || faster || reacted)) return [false, ''];
+  if (ctx.defenseSkill.category === '防御' || lastStrike) return [false, null];
+  if (!(firstStrike || faster || reacted)) return [false, null];
   const reason = firstStrike
-    ? `先手技能 ${ctx.attackSkill.name}`
+    ? { key: 'reason.firstStrikeSkill', params: { skill: displayName(ctx.attackSkill) } }
     : reacted
-    ? '应对必定先手'
-    : `速度 ${ctx.attackerEffectiveSpeed} > ${ctx.defenderEffectiveSpeed}`;
+    ? { key: 'reason.counterAlwaysFirst' }
+    : {
+        key: 'reason.speedHigher',
+        params: {
+          attacker: ctx.attackerEffectiveSpeed,
+          defender: ctx.defenderEffectiveSpeed
+        }
+      };
   return [true, reason];
+}
+function reasonText(reason) {
+  return reason ? t(reason.key, reason.params) : '';
 }
 const SKILL_MODS = {
   // 多维击打：敌方每有 1 层星陨，本次连击 +1
@@ -3696,7 +3814,7 @@ const SKILL_MODS = {
     if (!ctx.starLayer) return null;
     return {
       comboAdd: ctx.starLayer,
-      notes: [`连击 +${ctx.starLayer}（星陨 ${ctx.starLayer} 层）`],
+      notes: [{ key: 'mod.comboStar', params: { add: ctx.starLayer, layer: ctx.starLayer } }],
     };
   },
   // 观星：地系技能威力每层星陨 +20%
@@ -3707,7 +3825,7 @@ const SKILL_MODS = {
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
-      notes: [`威力 +${Math.floor(multAdd*100)}%（星陨 ${ctx.starLayer} 层 ×20%）`],
+      notes: [{ key: 'mod.powerStarPct', params: { pct: Math.floor(multAdd * 100), layer: ctx.starLayer } }],
     };
   },
   // 坠星：全技能威力每层星陨 +20%
@@ -3717,7 +3835,7 @@ const SKILL_MODS = {
     const multAdd = 0.2 * ctx.starLayer;
     return {
       powerMultAdd: multAdd,
-      notes: [`威力 +${Math.floor(multAdd*100)}%（星陨 ${ctx.starLayer} 层 ×20%）`],
+      notes: [{ key: 'mod.powerStarPct', params: { pct: Math.floor(multAdd * 100), layer: ctx.starLayer } }],
     };
   },
   // 天体吸积：每 1 层星陨印记，技能威力 +20
@@ -3727,7 +3845,7 @@ const SKILL_MODS = {
     const add = 20 * ctx.starLayer;
     return {
       powerAdd: add,
-      notes: [`威力 +${add}（星陨 ${ctx.starLayer} 层 ×20）`],
+      notes: [{ key: 'mod.powerStarFlat', params: { add, layer: ctx.starLayer } }],
     };
   },
   // 星痕：若对手有印记，本次技能威力 +40
@@ -3736,7 +3854,7 @@ const SKILL_MODS = {
     if (!ctx.starLayer) return null;
     return {
       powerAdd: 40,
-      notes: ['威力 +40（有至少一层印记）'],
+      notes: [{ key: 'mod.powerMark' }],
     };
   },
   // 狂欢开始：本精灵受到的克制伤害+25%
@@ -3745,7 +3863,7 @@ const SKILL_MODS = {
     if (effectiveness(ctx.attackSkill.element, ctx.defender.types) <= 1) return null;
     return {
       powerMult: 1.25,
-      notes: ['威力 ×1.25（额外克制伤害）'],
+      notes: [{ key: 'mod.powerExtraSuper' }],
     };
   },
   // 顺风（岚鸟特性）：若先于敌方攻击，本次技能威力 +50%。
@@ -3760,7 +3878,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       powerMultAdd: 0.5,
-      notes: [`威力 +50%（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.powerFirst', params: { pct: 50, reason: reasonText(reason) } }],
     };
   },
   // 破空（霜翼领主特性）：若先于敌方攻击，本次技能威力 +75%
@@ -3770,7 +3888,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       powerMultAdd: 0.75,
-      notes: [`威力 +75%（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.powerFirst', params: { pct: 75, reason: reasonText(reason) } }],
     };
   },
   // 扇风：若先于敌方攻击，本次技能威力 +50%
@@ -3780,7 +3898,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       powerMultAdd: 0.5,
-      notes: [`威力 +50%（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.powerFirst', params: { pct: 50, reason: reasonText(reason) } }],
     };
   },
   // 疾风刺：若先于敌方攻击，改为3连击
@@ -3790,7 +3908,7 @@ const SKILL_MODS = {
     if (!firstStrike) return null;
     return {
       comboAdd: 2,
-      notes: [`变为3连击（先于敌方攻击 · ${reason}）`],
+      notes: [{ key: 'mod.comboFirst', params: { combo: 3, reason: reasonText(reason) } }],
     };
   },
   // 展翅：自己携带的普通系技能变为翼系技能，若后于对手行动，自己受到的伤害+25%
@@ -3800,7 +3918,7 @@ const SKILL_MODS = {
       if (stripXi(ctx.attackSkill.element) !== '普通') return null;
       return {
         elementOverride: '翼系',
-        notes: ['普通系技能变为翼系'],
+        notes: [{ key: 'mod.commonToWing' }],
       };
     }
     else {
@@ -3808,7 +3926,7 @@ const SKILL_MODS = {
       if (!firstStrike) return null;
       return {
         powerMult: 1.25,
-        notes: [`威力 ×1.25（后于对手行动 · ${reason}）`],
+        notes: [{ key: 'mod.powerAfter', params: { mult: 1.25, reason: reasonText(reason) } }],
       };
     }
   },
@@ -3818,7 +3936,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 龙卷风：应对状态：本次技能威力变为1.5倍
@@ -3827,7 +3945,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 1.5,
-      notes: [`威力 ×1.5（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 1.5 } }],
     };
   },
   // 追打：应对状态：本技能变为3连击
@@ -3836,7 +3954,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboAdd: 2,
-      notes: [`技能变为3连击（应对状态）`],
+      notes: [{ key: 'mod.comboCounter', params: { combo: 3 } }],
     };
   },
   // 炙热波动：应对状态：本次技能威力和赋予灼烧翻倍
@@ -3845,7 +3963,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 虫击：应对状态：本次技能威力变为2倍，无视敌方系别抵抗
@@ -3855,7 +3973,7 @@ const SKILL_MODS = {
     return {
       powerMult: 2,
       ignoreResist: true,
-      notes: [`威力 ×2，无视敌方系别抵抗（应对状态）`],
+      notes: [{ key: 'mod.powerIgnoreResist', params: { mult: 2 } }],
     };
   },
   // 突袭：应对状态：本次技能威力变为3倍
@@ -3864,7 +3982,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 3,
-      notes: [`威力 ×3（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 3 } }],
     };
   },
   // 暗突袭：应对状态：本次技能威力翻倍
@@ -3873,7 +3991,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 爆冲：应对状态：本次技能威力变为5倍
@@ -3882,7 +4000,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 5,
-      notes: [`威力 ×5（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 5 } }],
     };
   },
   // 技巧打击：应对状态：本次技能威力变为10倍
@@ -3891,7 +4009,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 10,
-      notes: [`威力 ×10（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 10 } }],
     };
   },
   // 无影脚：应对状态：本次技能威力变为2倍
@@ -3900,7 +4018,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力 ×2（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 2 } }],
     };
   },
   // 偷袭：应对状态：本次技能威力变为3倍
@@ -3909,7 +4027,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 3,
-      notes: [`威力 ×3（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 3 } }],
     };
   },
   // 散手：应对状态：本技能改为6连击
@@ -3918,7 +4036,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboAdd: 4,
-      notes: [`变为6连击（应对状态）`],
+      notes: [{ key: 'mod.comboCounter', params: { combo: 6 } }],
     };
   },
   // 连续爪击：应对状态：本次技能连击数翻倍
@@ -3927,7 +4045,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       comboMult: 2,
-      notes: [`连击数翻倍（应对状态）`],
+      notes: [{ key: 'mod.comboDoubleCounter' }],
     };
   },
   // 滚雪球：应对状态：额外获得2层，本次技能威力翻倍
@@ -3936,7 +4054,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 吹炎：应对状态：本次技能威力翻倍
@@ -3945,7 +4063,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 地陷：应对状态：本次技能威力翻倍，且物防额外+70%
@@ -3954,7 +4072,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 2,
-      notes: [`威力翻倍（应对状态）`],
+      notes: [{ key: 'mod.powerDoubleCounter' }],
     };
   },
   // 闪燃：应对状态：本次技能威力变为4倍
@@ -3963,7 +4081,7 @@ const SKILL_MODS = {
     if (ctx.defenseSkill.category !== '状态') return null;
     return {
       powerMult: 4,
-      notes: [`威力 ×4（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 4 } }],
     };
   },
   // 灾厄：对自己造成物伤，应对状态：改为对敌方造成物伤，且本次技能威力+120
@@ -3973,13 +4091,13 @@ const SKILL_MODS = {
       return {
         // 相当于不造成伤害
         powerAdd: -9999,
-        notes: [`威力 -9999（对自己造成物伤）`],
+        notes: [{ key: 'mod.selfPhysicalDamage' }],
       };
     }
     else {
       return {
         powerAdd: 120,
-        notes: [`威力 +120（应对状态）`],
+        notes: [{ key: 'mod.powerFlatCounter', params: { add: 120 } }],
       };
     }
   },
@@ -3994,7 +4112,7 @@ const SKILL_MODS = {
     return {
       powerMultAdd: layers * 0.1,
       speedAdd: layers * 5,
-      notes: [`威力 +${layers * 10}%（${layers} 层增益 ×10%）· 速度 +${layers * 5}（${layers} 层增益 ×5）`],
+      notes: [{ key: 'mod.powerSpeedPerBuff', params: { powerPct: layers * 10, speedAdd: layers * 5, layers } }],
     };
   },
   // 急中生智：自己有减益时，本次技能威力 +40
@@ -4009,7 +4127,7 @@ const SKILL_MODS = {
       if (b < 0) {
         return {
           powerAdd: 40,
-          notes: ['威力 +40（自身有减益）'],
+          notes: [{ key: 'mod.powerDebuff' }],
         };
       }
     }
@@ -4029,7 +4147,7 @@ const SKILL_MODS = {
     }
     return {
       powerAdd,
-      notes: [`威力 +${powerAdd}（速度差 ${spdGap}）`],
+      notes: [{ key: 'mod.powerSpeedGap', params: { add: powerAdd, gap: spdGap } }],
     };
   },
   // 鸣沙陷阱：物防比敌方越高，本次技能威力越高
@@ -4048,7 +4166,7 @@ const SKILL_MODS = {
     }
     return {
       powerAdd,
-      notes: [`威力 +${powerAdd}（物防差 ${defGap}）`],
+      notes: [{ key: 'mod.powerDefGap', params: { add: powerAdd, gap: defGap } }],
     };
   },
   // 愿力冲击：应对状态：技能威力 +150%。伤害类型由精灵当前最终
@@ -4060,7 +4178,7 @@ const SKILL_MODS = {
     return {
       // 愿力是乘算
       powerMult: 2.5,
-      notes: [`威力 ×2.5（应对状态）`],
+      notes: [{ key: 'mod.powerMultCounter', params: { mult: 2.5 } }],
     };
   },
   // 和弦共振：双方场上每有1种不同的印记，自己获得魔攻+50%。
@@ -4069,7 +4187,7 @@ const SKILL_MODS = {
     if (!ctx.starLayer) return null;
     return {
       matkAdd: 50,
-      notes: [`魔攻 +50%（场上存在一种印记）`],
+      notes: [{ key: 'mod.matkMark', params: { pct: 50 } }],
     };
   },
   // 目空：携带的非光系技能，威力+25%
@@ -4078,7 +4196,7 @@ const SKILL_MODS = {
     if (stripXi(ctx.attackSkill.element) === '光') return null;
     return {
       powerMultAdd: 0.25,
-      notes: ['威力 +25%（非光系技能）'],
+      notes: [{ key: 'mod.powerNonLight' }],
     };
   },
   // 勇敢：携带的能耗大于3的技能，威力+40%
@@ -4087,7 +4205,7 @@ const SKILL_MODS = {
     if (!(getSkillEnergy(ctx.attackSkill, ctx.starLayer) > 3)) return null;
     return {
       powerMultAdd: 0.4,
-      notes: ['威力 +40%（能耗 >3）'],
+      notes: [{ key: 'mod.powerHighEnergy' }],
     };
   },
   // 挺起胸脯：携带的能耗为1的技能，威力+50%
@@ -4096,7 +4214,7 @@ const SKILL_MODS = {
     if (getSkillEnergy(ctx.attackSkill, ctx.starLayer) !== 1) return null;
     return {
       powerMultAdd: 0.5,
-      notes: ['威力 +50%（能耗为1）'],
+      notes: [{ key: 'mod.powerEnergyOne' }],
     };
   },
   // 共鸣：携带的「虫鸣」技能威力+20
@@ -4105,7 +4223,7 @@ const SKILL_MODS = {
     if (ctx.attackSkill.name !== '虫鸣') return null;
     return {
       powerAdd: 20,
-      notes: ['威力 +20（虫鸣）'],
+      notes: [{ key: 'mod.powerInsectSong' }],
     };
   },
   // 涂鸦：使用非本系技能时威力+50%
@@ -4117,7 +4235,7 @@ const SKILL_MODS = {
     if (attackerTypes.includes(skillEl)) return null;
     return {
       powerMultAdd: 0.5,
-      notes: ['威力 +50%（非本系技能）'],
+      notes: [{ key: 'mod.powerNonStab' }],
     };
   },
   // 绝对秩序：受到非敌方系别的技能攻击时伤害-50%
@@ -4130,7 +4248,7 @@ const SKILL_MODS = {
     if (attackerTypes.includes(skillEl)) return null;
     return {
       powerMult: 0.5,
-      notes: ['威力 ×0.5（非敌方系别技能）'],
+      notes: [{ key: 'mod.powerOffClass' }],
     };
   },
   // 色散：对混血精灵造成伤害+50%。计算器无法判断防御方是否混血，
@@ -4299,7 +4417,7 @@ const LAST_STRIKE_SKILLS = {
   'skill_000309': true, // 后发制人
 };
 
-// Returns { powerMult, powerAdd, comboAdd, comboMult, notes: [{source, text}, ...] }.
+// Returns { powerMult, powerAdd, comboAdd, comboMult, notes: [{source, key, params}, ...] }.
 // Iterates the attacker's skills (category === '特性') to collect
 // passive characteristics; no positional assumption is made.
 //
@@ -4400,8 +4518,8 @@ function computeSkillDynamicModifiers(
     if (mod.matkAdd)      result.matkAdd      += mod.matkAdd;
     if (mod.ignoreResist) result.ignoreResist  = true;
     if (mod.elementOverride != null) result.elementOverride = mod.elementOverride;
-    for (const text of (mod.notes || [])) {
-      result.notes.push({ source: skill.name, text });
+    for (const note of (mod.notes || [])) {
+      result.notes.push({ source: skill, ...note });
     }
   };
 
@@ -4544,12 +4662,13 @@ function computeFinalDamage(ctx) {
 function calculateDamage() {
   if (!state.attacker || !state.defender || !state.attackSkill) {
     renderWaiting();
+    updateLethalReadout(null, 0);
     refreshAllModIcons();
     return;
   }
   // 构造 ctx 并调纯计算函数。挑战模式下，state 可能反映"上一题提交时的快照"，
   // 但 state.starLayer 仍随用户拖滑块实时变化，因此正常计算路径无需特殊处理。
-  const data = computeFinalDamage({
+  const ctx = {
     attacker: state.attacker,
     defender: state.defender,
     attackSkill: state.attackSkill,
@@ -4565,10 +4684,56 @@ function calculateDamage() {
     attackerPowerBoost: state.attackerPowerBoost,
     attackerCombo: state.attackerCombo,
     starLayer: state.starLayer,
-  });
+  };
+  const data = computeFinalDamage(ctx);
   renderResult(data);
   updateAtmosphere(data.hpPercent, data.isKill);
   refreshAllModIcons();
+  updateLethalReadout(ctx, data.defHP);
+}
+
+// 星陨滑条下方的最少致死层数读数：复用挑战模式的 findMinKillLayer，
+// 展示当前对位/配置下刚好击杀防御方所需的最少星陨层数。
+// 挑战模式下隐藏（并跳过计算），避免把答题答案直接摆在滑条下方。
+function updateLethalReadout(ctx, defHP) {
+  const el = document.getElementById('seal-lethal-label');
+  if (!el) return;
+  const c = state.challenge;
+  if (!ctx || c.active || c.running) {
+    el.hidden = true;
+    return;
+  }
+  const lethal = findMinKillLayer(ctx, { defHP });
+  el.textContent = lethal;
+  el.style.left = computeLethalLabelLeft(lethal);
+  el.hidden = false;
+}
+
+// 读数水平位置：默认按层数在滑条上的比例对齐（与 0/50/99 同一规则），
+// 若与固定刻度标签重叠，则向远离该刻度的方向让开，保证四个数字都可读。
+// .seal-slider-container 宽 200px，故 1 层 ≈ 2.02px。
+function computeLethalLabelLeft(lethal) {
+  const ROW_W = 200;
+  const GAP = 4;                          // 让位后与固定刻度的最小间距
+  const rowPx = (v) => (v / 99) * ROW_W;
+  const halfPx = lethal >= 10 ? 6 : 3;    // 两位 / 一位数字的半宽（0.65rem 字号）
+  const anchors = [
+    { value: 0,  half: 3 },               // "0"
+    { value: 50, half: 6 },               // "50"
+    { value: 99, half: 6 },               // "99"
+  ];
+  let center = rowPx(lethal);
+  for (const a of anchors) {
+    // 数值与刻度相同时字形完全重合，无需让位
+    if (lethal === a.value) continue;
+    const aCenter = rowPx(a.value);
+    const need = halfPx + a.half + GAP;
+    const delta = center - aCenter;
+    if (Math.abs(delta) < need) {
+      center = aCenter + (delta >= 0 ? need : -need);
+    }
+  }
+  return `${(center / ROW_W) * 100}%`;
 }
 
 // ============================================================
@@ -4579,13 +4744,27 @@ const RESULT_RING_CIRC = 2 * Math.PI * 80;
 
 // Ring now visualises DAMAGE taken (more intuitive):
 // 0% damage = empty ring, 100% damage (kill) = full red ring.
+// Colour anchors keep the old quarter-step hues, but every recalculation
+// interpolates between them so the ring warms up continuously
+// (green → yellow → orange → red) instead of snapping at 25/50/75%.
+const RING_COLOR_STOPS = [
+  { at: 0,   rgb: [0, 230, 118] },    // #00e676 — safe
+  { at: 45,  rgb: [255, 204, 0] },    // #ffcc00 — moderate
+  { at: 64,  rgb: [255, 140, 0] },    // #ff8c00 — heavy
+  { at: 88,  rgb: [255, 59, 59] },    // #ff3b3b — critical
+  { at: 100, rgb: [255, 0, 0] },      // #ff0000 — kill
+];
+
 function ringBarColor(data) {
-  if (data.isKill) return '#ff3b3b';
-  const d = data.hpPercent;
-  if (d < 25) return '#00e676';   // low damage — safe
-  if (d < 50) return '#ffcc00';   // moderate
-  if (d < 75) return '#ff8c00';   // heavy
-  return '#ff3b3b';               // critical (≥75% or kill)
+  // Clamped to [0, 100]%; a kill (damage ≥ 100%) lands on the red stop.
+  const pct = Math.max(0, Math.min(data.hpPercent, 100));
+  let i = 1;
+  while (i < RING_COLOR_STOPS.length - 1 && pct > RING_COLOR_STOPS[i].at) i++;
+  const a = RING_COLOR_STOPS[i - 1];
+  const b = RING_COLOR_STOPS[i];
+  const k = (pct - a.at) / (b.at - a.at);
+  const rgb = a.rgb.map((v, idx) => Math.round(v + (b.rgb[idx] - v) * k));
+  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
 function renderResult(data) {
@@ -4626,24 +4805,25 @@ function renderResult(data) {
     let chipsHTML = '';
     const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
     if (data.skillEff > 1) {
-      chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
+      chipsHTML += `<span class="result-chip super-effective">${t('result.super')} ×${data.skillEff}</span>`;
     } else if (data.skillEff < 1 && !ignoredResist) {
-      chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+      chipsHTML += `<span class="result-chip not-effective">${t('result.resist')} ×${data.skillEff}</span>`;
     }
     if (ignoredResist) {
-      chipsHTML += `<span class="result-chip not-effective" title="原抵抗 ×${data.skillEffRaw} 已被虫击·应对状态忽略">无视抵抗</span>`;
+      const ignoreTip = escapeAttr(t('result.ignoreResist.title', { eff: data.skillEffRaw }));
+      chipsHTML += `<span class="result-chip not-effective" title="${ignoreTip}">${t('result.ignoreResist')}</span>`;
     }
     if (data.n > 0) {
       if (data.isSkillIllusion) {
-        chipsHTML += `<span class="result-chip not-effective">幻系不触发</span>`;
+        chipsHTML += `<span class="result-chip not-effective">${t('result.illusionNone')}</span>`;
       } else if (data.starEff !== 1) {
         const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
-        const label = data.starEff > 1 ? '星陨克制' : '星陨抵抗';
+        const label = data.starEff > 1 ? t('result.starSuper') : t('result.starResist');
         chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
       }
     }
     if (data.isKill) {
-      chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
+      chipsHTML += `<span class="result-chip overflow">${t('result.overflow', { n: data.overflow.toLocaleString() })}</span>`;
     }
     // Always render the chips row (even when empty) so its height is
     // always the same — adding/removing chips does not push the ring.
@@ -4651,7 +4831,7 @@ function renderResult(data) {
 
     // Damage lines
     const dmgLinesHTML = `
-      <div class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></div>
+      <div class="result-dmg-line">${t('result.dmgLine', { skill: data.skillDmg.toLocaleString(), star: data.starDmg.toLocaleString() })}</div>
     `;
 
     infoEl.innerHTML = chipsRow + dmgLinesHTML;
@@ -4695,7 +4875,7 @@ function updateMobileResultBar(data) {
     pctEl.textContent = '—';
     pctEl.style.textShadow = 'none';
     dmgEl.textContent = '—';
-    infoEl.innerHTML = '<span class="result-waiting-mini">选择双方精灵开始计算</span>';
+    infoEl.innerHTML = `<span class="result-waiting-mini">${t('waiting.pickBoth')}</span>`;
     return;
   }
 
@@ -4730,33 +4910,33 @@ function updateMobileResultBar(data) {
   let chipsHTML = '';
   const ignoredResist = data.dyn && data.dyn.ignoreResist && (data.skillEffRaw ?? 1) < 1;
   if (data.skillEff > 1) {
-    chipsHTML += `<span class="result-chip super-effective">克制 ×${data.skillEff}</span>`;
+    chipsHTML += `<span class="result-chip super-effective">${t('result.super')} ×${data.skillEff}</span>`;
   } else if (data.skillEff < 1 && !ignoredResist) {
-    chipsHTML += `<span class="result-chip not-effective">抵抗 ×${data.skillEff}</span>`;
+    chipsHTML += `<span class="result-chip not-effective">${t('result.resist')} ×${data.skillEff}</span>`;
   }
   if (ignoredResist) {
-    chipsHTML += `<span class="result-chip not-effective">无视抵抗</span>`;
+    chipsHTML += `<span class="result-chip not-effective">${t('result.ignoreResist')}</span>`;
   }
   if (data.n > 0 && !data.isSkillIllusion && data.starEff !== 1) {
     const cls = data.starEff > 1 ? 'super-effective' : 'not-effective';
-    const label = data.starEff > 1 ? '星陨克制' : '星陨抵抗';
+    const label = data.starEff > 1 ? t('result.starSuper') : t('result.starResist');
     chipsHTML += `<span class="result-chip ${cls}">${label} ×${data.starEff}</span>`;
   }
   if (data.isKill) {
-    chipsHTML += `<span class="result-chip overflow">溢出 ${data.overflow.toLocaleString()}</span>`;
+    chipsHTML += `<span class="result-chip overflow">${t('result.overflow', { n: data.overflow.toLocaleString() })}</span>`;
   }
-  const dmgLine = `<span class="result-dmg-line">技能 <strong>${data.skillDmg.toLocaleString()}</strong> · 星陨 <strong class="star-val">${data.starDmg.toLocaleString()}</strong></span>`;
+  const dmgLine = `<span class="result-dmg-line">${t('result.dmgLine', { skill: data.skillDmg.toLocaleString(), star: data.starDmg.toLocaleString() })}</span>`;
   infoEl.innerHTML = chipsHTML + dmgLine;
 }
 
 function renderBreakdownList(breakdownList, data) {
   // Use the overridden element (e.g. 展翅: 普通 → 翼) for the displayed name.
   const skillElementRaw = (data.dyn && data.dyn.elementOverride) || data.skill.element;
-  const skillNameEl = skillElementRaw ? elOf(skillElementRaw).name : '无';
+  const skillNameEl = elLabel(skillElementRaw);
   const stabBadge = data.stab > 1
-    ? ' <span class="skill-badge stab">本系 ×1.25</span>'
+    ? ` <span class="skill-badge stab">${t('breakdown.stab')} ×1.25</span>`
     : '';
-  const stabCoef = data.stab > 1 ? ' × ' + data.stab + ' (本系)' : '';
+  const stabCoef = data.stab > 1 ? ' × ' + data.stab + ` (${t('breakdown.stab')})` : '';
   const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, notes: [] };
   const powerBoost = data.powerBoost || 0;
   const comboChip = data.attackerCombo || 0;
@@ -4840,19 +5020,19 @@ function renderBreakdownList(breakdownList, data) {
   let comboText;
   if (!hasCombo) {
     // No inherent combo: the chip is suppressed.
-    comboText = '无连击';
+    comboText = t('breakdown.noCombo');
   } else if (comboAdditiveExpr && comboMultExpr) comboText = `${comboAdditiveExpr}${comboMultExpr}`;
   else if (comboAdditiveExpr)            comboText = comboAdditiveExpr;
   else if (comboMultExpr)                comboText = `${baseCombo}${comboMultExpr}`;
   else                                  comboText = String(baseCombo);
   const dynNotesHTML = dynMods.notes.length
-    ? `<div><span class="label">动态修正:</span></div>` +
+    ? `<div><span class="label">${t('breakdown.dynamic')}:</span></div>` +
       dynMods.notes.map(n =>
-        `<div style="padding-left:1.4em"><span class="multiplier">· ${n.source}: ${n.text}</span></div>`
+        `<div style="padding-left:1.4em"><span class="multiplier">· ${displayName(n.source)}: ${t(n.key, n.params)}</span></div>`
       ).join('')
     : '';
-  const atkStatLabel = data.isMagic ? '魔攻' : '物攻';
-  const defStatLabel = data.isMagic ? '魔防' : '物防';
+  const atkStatLabel = t(data.isMagic ? 'stat.matk' : 'stat.atk');
+  const defStatLabel = t(data.isMagic ? 'stat.mdef' : 'stat.def');
   // Compose the 攻击/防御 stat line — shows base × buff breakdown = final,
   // parallel to the 威力/连击 lines. Uses the multiplier form (not additive
   // contributions) because Math.round(base × pct/100) summed across terms
@@ -4879,33 +5059,33 @@ function renderBreakdownList(breakdownList, data) {
   const ignoredResist = (dynMods.ignoreResist || (data.dyn && data.dyn.ignoreResist))
     && (data.skillEffRaw ?? 1) < 1;
   const effExpr = ignoredResist
-    ? `${data.skillEff} <span class="label" style="font-size:0.7rem">(原 ×${data.skillEffRaw} 抵抗已无视)</span>`
+    ? `${data.skillEff} <span class="label" style="font-size:0.7rem">${t('breakdown.resistIgnored', { eff: data.skillEffRaw })}</span>`
     : `${data.skillEff}`;
   breakdownList.innerHTML = `
-    <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— 技能伤害 ——</div>
-    <div><span class="label">攻击方:</span> <span class="value">${data.atk.name}</span></div>
-    <div><span class="label">技能:</span> <span class="value">${data.skill.name}</span> <span class="label" style="font-size:0.7rem">(${data.skill.damage_class || '?'} · ${skillNameEl})</span>${stabBadge}</div>
-    <div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
-    <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
-    <div><span class="label">威力:</span> <span class="value">${powerText}</span></div>
-    <div><span class="label">连击:</span> <span class="value">${comboText}</span></div>
-    <div><span class="label">系数:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ' (连击)' : ''}</span></div>
+    <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— ${t('breakdown.sectionSkill')} ——</div>
+    <div><span class="label">${t('breakdown.attacker')}:</span> <span class="value">${displayName(data.atk)}</span></div>
+    <div><span class="label">${t('breakdown.skill')}:</span> <span class="value">${displayName(data.skill)}</span> <span class="label" style="font-size:0.7rem">(${displayDamageClass(data.skill.damage_class)} · ${skillNameEl})</span>${stabBadge}</div>
+    <div><span class="label">${atkStatLabel}:</span> <span class="value">${atkStatText}</span></div>
+    <div><span class="label">${defStatLabel}:</span> <span class="value">${defStatText}</span></div>
+    <div><span class="label">${t('buffLabel.power')}:</span> <span class="value">${powerText}</span></div>
+    <div><span class="label">${t('buffLabel.combo')}:</span> <span class="value">${comboText}</span></div>
+    <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ` (${t('buffLabel.combo')})` : ''}</span></div>
     ${dynNotesHTML}
-    <div class="final-line"><span class="label">技能伤害小计:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
+    <div class="final-line"><span class="label">${t('breakdown.skillSubtotal')}:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
-    <div class="label" style="color:var(--accent-gold);font-weight:600;">—— 星陨伤害 ——</div>
-    <div><span class="label">星陨层数:</span> <span class="value">${data.n}</span></div>
-    <div><span class="label">星陨 power:</span> <span class="value">${data.n}² + 24×${data.n} - 24 = ${data.starPower}</span></div>
-    ${data.isSkillIllusion ? `<div><span class="label">触发:</span> <span class="value" style="color:#ff8c00">否 (技能为幻系)</span></div>`
+    <div class="label" style="color:var(--accent-gold);font-weight:600;">—— ${t('breakdown.sectionStar')} ——</div>
+    <div><span class="label">${t('breakdown.starLayers')}:</span> <span class="value">${data.n}</span></div>
+    <div><span class="label">${t('breakdown.starPower')}:</span> <span class="value">${data.n}² + 24×${data.n} - 24 = ${data.starPower}</span></div>
+    ${data.isSkillIllusion ? `<div><span class="label">${t('breakdown.triggered')}:</span> <span class="value" style="color:#ff8c00">${t('breakdown.noStellar')}</span></div>`
       : (data.n > 0
-        ? `<div><span class="label">${data.isMagic ? '魔攻' : '物攻'}:</span> <span class="value">${atkStatText}</span></div>
-           <div><span class="label">${data.isMagic ? '魔防' : '物防'}:</span> <span class="value">${defStatText}</span></div>
-           <div><span class="label">克制(幻系):</span> <span class="multiplier">×${data.starEff}</span></div>
-           <div><span class="label">系数:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
-        : `<div><span class="label">触发:</span> <span class="value" style="color:var(--text-secondary)">否 (层数为 0)</span></div>`)}
-    <div class="final-line"><span class="label">星陨伤害小计:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
+        ? `<div><span class="label">${atkStatLabel}:</span> <span class="value">${atkStatText}</span></div>
+           <div><span class="label">${defStatLabel}:</span> <span class="value">${defStatText}</span></div>
+           <div><span class="label">${t('breakdown.stellarEffect')}:</span> <span class="multiplier">×${data.starEff}</span></div>
+           <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
+        : `<div><span class="label">${t('breakdown.triggered')}:</span> <span class="value" style="color:var(--text-secondary)">${t('breakdown.noLayers')}</span></div>`)}
+    <div class="final-line"><span class="label">${t('breakdown.starSubtotal')}:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
     <hr class="divider">
-    <div class="final-line"><span class="label">最终合计伤害:</span> <span class="value" style="color:var(--accent-cyan);font-size:1.1rem">${data.finalDamage.toLocaleString()}</span>
+    <div class="final-line"><span class="label">${t('breakdown.total')}:</span> <span class="value" style="color:var(--accent-cyan);font-size:1.1rem">${data.finalDamage.toLocaleString()}</span>
       <span class="label" style="font-size:0.7rem"> / ${data.defHP.toLocaleString()} HP (${data.hpPercent.toFixed(1)}%)</span></div>
   `;
 }
@@ -4938,22 +5118,22 @@ function renderWaiting() {
     if (dmgEl) dmgEl.textContent = '—';
     // Info 文案：覆盖默认"选择双方精灵开始计算"
     const infoEl = document.getElementById('result-info');
-    if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">提交答案后计算结果</div>`;
+    if (infoEl) infoEl.innerHTML = `<div class="result-waiting-mini">${t('waiting.submitFirst')}</div>`;
     // Hide breakdown
     const breakdownSection = document.getElementById('breakdown-section');
     if (breakdownSection) breakdownSection.classList.add('is-hidden');
     const breakdownContent = document.getElementById('breakdown-content');
     if (breakdownContent) breakdownContent.classList.remove('open');
     updateAtmosphere(0, false);
-    updateMobileResultBar({ _waitingMsg: '提交答案后计算结果' });
+    updateMobileResultBar({ _waitingMsg: t('waiting.submitFirst') });
     return;
   }
 
   // 普通模式（不在挑战答题中）的提示语
-  let msg = '选择双方精灵开始计算';
-  if (state.attacker && !state.defender) msg = '选择防御方精灵';
-  if (!state.attacker && state.defender) msg = '选择攻击方精灵';
-  if (state.attacker && state.defender && !state.attackSkill) msg = '该攻击方无可用攻击技能';
+  let msg = t('waiting.pickBoth');
+  if (state.attacker && !state.defender) msg = t('waiting.pickDefender');
+  if (!state.attacker && state.defender) msg = t('waiting.pickAttacker');
+  if (state.attacker && state.defender && !state.attackSkill) msg = t('waiting.noAttackSkills');
 
   // Reset ring
   const ringFill = document.getElementById('result-ring-fill');
@@ -5053,10 +5233,30 @@ function toggleBreakdown() {
 // ============================================================
 // 维护指南：在数组开头追加新版本，html 字段支持 h3 / ul / li / code / a / hr 等行内结构。
 // 修改后无需改 HTML：所有渲染都由 initInfoModal() 注入。
-const MODAL_CONTENT = {
+const MODAL_CONTENT_ZH = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>S5 数据更新 <span class="modal-date">· 2026-11-05</span></h3>
+      <ul>
+        <li>更新了 S5 的数据。</li>
+      </ul>
+      <hr>
+      <h3>国际化支持 <span class="modal-date">· 2026-11-03</span></h3>
+      <ul>
+        <li>新增英文界面，可在页脚「中文 · English」处切换。</li>
+        <li>新增英文静态页：<a href="https://stardmg.top/en/" target="_blank" rel="noopener noreferrer">stardmg.top/en/</a>，并补充 hreflang 与 sitemap。</li>
+        <li>伤害明细、修正说明、数据管理弹窗、使用说明与更新公告均已支持英文。</li>
+        <li>精灵、技能和系别名称优先显示英文，缺少翻译时自动回退中文。</li>
+        <li>新增星陨斩杀线层数提示，显示在星陨滑条下方。</li>
+        <li>优化伤害圆环颜色，现在为真正的渐变色，而非之前的固定四个颜色。</li>
+      </ul>
+      <hr>
+      <h3>S4 数据更新 <span class="modal-date">· 2026-09-10</span></h3>
+      <ul>
+        <li>更新了 S4 的数据。</li>
+      </ul>
+      <hr>
       <h3>特别适配提示 <span class="modal-date">· 2026-08-11</span></h3>
       <ul>
         <li>对于特别适配的特性和技能，如离心舞者的「和弦共振」，现在会在精灵面板顶部出现图标以提示其存在。</li>
@@ -5190,8 +5390,8 @@ const MODAL_CONTENT = {
 
       <h3>数据来源</h3>
       <ul>
-        <li>精灵与技能数据来自 <a href="https://wiki.biligame.com/rocom" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
-        <li>数据更新于 2026-07-16。</li>
+        <li>精灵与技能数据来自 <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a>。</li>
+        <li>数据更新于 2026-11-05。</li>
       </ul>
 
       <h3>关于</h3>
@@ -5205,6 +5405,181 @@ const MODAL_CONTENT = {
     `
   }
 };
+
+const MODAL_CONTENT_EN = {
+  announcement: {
+    title: 'Update Announcement',
+    html: `
+      <h3>S5 Data Update <span class="modal-date">· 2026-11-05</span></h3>
+      <ul>
+        <li>Updated S5 Jinie and skill data.</li>
+      </ul>
+      <hr>
+      <h3>English Support <span class="modal-date">· 2026-11-03</span></h3>
+      <ul>
+        <li>Added an English UI. Switch languages via the footer links "中文 · English".</li>
+        <li>Added a static English page at <a href="https://stardmg.top/en/" target="_blank" rel="noopener noreferrer">stardmg.top/en/</a>, with hreflang and sitemap entries.</li>
+        <li>Damage breakdown, modifier notes, data-management dialogs, How to Use and Update Announcement are now localized.</li>
+        <li>Jinie, skill and class names use English data when available and fall back to Chinese when missing.</li>
+        <li>Added a Starfall kill-threshold layer hint, displayed below the Starfall slider.</li>
+        <li>Improved the damage ring colors: it is now a true gradient instead of the previous four fixed colors.</li>
+      </ul>
+      <hr>
+      <h3>S4 Data Update <span class="modal-date">· 2026-09-10</span></h3>
+      <ul>
+        <li>Updated S4 Jinie and skill data.</li>
+      </ul>
+      <hr>
+      <h3>Special Support Notes <span class="modal-date">· 2026-08-11</span></h3>
+      <ul>
+        <li>Specially supported traits and skills, such as Centrina's "Chord Resonance", now show an icon at the top of the Jinie panel to indicate their presence.</li>
+        <li>Improved text selection on the page, so control labels are no longer selected accidentally (especially on mobile).</li>
+        <li>Fixed inaccurate readings at the bottom of the Starfall slider.</li>
+      </ul>
+      <hr>
+      <h3>Data Management / Footer <span class="modal-date">· 2026-08-06</span></h3>
+      <ul>
+        <li>Added the Data Management modal (in the subtitle) to toggle memory and to clear, export or import data.</li>
+        <li>Added a footer with copyright information and moved the BWIKI link there.</li>
+      </ul>
+      <hr>
+      <h3>Favorites <span class="modal-date">· 2026-07-28</span></h3>
+      <ul>
+        <li>Renamed "Common" to "Favorites".</li>
+        <li>The "Favorites" filter is no longer a fixed list: use the star button next to the attacker/defender label to add or remove the current Jinie.</li>
+        <li>When the Jinie picker is open, the star button becomes a reset button that restores the default favorites list.</li>
+        <li>The "Favorites" pool in Challenge Mode now follows your own favorites list, so you can build a fully personalized question set.</li>
+      </ul>
+      <hr>
+      <h3>Custom Skill Slot <span class="modal-date">· 2026-07-25</span></h3>
+      <ul>
+        <li>The custom skill slot at the bottom of the skill list now lets a Jinie use skills it cannot normally learn, simulating "Borrow / Mind Read / Copy / Roller Coaster / Bizarre".</li>
+        <li>This feature also works with memory and Challenge Mode.</li>
+      </ul>
+      <hr>
+      <h3>Mobile Layout Improvements <span class="modal-date">· 2026-07-23</span></h3>
+      <ul>
+        <li>Improved the mobile layout: swipe left and right between the attacker, Starfall layers and defender instead of the previous vertical layout.</li>
+        <li>Damage results moved from a ring to a horizontal bar at the bottom to save space.</li>
+        <li>Various mobile detail improvements and fixes.</li>
+      </ul>
+      <hr>
+      <h3>Buff / Skill Auto Memory <span class="modal-date">· 2026-07-22</span></h3>
+      <ul>
+        <li>Following nature/IV auto memory: buffs and the selected skill are now remembered for each Jinie and restored when you select the same Jinie again.</li>
+        <li>Various visual improvements and fixes.</li>
+      </ul>
+      <hr>
+      <h3>Challenge Mode <span class="modal-date">· 2026-07-21</span></h3>
+      <ul>
+        <li><strong>Challenge Mode released</strong>: a mini-game that tests your grasp of Starfall kill thresholds and helps you remember them.</li>
+        <li>Flow: Challenge Setup → Start Challenge → random questions → drag Starfall layers → Submit Answer → score → Next Question / results.</li>
+        <li>Both Jinie pools support "Fixed / Favorites / All"; stats and skill selection support "Memory / Random"; defense skills are matched by equal damage reduction.</li>
+        <li>During answering, Jinie panels are locked (dimmed, non-clickable); only Starfall layers can be adjusted. You can exit at any time.</li>
+        <li>Added support for "Astral Scar" and "Quick Wit".</li>
+        <li>Other detail improvements and bug fixes.</li>
+      </ul>
+      <hr>
+      <h3>Nature / IV Auto Memory <span class="modal-date">· 2026-07-20</span></h3>
+      <ul>
+        <li>Nature and IV changes are now automatically saved to localStorage and restored the next time you select a Jinie.</li>
+      </ul>
+      <hr>
+      <h3>S3 Data Update <span class="modal-date">· 2026-07-16</span></h3>
+      <ul>
+        <li>Updated S3 Jinie and skill data.</li>
+        <li>Added "Centrina" and "Wingletch" to the common Jinie list.</li>
+      </ul>
+      <hr>
+      <h3>Info Modals <span class="modal-date">· 2026-07-13</span></h3>
+      <ul>
+        <li>Added the "How to Use" and "Updates" info modals (the one you are reading now).</li>
+      </ul>
+      <hr>
+      <h3>Reaction State and Trait Support <span class="modal-date">· 2026-07-08 ~ 07-10</span></h3>
+      <ul>
+        <li><strong>Reaction State released</strong>: the defender now has a "Charge" option. When active, <strong>all Reaction State skills</strong> change their power or combo count according to their own rules, covering Iron Caltrop, Maelstrom, Pursuit, Scorching Wave, Swarm Strike, Blitz, Stealth Strike, Burst Charge, Tactical Strike, Shadow Kick, Sneak Attack, Freestyle Punch, Flurry Claws, Snowball Roll, Searing Breath, Earth Sink, Scorch Assault and Calamity.</li>
+        <li>Added 18-class "Wishpower Strike": the damage type adapts automatically (using the Jinie's higher Attack or Magic Attack), and Power +150% during Reaction State.</li>
+        <li>The "Power" chip is now always visible for every Jinie.</li>
+        <li>Added a "Combo" chip and a separate combo row in the damage breakdown.</li>
+        <li>Added a "Speed" chip, affecting Tailwind / Void Breaker, Spread Wings, Gust, Gale Stab and Flash Strike calculations.</li>
+        <li>Gust: Power +50% when attacking first.</li>
+        <li>Flash Strike and Sand Trap now add power based on the speed gap and the Physical Defense gap respectively.</li>
+        <li>Gale Stab: becomes a 3-hit combo when attacking first.</li>
+        <li>Swiftwing family trait: Power +50% when attacking first; Snowcrown trait: Power +75% when attacking first.</li>
+        <li>Eyralon family trait: equipped Common-class skills become Wing-class; receives +25% damage when acting second.</li>
+        <li>Framorn trait: each enemy buff layer grants +10% Power to this skill.</li>
+        <li>Carnivark family trait: receives +25% damage when hit super-effectively.</li>
+        <li>Spaces in the search box are ignored, so accidental spaces no longer hide results.</li>
+        <li>Hovering over attack/defense skill icons now shows the full skill description.</li>
+        <li>Fixed several damage calculation bugs.</li>
+      </ul>
+      <hr>
+      <h3>Site Launch <span class="modal-date">· 2026-07-08</span></h3>
+      <ul>
+        <li>Initial release.</li>
+        <li>Full damage calculation, 18-class type effectiveness, combo count / damage reduction and more.</li>
+        <li>Starfall layers 0–99 with pulse animation and slider dragging.</li>
+      </ul>
+      <p style="color:var(--text-secondary);margin-top:14px">Full history and source code: <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p>
+    `
+  },
+  guide: {
+    title: 'How to Use',
+    html: `
+      <h3>Overview</h3>
+      <ul>
+        <li>This is a PvP damage calculator for <strong>Roco Kingdom: World</strong>, designed specifically for <strong>Starfall</strong>. It provides basic damage calculation, convenient Starfall layer adjustment, special support for some Jinies and skills, and a Challenge Mode to test your familiarity with Starfall kill thresholds.</li>
+        <li>The primary design goal is to stay clean and simple and avoid unnecessary complexity, so not every game mechanic is supported (and I'm too lazy to add them all, haha).</li>
+      </ul>
+
+      <h3>Basic Flow</h3>
+      <ol>
+        <li>Select an <strong>attacker</strong> and a <strong>defender</strong> Jinie (search or filter by class).</li>
+        <li>Adjust base stats, nature, IVs and other buffs.</li>
+        <li>Select an attacking skill (required) and a defending skill (optional).</li>
+        <li>Drag the central <strong>Starfall Layers</strong> slider (0–99) to see damage and remaining HP in real time.</li>
+        <li>Click "Damage Breakdown" to expand every multiplier in the full formula.</li>
+      </ol>
+
+      <h3>Special Support</h3>
+      <ul>
+        <li>Jinie traits, including the Relthor family, Centrina family, Swiftwing family, Eyralon family, Carnivark family, Framorn, Unicorn family, Tumblebug family, Puffly family, Squidle family and Duck Jiji family.</li>
+        <li>Skills that scale with Starfall layers, including Dimensional Strike and Celestial Accretion.</li>
+        <li>Attacking skills that can trigger special Reaction State effects through the defender's "Charge", including Iron Caltrop, Maelstrom, Pursuit, Scorching Wave, Swarm Strike, Blitz, Stealth Strike, Burst Charge, Tactical Strike, Shadow Kick, Sneak Attack, Freestyle Punch, Flurry Claws, Snowball Roll, Searing Breath, Earth Sink, Scorch Assault and Calamity, plus the 18-class Wishpower Strike.</li>
+        <li>Also supported: Gust, Gale Stab, Flash Strike, Sand Trap, Astral Scar and Quick Wit.</li>
+      </ul>
+
+      <h3>Challenge Mode</h3>
+      <p>A mini-game that tests your grasp of Starfall kill thresholds and helps you remember them.</p>
+      <ol>
+        <li>Click the "Challenge Mode" button at the top to enter the setup stage, where you can configure the Jinie pool, stats, skill selection and number of questions.</li>
+        <li>Click "Start Challenge" to begin. The system generates random questions based on your settings. Both Jinie panels are locked and damage calculation is paused; only Starfall layers can be adjusted. This is your answer area.</li>
+        <li>Based on the displayed Jinie states, decide how many Starfall layers the attacker needs to exactly kill the defender (damage over 100%), adjust the slider, then click "Submit Answer".</li>
+        <li>Damage is then calculated and you are scored according to the difference between your answer and the optimal answer.</li>
+        <li>Click "Next Question" to repeat from step 2 until all questions are answered.</li>
+        <li>At any stage you can click "Exit Challenge" to return to the calculator.</li>
+      </ol>
+
+      <h3>Data Source</h3>
+      <ul>
+        <li>Jinie and skill data come from <a href="https://wiki.biligame.com/nrc" target="_blank" rel="noopener noreferrer">BWIKI</a>.</li>
+        <li>Data updated on 2026-11-05.</li>
+      </ul>
+
+      <h3>About</h3>
+      <ul>
+        <li>Primary site: <a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
+        <li>Mirror: <a href="https://bartzh.github.io/roco-star-dmg/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></li>
+        <li>Source repository: <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">Bartzh/roco-star-dmg</a></li>
+        <li>Author's Bilibili page: <a href="https://space.bilibili.com/235905700" target="_blank" rel="noopener noreferrer">Bilibili Space</a></li>
+        <li>All code is open source under the WTFPL (Do What The Fuck You Want To Public License). Contributions and feedback are welcome.</li>
+      </ul>
+    `
+  }
+};
+
+const MODAL_CONTENT = { zh: MODAL_CONTENT_ZH, en: MODAL_CONTENT_EN };
 
 // 初始化弹窗：触发按钮、ESC、点击遮罩、底部确认按钮均可关闭。
 // 打开时锁定 body 滚动，关闭后恢复焦点到触发按钮。
@@ -5221,7 +5596,7 @@ function initInfoModal() {
   let lastFocus = null;
 
   const open = (type) => {
-    const data = MODAL_CONTENT[type];
+    const data = MODAL_CONTENT[I18N.isEn() ? 'en' : 'zh'][type];
     if (!data) return;
     titleEl.textContent = data.title;
     bodyEl.innerHTML    = data.html;
@@ -5510,7 +5885,7 @@ function enterChallengeMode() {
     btn.classList.add('is-active');
     btn.setAttribute('aria-pressed', 'true');
   }
-  if (text) text.textContent = '退出挑战';
+  if (text) text.textContent = t('challenge.exit');
   // 现在没有icon了
   if (icon) icon.textContent = '✕';
 
@@ -5599,7 +5974,7 @@ function exitChallengeMode() {
     btn.classList.remove('is-active');
     btn.setAttribute('aria-pressed', 'false');
   }
-  if (text) text.textContent = '挑战模式';
+  if (text) text.textContent = t('challenge.toggle');
   if (icon) icon.textContent = '⚔';
 
   // 逐对 label 做反向过渡（与 setup 淡出并行）
@@ -6193,7 +6568,11 @@ function renderChallengeProgress() {
   const el = document.getElementById('challenge-progress-info');
   if (!el) return;
   const c = state.challenge;
-  el.textContent = `第 ${c.current + 1} / ${c.total} 题 · 累计 ${c.totalScore} 分`;
+  el.textContent = t('challenge.progress', {
+    current: c.current + 1,
+    total: c.total,
+    score: c.totalScore
+  });
 }
 
 // 渲染提交/下一道题/查看结果按钮文案 + 启用状态。
@@ -6204,15 +6583,15 @@ function renderSubmitButton() {
   const isLast = c.current >= c.total - 1;
   btn.classList.remove('is-next');
   if (c.phase === 'picking') {
-    btn.textContent = '提交答案';
+    btn.textContent = t('challenge.submit');
     btn.disabled = false;
   } else if (c.phase === 'answered') {
-    btn.textContent = isLast ? '查看结果' : '下一道题';
+    btn.textContent = isLast ? t('challenge.viewResults') : t('challenge.next');
     btn.disabled = false;
     btn.classList.add('is-next');
   } else {
     // 'idle' / 'done'
-    btn.textContent = '提交答案';
+    btn.textContent = t('challenge.submit');
     btn.disabled = true;
   }
 }
@@ -6224,7 +6603,7 @@ function renderSubmitButton() {
 function renderChallengeResult() {
   const c = state.challenge;
   const info = document.getElementById('challenge-progress-info');
-  if (info) info.textContent = `挑战完成 · 总分 ${c.totalScore} / ${c.total * 100}`;
+  if (info) info.textContent = t('challenge.done', { score: c.totalScore, max: c.total * 100 });
   // 提交按钮淡出（220ms），不直接 display:none 避免突兀。
   const btn = document.getElementById('challenge-submit-btn');
   if (btn) {
@@ -6306,7 +6685,7 @@ function applyQuestion(index) {
     state.attackSkill    = { id: q.attackSkillId, ...customSk };
     state.attackSkillIdx = CUSTOM_SKILL_IDX;
     state.customSkillResolved.attacker = state.attackSkill;
-    state.customSkillInput.attacker    = customSk.name;
+    state.customSkillInput.attacker    = displayName(customSk);
     state.customSkillPrevSkill.attacker = null;
   } else {
     // 题目的 id 在新精灵里不可用 → 用 opts[0] 兜底
@@ -6331,11 +6710,11 @@ function applyQuestion(index) {
     state.defenseSkill    = { id: q.defenseSkillId, ...customSk };
     state.defenseSkillIdx = CUSTOM_SKILL_IDX;
     state.customSkillResolved.defender = state.defenseSkill;
-    state.customSkillInput.defender    = customSk.name;
+    state.customSkillInput.defender    = displayName(customSk);
     state.customSkillPrevSkill.defender = null;
   } else {
     state.defenseSkillIdx = 0;
-    state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', reduction: 1, _pseudo: true };
+    state.defenseSkill = defOpts[0] || { id: '__none__', name: '无', name_en: 'None', reduction: 1, _pseudo: true };
     state.customSkillResolved.defender = null;
     state.customSkillInput.defender    = '';
     state.customSkillPrevSkill.defender = { idx: 0, skill: state.defenseSkill };
@@ -6649,7 +7028,7 @@ function exitChallenge() {
     toggleBtn.setAttribute('aria-pressed', 'false');
     const text = toggleBtn.querySelector('.challenge-toggle-text');
     const icon = toggleBtn.querySelector('.challenge-toggle-icon');
-    if (text) text.textContent = '挑战模式';
+    if (text) text.textContent = t('challenge.toggle');
     if (icon) icon.textContent = '⚔';
   }
   // 4. body 退出 running（同时清理可能残留的 challenge-mode）—— 已移至
@@ -6693,9 +7072,9 @@ function startChallenge() {
         const title = document.getElementById('modal-title');
         const body = document.getElementById('modal-body');
         if (modal && title && body) {
-          title.textContent = '无法开始挑战';
-          const whichSide = side === 'attacker' ? '攻击方' : '防御方';
-          body.innerHTML = `<div style="line-height:1.7">「固定」池需要${whichSide}已选中精灵。请先在精灵面板中选择，或切换为「全部 / 收藏」池。</div>`;
+          title.textContent = t('challenge.cannotStart');
+          const whichSide = t(side === 'attacker' ? 'side.attacker' : 'side.defender');
+          body.innerHTML = `<div style="line-height:1.7">${t('challenge.fixedNeedsSpirit', { side: whichSide })}</div>`;
           modal.classList.add('is-open');
           modal.setAttribute('aria-hidden', 'false');
         }
@@ -7030,7 +7409,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadData();
   } catch (e) {
     const info = document.getElementById('result-info');
-    if (info) info.innerHTML = '<div class="result-waiting-mini" style="color:#ff3b3b;max-width:260px;line-height:1.5">数据加载失败: ' + (e.message || e) + '<br><br>若用 file:// 打开，请先执行 <code>python build.py</code> 生成 calculator.built.html。</div>';
+    if (info) info.innerHTML = `<div class="result-waiting-mini" style="color:#ff3b3b;max-width:260px;line-height:1.5">${t('load.error', { msg: e.message || String(e) })}</div>`;
     return;
   }
   buildSkillIndices();

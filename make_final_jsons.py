@@ -2,13 +2,12 @@ import json
 import re
 
 from pypinyin import Style, lazy_pinyin
+import urllib.parse
 from dataclasses import dataclass, field, asdict
 from typing import Literal, Optional
 
 with open('datas/intermediate/core.json', 'r', encoding='utf-8') as f:
     core = json.load(f)
-with open('datas/intermediate/learnsets.json', 'r', encoding='utf-8') as f:
-    learnsets = json.load(f)
 with open('datas/intermediate/learnset_catalog.json', 'r', encoding='utf-8') as f:
     learnset_catalog = json.load(f)
 with open('datas/intermediate/skill_catalog.json', 'r', encoding='utf-8') as f:
@@ -17,6 +16,17 @@ with open('datas/intermediate/pet_illustration_urls.json', 'r', encoding='utf-8'
     pet_illustration_urls = json.load(f)
 with open('datas/intermediate/skill_icon_urls.json', 'r', encoding='utf-8') as f:
     skill_icon_urls = json.load(f)
+with open('datas/intermediate/rocopedia/jinies_en.json', 'r', encoding='utf-8') as f:
+    jinies_en = json.load(f)
+jinies_en_dict = {pet['gameId']: pet for pet in jinies_en['game']['pets']}
+with open('datas/intermediate/rocopedia/skills_en.json', 'r', encoding='utf-8') as f:
+    skills_en = json.load(f)
+skills_en_dict = {skill['gameId']: skill for skill in skills_en['game']['skills']}
+with open('datas/intermediate/rocopedia/traits_en.json', 'r', encoding='utf-8') as f:
+    traits_en = json.load(f)
+traits_en_dict = {trait['slug']: trait for trait in traits_en}
+with open('datas/intermediate/rocopedia_links.json', 'r', encoding='utf-8') as f:
+    rocopedia_links = json.load(f)
 
 
 # ============================================================
@@ -39,12 +49,12 @@ for _base_name, _source_ids in _name_to_source_ids.items():
         id_to_final_name[_source_ids[0]] = _base_name
     else:
         # 用技能数据里真正的 int id 排序，catalog 的 key 是 `skill_xxxxxx` 字符串。
-        _sorted = sorted(_source_ids, key=lambda x: int(skill_catalog[x]['id']))
+        _sorted = sorted(_source_ids, key=lambda x: int(skill_catalog[x]['game_id']))
         for _i, _sid in enumerate(_sorted):
             id_to_final_name[_sid] = _base_name if _i == 0 else f'{_base_name}{_i + 1}'
         print(
             f'重名技能 "{_base_name}"：共 {len(_sorted)} 个，已加后缀区分：'
-            + ', '.join(f'{skill_catalog[_sid]['id']}→{id_to_final_name[_sid]}' for _sid in _sorted)
+            + ', '.join(f'{skill_catalog[_sid]['game_id']}→{id_to_final_name[_sid]}' for _sid in _sorted)
         )
 
 
@@ -133,43 +143,42 @@ def make_search_keys(name: str) -> tuple[str, str]:
 sprites = {}
 no_skills = []
 no_stats = []
+is_lord_evolution = []
 for pet_id, pet_info in core.items():
     # 没有图鉴，说明是未上线精灵
-    if not pet_info.get('hb'):
+    if not pet_info.get('number'):
+        print('无图鉴id精灵：', pet_id)
         continue
-    if not pet_info.get('st'):
+    if not pet_info.get('stats'):
         no_stats.append(pet_id)
         continue
     skills = []
-    learnset = learnset_catalog[learnsets[pet_id]]
-    if fs := learnset.get('fs'):
-        skills.append(id_to_final_name[fs])
-    if ns := learnset.get('ns'):
-        skills.extend(id_to_final_name[s['sk']] for s in ns)
-    if lg := learnset.get('lg'):
-        skills.append(id_to_final_name[lg['sk']])
-    if ss := learnset.get('ss'):
-        skills.extend(id_to_final_name[s] for s in ss)
-    if bs := learnset.get('bs'):
-        skills.extend(id_to_final_name[s['sk']] for s in bs)
+    learnset = learnset_catalog[pet_info['learnset_id']]
+    if feature_skill := learnset.get('feature_skill'):
+        skills.append(id_to_final_name[feature_skill])
+    if native_skills := learnset.get('native_skills'):
+        skills.extend(id_to_final_name[s['skill']] for s in native_skills)
+    if legendary := learnset.get('legendary'):
+        skills.append(id_to_final_name[legendary['skill']])
+    if skill_stones := learnset.get('skill_stones'):
+        skills.extend(id_to_final_name[s] for s in skill_stones)
+    if blood_skills := learnset.get('blood_skills'):
+        skills.extend(id_to_final_name[s['skill']] for s in blood_skills)
     if not skills:
         no_skills.append(pet_id)
         continue
-    name = pet_info['t']
+    name = pet_info['title']
     pinyin_full, pinyin_initials = make_search_keys(name)
     sprites[name] = {
-        # 用于排序，随后删除
-        'hb': pet_info['hb'],
-
         'id': name,
         'name': name, # str: 精灵的名字。
-        'types': pet_info['tp'], # list[str]: 精灵所属系别，如“水系”（任何系别都会带一个“系”字），部分精灵有两个系别。
-        'hp': pet_info['st']['hp'], # int: 精灵的生命值。
-        'atk': pet_info['st']['at'], # int: 精灵的物攻。
-        'matk': pet_info['st']['sa'], # int: 精灵的魔攻。
-        'def': pet_info['st']['df'], # int: 精灵的物防。
-        'mdef': pet_info['st']['sd'], # int: 精灵的魔防。
-        'spd': pet_info['st']['se'], # int: 精灵的速度。
+        'types': pet_info['types'], # list[str]: 精灵所属系别，如“水系”（任何系别都会带一个“系”字），部分精灵有两个系别。
+        'hp': pet_info['stats']['hp'], # int: 精灵的生命值。
+        'atk': pet_info['stats']['atk'], # int: 精灵的物攻。
+        'matk': pet_info['stats']['spa'], # int: 精灵的魔攻。
+        'def': pet_info['stats']['def'], # int: 精灵的物防。
+        'mdef': pet_info['stats']['spd'], # int: 精灵的魔防。
+        'spd': pet_info['stats']['spe'], # int: 精灵的速度。
         'skills': skills, # list[str]: 精灵的所有技能的id。
         # Pre-computed search keys (used by the spirit-picker search box).
         # Both are lower-cased so the JS side can do a case-insensitive
@@ -177,26 +186,27 @@ for pet_id, pet_info in core.items():
         # letters, digits) are kept verbatim in both fields.
         'pinyin': pinyin_full,
         'pinyin_initials': pinyin_initials,
-        'hbid': int(pet_info['hb']['i'][9:]),
+        'hbid': int(pet_info['number']),
     }
     if il_url := pet_illustration_urls.get(name):
         sprites[name]['illustration_url'] = il_url # Optional[str]: 精灵的图片url。
+    if pet_en := jinies_en_dict.get(pet_info['game_id']):
+        splited_title = pet_en['title'].split('/', 1)
+        sprites[name]['name_en'] = splited_title[0]
+        if len(splited_title) > 1:
+            sprites[name]['name_en'] += ' (' + splited_title[1] + ')'
+    if pet_info.get('is_lord_evolution'):
+        is_lord_evolution.append(name)
 print('no_stats:', no_stats)
 print('no_skills:', no_skills)
-# 排除剩下的一些精灵
-del sprites['幽影树（突变的样子）']
 # 按图鉴id排序
 def hb_id(item: tuple[str, dict]) -> int:
     sprite = item[1]
     result = sprite['hbid']*10
-    # 目前用这种方法判断是否为首领是有效的
-    if sprite['hb']['hen'] == False and sprite['hb']['stp'] == False:
+    if item[0] in is_lord_evolution:
         result += 1
     return result
 sprites = dict(sorted(sprites.items(), key=hb_id))
-# 删除hb
-for s in sprites:
-    del sprites[s]['hb']
 sprites['拼图'] = {
     'id': 'pet_789987',
     'name': '拼图',
@@ -211,10 +221,10 @@ sprites['拼图'] = {
     'pinyin': 'pintu',
     'pinyin_initials': 'pt',
     'hbid': 789987,
+    'name_en': 'Puzzle'
 }
 
 for skill_id, skill_info in skill_catalog.items():
-    skill_info.pop('icon_id', None)
     # 技能的 key 与 id 都用最终名（重名时已加数字后缀），更便于使用。
     skill_info['id'] = id_to_final_name[skill_id]
     if skill_info['category'] == '防御':
@@ -237,6 +247,23 @@ for skill_id, skill_info in skill_catalog.items():
                 print('no combo:', skill_info['name'])
     if icon_url := skill_icon_urls.get(skill_info['name']):
         skill_info['icon_url'] = icon_url # Optional[str]: 技能的图标url。
+    if skill_info['category'] == '特性':
+        if link := rocopedia_links.get(skill_info['name']):
+            # 由于traits_en里也有部分符号被编码，所以不能用unquote全部解码
+            # 目前有 & 和 ' 被编码了
+            # slug = urllib.parse.unquote(link[0]['path'])
+            slug = link[0]['path'].replace('%28', '(').replace('%29', ')').replace('%21', '!')
+            if trait_en := traits_en_dict.get(slug):
+                skill_info['name_en'] = trait_en['name']
+                skill_info['desc_en'] = trait_en['effect']
+            else:
+                print(f'有link但没找到对应的trait_en：{slug}')
+    else:
+        if skill_en := skills_en_dict.get(skill_info['game_id']):
+            skill_info['name_en'] = skill_en['displayName']
+            skill_info['desc_en'] = skill_en['displayDescription']
+    skill_info.pop('game_id', None)
+    skill_info.pop('icon', None)
 # 以技能最终名作为 key（重名时已加数字后缀以保证唯一）
 skill_catalog = {skill_info['id']: skill_info for skill_info in skill_catalog.values()}
 
@@ -921,12 +948,16 @@ attacker_random_pools: dict[str, RandomPool] = {
             combos=[
                 WeightedSkillCombo(
                     combo='多维击打',
-                    weight=20
+                    weight=16
                 ),
                 WeightedSkillCombo(
                     combo='离子震荡',
                     weight=3
                 ),
+                WeightedSkillCombo(
+                    combo='翼击',
+                    weight=16
+                )
             ]
         ),
     ),
