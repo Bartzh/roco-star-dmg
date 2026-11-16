@@ -1037,6 +1037,62 @@ function getFinalStat(spirit, statKey, nature, ivs) {
 }
 
 // ============================================================
+// 面板「属性配置」显示值：在性格 / 个体之外继续叠加
+//   - buff chip（攻 / 防 / 速）
+//   - 速度 chip（固定加值）
+//   - 特性 / 技能的动态属性修正（atkPctAdd / matkAdd / defPctAdd / 速度修正）
+// 与伤害计算同源，保证面板显示的就是本次计算实际使用的数值。
+// HP 不参与 buff（伤害公式中的 defHP 亦为未 buff 值）。
+// ============================================================
+function getDisplayDynamicMods() {
+  // 双方或攻击技能未就绪时返回 null：此时只显示性格 / 个体 / chip 结果。
+  if (!state.attacker || !state.defender || !state.attackSkill) return null;
+  return computeSkillDynamicModifiers(
+    state.attacker, state.attackSkill, state.attackerNature, state.attackerIVs,
+    state.defender, state.defenseSkill, state.defenderNature, state.defenderIVs,
+    state.starLayer
+  );
+}
+function getDisplayStatValue(side, statKey, dyn) {
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+  if (!spirit) return 0;
+  const base = getFinalStat(spirit, statKey, getNature(side), getIVs(side));
+  if (statKey === 'hp') return base;
+  const mods = dyn || {};
+  if (statKey === 'spd') {
+    // 动态修正后的有效速度（与先手判定同源）；双方未就绪时退回 基线 + 速度 chip。
+    const effective = side === 'attacker' ? mods.attackerEffectiveSpeed : mods.defenderEffectiveSpeed;
+    return effective != null ? effective : base + getSpeed(side);
+  }
+  let pct = 0;
+  if (side === 'attacker') {
+    if (statKey === 'atk')       pct = getBuff('attacker', 'atk')  + (mods.atkPctAdd || 0);
+    else if (statKey === 'matk') pct = getBuff('attacker', 'matk') + (mods.atkPctAdd || 0) + (mods.matkAdd || 0);
+    else                         pct = getBuff('attacker', statKey);
+  } else {
+    if (statKey === 'def')       pct = getBuff('defender', 'def')  + (mods.defPctAdd || 0);
+    else if (statKey === 'mdef') pct = getBuff('defender', 'mdef') + (mods.defPctAdd || 0);
+    else                         pct = getBuff('defender', statKey);
+  }
+  if (!pct) return base;
+  return Math.max(0, Math.round(base * (1 + pct / 100)));
+}
+// 只刷新数值文本、不重建 DOM —— 供 buff / 速度 chip 拖动中高频调用，
+// 避免重建 chip 节点打断拖拽手势。
+function refreshStatDisplays() {
+  const dyn = getDisplayDynamicMods();
+  for (const side of ['attacker', 'defender']) {
+    const grid = document.getElementById(`${side}-stats-grid`);
+    if (!grid) continue;
+    grid.querySelectorAll('.stat-cell[data-stat]').forEach(cell => {
+      const valueEl = cell.querySelector('.stat-value');
+      if (!valueEl) return;
+      valueEl.textContent = String(getDisplayStatValue(side, cell.dataset.stat, dyn));
+    });
+  }
+}
+
+// ============================================================
 // STAB (Same-Type Attack Bonus): ×1.25 if the skill's element
 // matches any of the attacker's types. Applied BEFORE type
 // effectiveness. Star damage does NOT receive STAB.
@@ -2292,11 +2348,12 @@ function renderStatsConfig(side) {
   renderBuffChips(side);
 
   // Build 3x2 grid
+  const dyn = getDisplayDynamicMods();
   grid.innerHTML = STAT_KEYS.map(statKey => {
     const isUp   = nature.up   === statKey;
     const isDown = nature.down === statKey;
     const hasIV  = ivs.includes(statKey);
-    const finalVal = getFinalStat(spirit, statKey, nature, ivs);
+    const finalVal = getDisplayStatValue(side, statKey, dyn);
     const statLabel = t(`stat.${statKey}`);
     const natureState = t(isUp ? 'nature.up' : isDown ? 'nature.down' : 'nature.unset');
     const ivState = t(hasIV ? 'iv.selected' : 'iv.unselected');
@@ -4536,6 +4593,10 @@ function computeSkillDynamicModifiers(
   // (4) Power multiplier.
   result.powerMult = result.powerMultAdd * result.powerMult;
   delete result.powerMultAdd;
+  // 面板显示用：双方计入动态修正后的有效速度（与先手判定同源）。
+  // 由 applySpeedMod 在计算过程中原地更新，这里一并透出。
+  result.attackerEffectiveSpeed = ctx.attackerEffectiveSpeed;
+  result.defenderEffectiveSpeed = ctx.defenderEffectiveSpeed;
   return result;
 }
 
@@ -4661,6 +4722,9 @@ function computeFinalDamage(ctx) {
 }
 
 function calculateDamage() {
+  // 属性面板显示值跟随 buff / 速度 chip / 动态修正实时刷新（与伤害同源）。
+  // 只更新文本、不重建 DOM，可安全地在 chip 拖拽过程中高频调用。
+  refreshStatDisplays();
   if (!state.attacker || !state.defender || !state.attackSkill) {
     renderWaiting();
     updateLethalReadout(null, 0);
