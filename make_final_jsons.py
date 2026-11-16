@@ -289,10 +289,23 @@ class SkillsPool:
     combos: list[WeightedSkillCombo]
 
 @dataclass
+class WeightedModValue:
+    value: float | bool  # 数值型手动技能填 int，开关型填 bool
+    weight: float
+
+@dataclass
+class ModPool:
+    default_weight: float  # 落入该区间 → 不覆盖，使用技能自身的 defaultInput
+    values: list[WeightedModValue]
+
+@dataclass
 class RandomPool:
     stats: Optional[StatsPool] = None
     buffs: Optional[BuffsPool] = None
     skills: Optional[SkillsPool] = None
+    # 手动技能输入池：技能 id → 输入值权重池（数值型 / 开关型）。
+    # 只有本题实际生效的技能（精灵特性或本侧选中的攻击/防御技能）才会被抽样。
+    mods: Optional[dict[str, ModPool]] = None
 
 
 attacker_random_pools: dict[str, RandomPool] = {
@@ -1761,15 +1774,6 @@ defender_random_pools: dict[str, RandomPool] = {
                 ),
             ]
         ),
-        buffs=BuffsPool(
-            default_weight=0,
-            combos=[
-                WeightedBuffCombo(
-                    combo=[{'def': 75, 'mdef': 75, 'spd': 115}],
-                    weight=1
-                ),
-            ]
-        ),
         skills=SkillsPool(
             default_weight=0,
             combos=[
@@ -1787,6 +1791,15 @@ defender_random_pools: dict[str, RandomPool] = {
                 ),
             ]
         ),
+        mods={
+            '虫群突袭': ModPool(
+                default_weight=0,
+                values=[
+                    WeightedModValue(value=4, weight=1),
+                    WeightedModValue(value=5, weight=19),
+                ]
+            ),
+        }
     ),
     '巨鼓象': RandomPool(
         stats=StatsPool(

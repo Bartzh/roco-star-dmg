@@ -2990,23 +2990,42 @@ function openSkillModModal(skill, side) {
   open();
 }
 
-// 挑战模式生成题目时，从 localStorage 加载 skillModInputs 并按 category 过滤：
-//   - 特性（category === '特性'）跟随 useMemoryStats（属性配置记忆）
-//   - 非特性技能跟随 useMemorySkill（技能选择记忆）
-// 两个记忆开关都关闭时返回空对象。rawInputs 为 loadSpiritConfig 返回的
-// skillModInputs 对象（可能为 undefined）。
-function filterSkillModInputsByMemory(rawInputs, side) {
-  const useSkill = state.challenge.useMemorySkill[side];
-  const useStats = state.challenge.useMemoryStats[side];
-  if (!useSkill && !useStats) return {};
+// 把随机池里的手动技能输入值规整到该技能的合法范围 / 类型。
+// 未登记为手动技能的 key 返回 undefined（调用方忽略）。
+function normalizeSkillModValue(skillKey, value) {
+  const cfg = SKILL_MODS_MANUAL[skillKey];
+  if (!cfg) return undefined;
+  if (cfg.inputType === 'number') {
+    return Math.max(cfg.min, Math.min(cfg.max, Math.round(Number(value) || 0)));
+  }
+  return !!value;
+}
+
+// 挑战模式出题时解析某侧的手动技能输入：
+//   1. 记忆优先：特性跟随 useMemoryStats，非特性技能跟随 useMemorySkill；
+//   2. 记忆未提供时，从该精灵随机池的 mods 中按权重抽值；
+//   3. 都没有 → 不写入（计算侧回退该技能的 defaultInput）。
+// 只有本题实际生效的技能（精灵特性 + 本侧选中的技能）才会参与随机池抽样。
+function resolveSkillModInputs(side, spirit, abilityId, selectedSkillId) {
+  const saved = loadSpiritConfig(spirit?.id, side)?.skillModInputs || {};
   const result = {};
-  for (const [key, val] of Object.entries(rawInputs || {})) {
+  for (const [key, val] of Object.entries(saved)) {
     const sk = SKILLS[key];
     const isAbility = sk && sk.category === '特性';
-    // 特性跟随 useMemoryStats，其他技能跟随 useMemorySkill
-    if (isAbility ? useStats : useSkill) {
-      result[key] = val;
-    }
+    const useMem = isAbility
+      ? state.challenge.useMemoryStats[side]
+      : state.challenge.useMemorySkill[side];
+    if (useMem) result[key] = val;
+  }
+  const modPools = _getRandomPool(side, spirit?.id)?.mods || {};
+  const relevantKeys = new Set([abilityId, selectedSkillId].filter(Boolean));
+  for (const key of relevantKeys) {
+    if (!SKILL_MODS_MANUAL[key]) continue;     // 只处理已登记的手动技能
+    if (result[key] !== undefined) continue;   // 记忆优先
+    const picked = _pickModValue(modPools[key]);
+    if (!picked.hit) continue;
+    const value = normalizeSkillModValue(key, picked.value);
+    if (value !== undefined) result[key] = value;
   }
   return result;
 }
@@ -5678,6 +5697,23 @@ function _pickFromPool(pool) {
   return null;
 }
 
+// 从随机池的手动技能配置中按权重抽一个输入值。
+// 返回 { hit, value }；落入 default_weight 区间 / 池为空时 hit=false，
+// 调用方不写入该技能（计算侧回退 defaultInput）。
+function _pickModValue(modPool) {
+  if (!modPool) return { hit: false, value: undefined };
+  const values = modPool.values || [];
+  const defaultW = modPool.default_weight || 0;
+  const totalW = values.reduce((s, v) => s + v.weight, 0) + defaultW;
+  if (totalW <= 0) return { hit: false, value: undefined };
+  let r = Math.random() * totalW;
+  for (const v of values) {
+    r -= v.weight;
+    if (r < 0) return { hit: true, value: v.value };
+  }
+  return { hit: false, value: undefined };
+}
+
 // 挑战模式技能随机兜底的权重表（具体数值可调）。
 //  - 攻击方：愿力冲击（id 以 __yuanli_ 开头，共 18 个变体）权重低；
 //    精灵自身攻击技能权重高。
@@ -5919,16 +5955,13 @@ function buildQuestionSnapshot(_index) {
   const atkSkId  = buildSkillRng('attacker')(attacker);
   const defSkId  = buildSkillRng('defender')(defender);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
-  // 手动技能输入按 category 分别跟随记忆开关：
-  //   - 特性（如偏振）跟随 useMemoryStats（属性配置记忆）
-  //   - 非特性技能（如色散）跟随 useMemorySkill（技能选择记忆）
-  // 对应开关关闭时，该 category 的 mod 走 defaultInput（通常 false = 不触发）。
-  const atkModInputs = filterSkillModInputsByMemory(
-    loadSpiritConfig(attacker.id, 'attacker')?.skillModInputs, 'attacker'
-  );
-  const defModInputs = filterSkillModInputsByMemory(
-    loadSpiritConfig(defender.id, 'defender')?.skillModInputs, 'defender'
-  );
+  // 手动技能输入：记忆优先（特性跟随 useMemoryStats，其他技能跟随
+  // useMemorySkill）；记忆未提供时按该精灵随机池的 mods 权重抽样。
+  // 只有本题实际生效的技能（精灵特性 + 本侧选中的技能）参与池抽样。
+  const atkAbility = getSpiritAbility(attacker);
+  const defAbility = getSpiritAbility(defender);
+  const atkModInputs = resolveSkillModInputs('attacker', attacker, atkAbility?.id, atkSkId);
+  const defModInputs = resolveSkillModInputs('defender', defender, defAbility?.id, defSkId);
   return {
     attacker,
     defender,
