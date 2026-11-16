@@ -2934,15 +2934,16 @@ function setSkillModInput(skill, side, value) {
 // mod-icon 的 tooltip 文案。手动技能额外提示交互方式；数字型带上当前数值。
 function getModIconTitle(skill, side) {
   if (!skill) return '';
-  let title = `${skill.name}：${skill.desc}`;
+  let title = t('mod.title', { name: displayName(skill), desc: displayDesc(skill) });
   const cfg = getSkillModManualConfig(skill);
   if (!cfg) return title;
   if (cfg.inputType === 'number') {
     const val = getSkillModInput(skill, side);
-    const unit = cfg.unit ? ` ${cfg.unit}` : '';
-    title += `\n（当前 ${val}${unit} · 点击调整）`;
+    const unit = cfg.unitKey ? t(cfg.unitKey) : '';
+    const value = unit ? `${val} ${unit}` : String(val);
+    title += `\n${t('mod.current', { value })}`;
   } else {
-    title += '\n（点击切换是否触发）';
+    title += `\n${t('mod.toggleHint')}`;
   }
   return title;
 }
@@ -2965,15 +2966,16 @@ function openSkillModModal(skill, side) {
   let pending = Number(getSkillModInput(skill, side)) || 0;
   const clampValue = (v) => Math.max(cfg.min, Math.min(cfg.max, Math.round(Number(v) || 0)));
 
-  titleEl.textContent = skill.name;
+  titleEl.textContent = displayName(skill);
+  const modLabel = t(cfg.labelKey);
   bodyEl.innerHTML = `
-    <p class="mod-modal-desc">${skill.desc}</p>
-    <div class="mod-modal-label">${cfg.label}（${cfg.min}~${cfg.max}）</div>
+    <p class="mod-modal-desc">${displayDesc(skill)}</p>
+    <div class="mod-modal-label">${t('mod.modal.label', { label: modLabel, min: cfg.min, max: cfg.max })}</div>
     <div class="mod-modal-slider">
       <input type="range" class="mod-modal-range" min="${cfg.min}" max="${cfg.max}" step="1"
-             value="${pending}" aria-label="${cfg.label}">
+             value="${pending}" aria-label="${modLabel}">
       <input type="number" class="mod-modal-number" min="${cfg.min}" max="${cfg.max}" step="1"
-             value="${pending}" inputmode="numeric" aria-label="${cfg.label}（可手动输入）">
+             value="${pending}" inputmode="numeric" aria-label="${t('mod.modal.numberAria', { label: modLabel })}">
     </div>
   `;
   const rangeEl  = bodyEl.querySelector('.mod-modal-range');
@@ -3108,8 +3110,6 @@ function buildModIconNode(skill, active, side) {
   const el = elOf(skill.element);
   const span = document.createElement('span');
   span.className = `mod-icon ${active ? 'active' : 'inactive'} enter`;
-  // 待适配本地化
-  // span.title = t('mod.title', { name: displayName(skill), desc: displayDesc(skill) });
   span.title = getModIconTitle(skill, side);
   // 可点击的 manual mod：附加点击 / 键盘交互 + 悬停样式。
   // 数字型（skillModUsesModal）点击打开 #mod-modal；布尔型直接 toggle。
@@ -4260,7 +4260,7 @@ const SKILL_MODS = {
     if (!input) return null;
     return {
       powerMult: 1.5,
-      notes: ['威力 +50%（对混血精灵）'],
+      notes: [{ key: 'mod.powerVsHybrid' }],
     };
   },
   // 偏振（特性）：受到自己携带技能系别的攻击伤害-40%。
@@ -4272,7 +4272,7 @@ const SKILL_MODS = {
     if (!input) return null;
     return {
       powerMult: 0.6,
-      notes: ['受到伤害 -40%（攻击系别匹配携带技能）'],
+      notes: [{ key: 'mod.damageTakenCarried' }],
     };
   },
   // 虫群鼓舞（特性）：队伍中每有 1 只其他虫系精灵，自己入场时攻防速 +10%。
@@ -4289,7 +4289,7 @@ const SKILL_MODS = {
       atkPctAdd: pct,
       defPctAdd: pct,
       speedPctAdd: pct,
-      notes: [`攻防速 +${pct}%（其他虫系精灵 ${count} 只 ×10%）`],
+      notes: [{ key: 'mod.swarmStat', params: { pct, count, perPct: 10 } }],
     };
   },
   // 虫群突袭（特性）：机制同虫群鼓舞，每只其他虫系精灵 +15%。
@@ -4301,7 +4301,7 @@ const SKILL_MODS = {
       atkPctAdd: pct,
       defPctAdd: pct,
       speedPctAdd: pct,
-      notes: [`攻防速 +${pct}%（其他虫系精灵 ${count} 只 ×15%）`],
+      notes: [{ key: 'mod.swarmStat', params: { pct, count, perPct: 15 } }],
     };
   },
   // 魔能爆（攻击）：使用时消耗所有能量，消耗越高威力越高。
@@ -4315,7 +4315,7 @@ const SKILL_MODS = {
     const power = table[energy];
     return {
       powerOverride: power,
-      notes: [`威力 ${power}（消耗能量 ${energy} 点）`],
+      notes: [{ key: 'mod.powerEnergyCost', params: { power, energy } }],
     };
   },
   // Add more skills here as they're introduced.
@@ -4362,7 +4362,8 @@ for (const [key, sides] of Object.entries(SKILL_MODS_SIDES)) {
 //   - fn.defaultInput 为用户未操作时的默认值
 // inputType:
 //   - 'toggle'（默认）：布尔开关，点击 icon 直接切换
-//   - 'number'：数值输入（min~max），点击 icon 打开 #mod-modal 弹窗选择
+//   - 'number'：数值输入（min~max），点击 icon 打开 #mod-modal 弹窗选择；
+//     弹窗文案通过 labelKey / unitKey 引用 i18n 词条，不写死中文。
 // 只要不是简单开关的 mod，都通过 inputType/扩展字段走弹窗，后续新增同类
 // 特性时只需在这里登记配置，无需改交互代码。
 const SKILL_MODS_MANUAL = {
@@ -4375,16 +4376,16 @@ const SKILL_MODS_MANUAL = {
     inputType: 'number',
     min: 0,
     max: 5,
-    label: '队伍中其他虫系精灵数量',
-    unit: '只',
+    labelKey: 'mod.manual.swarmCount.label',
+    unitKey: 'mod.manual.swarmCount.unit',
   },
   虫群突袭: {
     defaultInput: 0,
     inputType: 'number',
     min: 0,
     max: 5,
-    label: '队伍中其他虫系精灵数量',
-    unit: '只',
+    labelKey: 'mod.manual.swarmCount.label',
+    unitKey: 'mod.manual.swarmCount.unit',
   },
   // 魔能爆：消耗所有能量，威力随消耗能量（0~10）查表。
   // 0 能量仍有基础威力（46），因此 0 也视为生效（icon 不置灰）。
@@ -4393,8 +4394,8 @@ const SKILL_MODS_MANUAL = {
     inputType: 'number',
     min: 0,
     max: 10,
-    label: '消耗能量',
-    unit: '点',
+    labelKey: 'mod.manual.energyCost.label',
+    unitKey: 'mod.manual.energyCost.unit',
     activeWhenZero: true,
   },
 };

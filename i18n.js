@@ -223,6 +223,15 @@
       'buff.title': `左右拖动或滚轮调整 · shift+滚轮精细调整 · 双击重置`,
       'buff.title.combo': `左右拖动或滚轮调整 · 双击重置`,
       'mod.title': `{name}：{desc}`,
+      'mod.current': `（当前 {value} · 点击调整）`,
+      'mod.toggleHint': `（点击切换是否触发）`,
+      'mod.modal.title': `技能调整`,
+      'mod.modal.label': `{label}（{min}~{max}）`,
+      'mod.modal.numberAria': `{label}（可手动输入）`,
+      'mod.manual.swarmCount.label': `队伍中其他虫系精灵数量`,
+      'mod.manual.swarmCount.unit': `只`,
+      'mod.manual.energyCost.label': `消耗能量`,
+      'mod.manual.energyCost.unit': `点`,
 
       /* ---- Damage breakdown ---- */
       'breakdown.sectionSkill': `技能伤害`,
@@ -275,6 +284,10 @@
       'mod.powerInsectSong': `威力 +20（虫鸣）`,
       'mod.powerNonStab': `威力 +50%（非本系技能）`,
       'mod.powerOffClass': `威力 ×0.5（非敌方系别技能）`,
+      'mod.powerVsHybrid': `威力 +50%（对混血精灵）`,
+      'mod.damageTakenCarried': `受到伤害 -40%（攻击系别匹配携带技能）`,
+      'mod.swarmStat': `攻防速 +{pct}%（其他虫系精灵 {count} 只 ×{perPct}%）`,
+      'mod.powerEnergyCost': `威力 {power}（消耗能量 {energy} 点）`,
 
       /* ---- Data management dialogs ---- */
       'confirm.resetFavorites.title': `重置收藏列表`,
@@ -499,6 +512,15 @@
       'buff.title': `Drag or scroll to adjust · Shift+scroll for fine steps · Double-click to reset`,
       'buff.title.combo': `Drag or scroll to adjust · Double-click to reset`,
       'mod.title': `{name}: {desc}`,
+      'mod.current': `(current {value} · click to adjust)`,
+      'mod.toggleHint': `(click to toggle)`,
+      'mod.modal.title': `Skill Adjustment`,
+      'mod.modal.label': `{label} ({min}–{max})`,
+      'mod.modal.numberAria': `{label} (editable)`,
+      'mod.manual.swarmCount.label': `Other Bug-class Jinies on the team`,
+      'mod.manual.swarmCount.unit': ``,
+      'mod.manual.energyCost.label': `Energy consumed`,
+      'mod.manual.energyCost.unit': ``,
 
       /* ---- Damage breakdown ---- */
       'breakdown.sectionSkill': `Skill Damage`,
@@ -551,6 +573,10 @@
       'mod.powerInsectSong': `Power +20 (Insect Song)`,
       'mod.powerNonStab': `Power +50% (non-STAB skill)`,
       'mod.powerOffClass': `Power ×0.5 (skill class differs from the enemy's class)`,
+      'mod.powerVsHybrid': `Power +50% (vs. Hybrid Jinies)`,
+      'mod.damageTakenCarried': `Damage taken -40% (attacking class matches an equipped skill)`,
+      'mod.swarmStat': `Attack, Defense and Speed +{pct}% ({count} other Bug-class Jinies ×{perPct}%)`,
+      'mod.powerEnergyCost': `Power {power} (Energy consumed {energy})`,
 
       /* ---- Data management dialogs ---- */
       'confirm.resetFavorites.title': `Reset Favorites`,
