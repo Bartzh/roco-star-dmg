@@ -301,6 +301,7 @@ textarea::placeholder {
   font-size: 12px;
   line-height: 1;
   font-weight: 700;
+  letter-spacing: 0;
   /* 纯数字在任意图标上都可读 */
   text-shadow: 0 0 2px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.7);
   pointer-events: none;
