@@ -2791,8 +2791,11 @@ function getSkillEnergy(skill, starLayer = 0) {
 function isSkillModActive(skill, side) {
   if (!skill || !hasSkillMod(skill)) return false;
   const fn = SKILL_MODS[skill.modKey] || SKILL_MODS[skill.id];
-  // 手动技能：触发状态由用户输入决定，不运行时计算
+  // 手动技能：触发状态由用户输入决定，不运行时计算。
+  // 部分数字型技能 0 也有效（如魔能爆 0 能量仍有基础威力），由配置标记。
   if (fn.manual) {
+    const cfg = getSkillModManualConfig(skill);
+    if (cfg && cfg.activeWhenZero) return true;
     return !!getSkillModInput(skill, side);
   }
   const fromAttacker = side === 'attacker';
@@ -3613,6 +3616,7 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 // Each entry takes (ctx, fromAttacker, input) and returns either null or
 //   {
 //     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
+//     powerOverride?: number,
 //     ignoreResist?: boolean, elementOverride?: string,
 //     matkAdd?: number, atkPctAdd?: number, defPctAdd?: number,
 //     speedAdd?: number, speedPctAdd?: number,
@@ -3620,6 +3624,8 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 //   }.
 // ignoreResist: true ⇒ the defender's type resistance (effectiveness < 1)
 //   is neutralized to 1 (weak/super-effective multipliers are preserved).
+// powerOverride: 用指定值替换技能基础威力（如魔能爆按消耗能量查表），
+//   用户的"威力" chip 与动态 powerAdd 仍在此基础上叠加。
 // elementOverride: if set, replaces skill.element for STAB / effectiveness /
 //   幻-element checks during damage calculation (e.g. 展翅 changes
 //   普通系 → 翼系). The original skill.element is preserved.
@@ -4161,6 +4167,20 @@ const SKILL_MODS = {
       notes: [`攻防速 +${pct}%（其他虫系精灵 ${count} 只 ×15%）`],
     };
   },
+  // 魔能爆（攻击）：使用时消耗所有能量，消耗越高威力越高。
+  // 计算器没有"当前能量"概念，由用户点击 mod-icon 在弹窗中选择消耗能量数
+  // （0~10），威力按官方数值表查得后覆盖技能基础威力。
+  魔能爆(ctx, fromAttacker, input) {
+    if (!fromAttacker) return null;
+    const energy = Math.max(0, Math.min(10, Math.round(Number(input) || 0)));
+    // 消耗能量 → 威力（0~10）
+    const table = [46, 71, 91, 111, 136, 156, 166, 181, 191, 201, 211];
+    const power = table[energy];
+    return {
+      powerOverride: power,
+      notes: [`威力 ${power}（消耗能量 ${energy} 点）`],
+    };
+  },
   // Add more skills here as they're introduced.
 };
 
@@ -4185,6 +4205,7 @@ const SKILL_MODS_SIDES = {
   __yuanli__: 'attacker', 和弦共振: 'attacker',
   目空: 'attacker', 夺目: 'attacker', 勇敢: 'attacker', 挺起胸脯: 'attacker',
   共鸣: 'attacker', 齐鸣: 'attacker', 涂鸦: 'attacker', 色散: 'attacker',
+  魔能爆: 'attacker',
   // 只在防御方触发
   狂欢开始: 'defender', 绝对秩序: 'defender', 偏振: 'defender',
   // 双方都可能触发（特性随持有者在哪一侧生效）
@@ -4227,6 +4248,17 @@ const SKILL_MODS_MANUAL = {
     max: 5,
     label: '队伍中其他虫系精灵数量',
     unit: '只',
+  },
+  // 魔能爆：消耗所有能量，威力随消耗能量（0~10）查表。
+  // 0 能量仍有基础威力（46），因此 0 也视为生效（icon 不置灰）。
+  魔能爆: {
+    defaultInput: 0,
+    inputType: 'number',
+    min: 0,
+    max: 10,
+    label: '消耗能量',
+    unit: '点',
+    activeWhenZero: true,
   },
 };
 for (const [key, cfg] of Object.entries(SKILL_MODS_MANUAL)) {
@@ -4272,7 +4304,7 @@ function computeSkillDynamicModifiers(
     defender, defenseSkill, defenderNature, defenderIVs,
     starLayer
   );
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, matkAdd: 0, atkPctAdd: 0, defPctAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
+  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, powerOverride: null, comboAdd: 0, comboMult: 1, matkAdd: 0, atkPctAdd: 0, defPctAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
 
   // 取精灵的特性技能（skills 中第一个 category === '特性'）。
   const getAbility = (spirit) => {
@@ -4340,6 +4372,7 @@ function computeSkillDynamicModifiers(
     // defPctAdd 只作用于防御方自身的防御，避免双方特性互相串扰。
     if (mod.atkPctAdd && fromAttacker)  result.atkPctAdd += mod.atkPctAdd;
     if (mod.defPctAdd && !fromAttacker) result.defPctAdd += mod.defPctAdd;
+    if (mod.powerOverride != null) result.powerOverride = mod.powerOverride;
     if (mod.comboAdd)     result.comboAdd     += mod.comboAdd;
     if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
     if (mod.powerMultAdd) result.powerMultAdd += mod.powerMultAdd;
@@ -4449,7 +4482,10 @@ function computeFinalDamage(ctx) {
   const hasCombo = skill.combo != null;
   const chipCombo = hasCombo ? attackerCombo : 0;
   const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + chipCombo) * dyn.comboMult);
-  const power = Math.max(0, ((skill.power ?? 0) + powerBoost + dyn.powerAdd) * dyn.powerMult);
+  // powerOverride（如魔能爆按消耗能量查表）替换技能基础威力，
+  // 用户的威力 chip 与动态 powerAdd 仍在其上叠加。
+  const basePower = dyn.powerOverride != null ? dyn.powerOverride : (skill.power ?? 0);
+  const power = Math.max(0, (basePower + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
     power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
   );
@@ -4705,7 +4741,8 @@ function renderBreakdownList(breakdownList, data) {
   const dynMods = data.dyn || { powerMult: 1, powerAdd: 0, comboAdd: 0, comboMult: 1, notes: [] };
   const powerBoost = data.powerBoost || 0;
   const comboChip = data.attackerCombo || 0;
-  const basePower = data.skill.power ?? 0;
+  // powerOverride（如魔能爆按消耗能量查表）优先于技能数据里的基础威力
+  const basePower = dynMods.powerOverride != null ? dynMods.powerOverride : (data.skill.power ?? 0);
   const dynAdd = dynMods.powerAdd || 0;
   const basePowerWithBoost = Math.max(0, basePower + powerBoost + dynAdd);
   const hasCombo = data.hasCombo !== false;   // default true for legacy callers
