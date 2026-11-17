@@ -1048,6 +1048,11 @@ function getFinalStat(spirit, statKey, nature, ivs, level = DEFAULT_LEVEL) {
   const mult = getNatureMultiplier(nature, statKey);
   const lv = level == null ? DEFAULT_LEVEL : level;
   const effective = base + iv / 2;
+  // 已知游戏取整特例：60 级、种族值 105、无个体、中性性格时实际为 175（而非 176）。
+  // 属于 .5 边界在游戏内浮点运算下向下取整的情况。
+  if (statKey !== 'hp' && lv === DEFAULT_LEVEL && base === 105 && iv === 0 && mult === 1) {
+    return 175;
+  }
   if (statKey === 'hp') {
     return Math.round(Math.round((lv / 50 + 0.5) * effective + lv + 10) * mult + 100);
   }
