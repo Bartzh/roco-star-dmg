@@ -1087,16 +1087,15 @@ function getDisplayStatValue(side, statKey, dyn) {
     const effective = side === 'attacker' ? mods.attackerEffectiveSpeed : mods.defenderEffectiveSpeed;
     return effective != null ? effective : base + getSpeed(side);
   }
+  // 动态修正按持有者一侧取：攻 buff 作用于该侧的物攻/魔攻，防 buff 作用于
+  // 该侧的物防/魔防（如虫群鼓舞对持有者同时提供攻 / 防 / 速）。
+  const atkPct = side === 'attacker' ? (mods.attackerAtkPctAdd || 0) : (mods.defenderAtkPctAdd || 0);
+  const defPct = side === 'attacker' ? (mods.attackerDefPctAdd || 0) : (mods.defenderDefPctAdd || 0);
   let pct = 0;
-  if (side === 'attacker') {
-    if (statKey === 'atk')       pct = getBuff('attacker', 'atk')  + (mods.atkPctAdd || 0);
-    else if (statKey === 'matk') pct = getBuff('attacker', 'matk') + (mods.atkPctAdd || 0) + (mods.matkAdd || 0);
-    else                         pct = getBuff('attacker', statKey);
-  } else {
-    if (statKey === 'def')       pct = getBuff('defender', 'def')  + (mods.defPctAdd || 0);
-    else if (statKey === 'mdef') pct = getBuff('defender', 'mdef') + (mods.defPctAdd || 0);
-    else                         pct = getBuff('defender', statKey);
-  }
+  if (statKey === 'atk')       pct = getBuff(side, 'atk')  + atkPct;
+  else if (statKey === 'matk') pct = getBuff(side, 'matk') + atkPct + (side === 'attacker' ? (mods.matkAdd || 0) : 0);
+  else if (statKey === 'def')  pct = getBuff(side, 'def')  + defPct;
+  else                         pct = getBuff(side, 'mdef') + defPct;
   if (!pct) return base;
   return Math.max(0, Math.round(base * (1 + pct / 100)));
 }
@@ -3842,10 +3841,12 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 // matkAdd: flat percentage points added to the attacker's 魔攻 buff
 //   (additive with the user's chip buff). Only takes effect when the
 //   skill deals magic damage (isMagic === true).
-// atkPctAdd: percentage points added to the attacker's attack buff
-//   (物攻/魔攻通用，与 chip buff 相加)。只对攻击方（fromAttacker）生效。
-// defPctAdd: percentage points added to the defender's defense buff
-//   (物防/魔防通用，与 chip buff 相加)。只对防御方生效。
+// atkPctAdd: percentage points added to the holder's attack buff
+//   (物攻/魔攻通用，与 chip buff 相加)。伤害公式只取攻击方的这份加成；
+//   防御方持有的部分仅用于属性面板显示。
+// defPctAdd: percentage points added to the holder's defense buff
+//   (物防/魔防通用，与 chip buff 相加)。伤害公式只取防御方的这份加成；
+//   攻击方持有的部分仅用于属性面板显示。
 // speedAdd: flat speed points added to the attacker's (or defender's,
 //   depending on fromAttacker) effective speed. Applied in-place to
 //   ctx.attackerEffectiveSpeed / ctx.defenderEffectiveSpeed during the
@@ -4374,8 +4375,8 @@ const SKILL_MODS = {
   // 虫群鼓舞（特性）：队伍中每有 1 只其他虫系精灵，自己入场时攻防速 +10%。
   // 计算器没有队伍概念，由用户点击 mod-icon 在弹窗中选择数量（0~5）。
   // input = 其他虫系精灵数量；攻/防/速均为百分比加成：
-  //   atkPctAdd  → 攻击方持有的攻击（物攻/魔攻通用）
-  //   defPctAdd  → 防御方持有的防御（物防/魔防通用）
+  //   atkPctAdd  → 持有者的攻击（物攻/魔攻通用）
+  //   defPctAdd  → 持有者的防御（物防/魔防通用）
   //   speedPctAdd→ 影响先手判定（顺风 / 破空 / 扇风 / 疾风刺 / 闪击）
   虫群鼓舞(ctx, fromAttacker, input) {
     const count = Number(input) || 0;
@@ -4549,7 +4550,15 @@ function computeSkillDynamicModifiers(
     defender, defenseSkill, defenderNature, defenderIVs,
     starLayer, attackerLevel, defenderLevel
   );
-  const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, powerOverride: null, comboAdd: 0, comboMult: 1, matkAdd: 0, atkPctAdd: 0, defPctAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
+  // atk/def 百分比按持有者一侧分别累计：攻击方的 atk+def、防御方的 atk+def
+  // 都保留，伤害计算只取"攻击方的 atk"与"防御方的 def"，面板显示则四项全用。
+  const result = {
+    powerMultAdd: 1, powerMult: 1, powerAdd: 0, powerOverride: null,
+    comboAdd: 0, comboMult: 1, matkAdd: 0,
+    attackerAtkPctAdd: 0, attackerDefPctAdd: 0,
+    defenderAtkPctAdd: 0, defenderDefPctAdd: 0,
+    speedAdd: 0, ignoreResist: false, elementOverride: null, notes: []
+  };
 
   // 取精灵的特性技能（skills 中第一个 category === '特性'）。
   const getAbility = (spirit) => {
@@ -4613,10 +4622,17 @@ function computeSkillDynamicModifiers(
       if (mod.speedAdd) result.speedAdd += mod.speedAdd;
       applySpeedMod(mod, fromAttacker);
     }
-    // 攻/防百分比加成：atkPctAdd 只作用于攻击方自身的攻击，
-    // defPctAdd 只作用于防御方自身的防御，避免双方特性互相串扰。
-    if (mod.atkPctAdd && fromAttacker)  result.atkPctAdd += mod.atkPctAdd;
-    if (mod.defPctAdd && !fromAttacker) result.defPctAdd += mod.defPctAdd;
+    // 攻/防百分比加成：按持有者一侧累计，不再丢弃交叉项。
+    // 伤害公式只读攻击方的攻击加成与防御方的防御加成，但属性面板需要
+    // 同时展示攻击方的双防与防御方的双攻（如虫群鼓舞的攻防速 +N%）。
+    if (mod.atkPctAdd) {
+      if (fromAttacker) result.attackerAtkPctAdd += mod.atkPctAdd;
+      else              result.defenderAtkPctAdd += mod.atkPctAdd;
+    }
+    if (mod.defPctAdd) {
+      if (fromAttacker) result.attackerDefPctAdd += mod.defPctAdd;
+      else              result.defenderDefPctAdd += mod.defPctAdd;
+    }
     if (mod.powerOverride != null) result.powerOverride = mod.powerOverride;
     if (mod.comboAdd)     result.comboAdd     += mod.comboAdd;
     if (mod.powerAdd)     result.powerAdd     += mod.powerAdd;
@@ -4699,13 +4715,14 @@ function computeFinalDamage(ctx) {
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
   // nonsensical negative stats from extreme debuffs. Dynamic stat modifiers
   // are additive with the chip buff:
-  //   - matkAdd  : 仅魔攻（历史字段，如 和弦共振）
-  //   - atkPctAdd: 物攻/魔攻通用（如 虫群鼓舞的攻 +N%）
-  //   - defPctAdd: 物防/魔防通用（如 虫群鼓舞作为防御方特性时的防 +N%）
+  //   - matkAdd            : 仅魔攻（历史字段，如 和弦共振）
+  //   - attackerAtkPctAdd  : 攻击方的物攻/魔攻通用加成（如 虫群鼓舞的攻 +N%）
+  //   - defenderDefPctAdd  : 防御方的物防/魔防通用加成（如 虫群鼓舞的防 +N%）
+  // 其余两项（攻击方的防 / 防御方的攻）只用于属性面板显示，不进入伤害公式。
   const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
-  const atkAddPct  = (isMagic ? (dyn.matkAdd || 0) : 0) + (dyn.atkPctAdd || 0);
+  const atkAddPct  = (isMagic ? (dyn.matkAdd || 0) : 0) + (dyn.attackerAtkPctAdd || 0);
   const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
-  const defAddPct  = dyn.defPctAdd || 0;
+  const defAddPct  = dyn.defenderDefPctAdd || 0;
   const atkStatBase = isMagic ? matkBaseNoBuff : atkBaseNoBuff;
   const defStatBase = getFinalStat(def, defStatKey, defNature, defIVs, defLevel);
   const atkStat = Math.max(0, Math.round(atkStatBase * (1 + (atkBuffPct + atkAddPct) / 100)));
