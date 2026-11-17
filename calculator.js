@@ -4734,14 +4734,15 @@ function computeFinalDamage(ctx) {
   // (e.g. 多维击打's starLayer-based extra hits) but never the chip.
   const hasCombo = skill.combo != null;
   const chipCombo = hasCombo ? attackerCombo : 0;
-  const combo = Math.max(0, ((skill.combo ?? 1) + dyn.comboAdd + chipCombo) * dyn.comboMult);
+  // 实际不应该出现小数combo，这里只是作为兜底。
+  const combo = Math.max(0, Math.round(((skill.combo ?? 1) + dyn.comboAdd + chipCombo) * dyn.comboMult));
   // powerOverride（如魔能爆按消耗能量查表）替换技能基础威力，
   // 用户的威力 chip 与动态 powerAdd 仍在其上叠加。
   const basePower = dyn.powerOverride != null ? dyn.powerOverride : (skill.power ?? 0);
   const power = Math.max(0, (basePower + powerBoost + dyn.powerAdd) * dyn.powerMult);
-  const skillDmg = Math.floor(
-    power * (atkStat / defStat) * levelFactor * stab * skillEff * (defSkill.reduction ?? 1) * combo
-  );
+  const skillDmg = Math.ceil(
+    Math.floor(power * stab * skillEff) * (atkStat / defStat) * levelFactor * (defSkill.reduction ?? 1)
+  ) * combo;
 
   // Starfall damage (幻 element)
   const starPower = n * n + 24 * n - 24;
@@ -4750,8 +4751,8 @@ function computeFinalDamage(ctx) {
   const starEff = effectiveness('幻系', def.types);
   let starDmg = 0;
   if (starTriggered) {
-    starDmg = Math.floor(
-      starPower * (atkStat / defStat) * levelFactor * starEff * (defSkill.reduction ?? 1)
+    starDmg = Math.ceil(
+      Math.floor(starPower * starEff) * (atkStat / defStat) * levelFactor * (defSkill.reduction ?? 1)
     );
   }
   const finalDamage = skillDmg + starDmg;
