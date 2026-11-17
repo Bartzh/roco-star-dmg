@@ -274,19 +274,19 @@ The calculation lives in `computeFinalDamage` in `calculator.js`. In short:
 
 ```
 skill damage = floor(
-  power × (attack / defense) × (37 / 41) × STAB × effectiveness
+  power × (attack / defense) × (0.45 × attacker level + 10) / 41 × STAB × effectiveness
   × defenseSkill.reduction × combo
 )
 
 starfall damage = floor(
-  (n² + 24n − 24) × (attack / defense) × (37 / 41)
+  (n² + 24n − 24) × (attack / defense) × (0.45 × attacker level + 10) / 41
   × starfall effectiveness × defenseSkill.reduction
 )
 
 total = skill damage + starfall damage
 ```
 
-`n` is the starfall layer (0–99). Starfall damage is not applied when the skill itself is 幻-element. Final stats include nature (×1.2 / ×0.9) and up to three IVs (+60 each); the HP formula has its own adjustment. The breakdown panel shows each of these terms.
+`n` is the starfall layer (0–99). Starfall damage is not applied when the skill itself is 幻-element. Stats are calculated at level 60 by default (nature ×1.2 / ×0.9, up to three IVs at +60 each); the Mogulong trait 恶龙的奢望 changes the level to 1–99 and feeds it into the stat formula. The breakdown panel shows each of these terms.
 
 ## Deployment
 

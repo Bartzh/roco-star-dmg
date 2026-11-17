@@ -232,6 +232,8 @@
       'mod.manual.swarmCount.unit': `只`,
       'mod.manual.energyCost.label': `消耗能量`,
       'mod.manual.energyCost.unit': `点`,
+      'mod.manual.dragonLevel.label': `当前等级`,
+      'mod.manual.dragonLevel.unit': `级`,
 
       /* ---- Damage breakdown ---- */
       'breakdown.sectionSkill': `技能伤害`,
@@ -286,6 +288,7 @@
       'mod.powerOffClass': `威力 ×0.5（非敌方系别技能）`,
       'mod.powerVsHybrid': `威力 +50%（对混血精灵）`,
       'mod.damageTakenCarried': `受到伤害 -40%（攻击系别匹配携带技能）`,
+      'mod.damageTakenLowLevel': `受到伤害 +40%（当前等级 {level} < 80）`,
       'mod.swarmStat': `攻防速 +{pct}%（其他虫系精灵 {count} 只 ×{perPct}%）`,
       'mod.powerEnergyCost': `威力 {power}（消耗能量 {energy} 点）`,
 
@@ -521,6 +524,8 @@
       'mod.manual.swarmCount.unit': ``,
       'mod.manual.energyCost.label': `Energy consumed`,
       'mod.manual.energyCost.unit': ``,
+      'mod.manual.dragonLevel.label': `Current level`,
+      'mod.manual.dragonLevel.unit': `Lv`,
 
       /* ---- Damage breakdown ---- */
       'breakdown.sectionSkill': `Skill Damage`,
@@ -575,6 +580,7 @@
       'mod.powerOffClass': `Power ×0.5 (skill class differs from the enemy's class)`,
       'mod.powerVsHybrid': `Power +50% (vs. Hybrid Jinies)`,
       'mod.damageTakenCarried': `Damage taken -40% (attacking class matches an equipped skill)`,
+      'mod.damageTakenLowLevel': `Damage taken +40% (current level {level} < 80)`,
       'mod.swarmStat': `Attack, Defense and Speed +{pct}% ({count} other Bug-class Jinies ×{perPct}%)`,
       'mod.powerEnergyCost': `Power {power} (Energy consumed {energy})`,
 

@@ -161,6 +161,16 @@ const STAT_KEYS = ['hp', 'atk', 'matk', 'def', 'mdef', 'spd'];
 const MAX_IV = 3;
 const IV_BONUS = 60;
 
+// 等级：所有精灵默认按满级 60 级计算。唯一会改变等级的是冥古龙特性
+// 「恶龙的奢望」（初始等级 +39，回合结束时 -10），其等级通过数值型
+// 手动 mod 输入保存（state.skillModInputs[side][LEVEL_MOD_KEY]）。
+// 等级无法用百分比 mod 表达，必须透传给 getFinalStat 参与属性计算。
+const DEFAULT_LEVEL = 60;
+const LEVEL_MOD_KEY = '恶龙的奢望';
+const LEVEL_MOD_DEFAULT = 99; // 初始 60 + 39
+const LEVEL_MIN = 1;
+const LEVEL_MAX = 99;
+
 // Defaults: attacker = +SPD/-HP nature, IVs in [ATK, MATK, SPD]
 //           defender = +HP/-ATK nature, IVs in [HP, DEF, MDEF]
 const DEFAULT_NATURE = {
@@ -911,6 +921,21 @@ let state = {
 
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
 function getIVs(side)     { return side === 'attacker' ? state.attackerIVs    : state.defenderIVs; }
+
+// 从手动 mod 输入中解析等级：只有持有「恶龙的奢望」的精灵才会有该输入，
+// 其余精灵一律按默认 60 级。未手动调整时回退到该 mod 的默认值（99）。
+function getLevelForAbility(inputs, ability) {
+  const key = ability && (ability.modKey || ability.id);
+  if (key !== LEVEL_MOD_KEY) return DEFAULT_LEVEL;
+  const v = Number(inputs && inputs[LEVEL_MOD_KEY]);
+  if (Number.isFinite(v) && v > 0) return v;
+  return LEVEL_MOD_DEFAULT;
+}
+function getLevel(side) {
+  const spirit = side === 'attacker' ? state.attacker : state.defender;
+  if (!spirit) return DEFAULT_LEVEL;
+  return getLevelForAbility(state.skillModInputs[side], getSpiritAbility(spirit));
+}
 function setNature(side, n) {
   if (side === 'attacker') state.attackerNature = n;
   else                     state.defenderNature = n;
@@ -1002,9 +1027,9 @@ function findSkillByName(name, category) {
 
 // ============================================================
 // STAT MODIFIERS: nature (×1.2 / ×0.9) and IVs (+60 each, max 3)
-// Final stat formula (rounded):
-//   HP:    (base * 1.7 + ivBonus * 0.85 + 70) * natureMult + 100
-//   other: (base * 1.1 + ivBonus * 0.55 + 10) * natureMult + 50
+// Final stat formula (rounded), level defaults to 60:
+//   HP:    round(round((level / 50 + 0.5) * (base + ivBonus / 2) + level + 10) * natureMult + 100)
+//   other: round(round((level / 100 + 0.5) * (base + ivBonus / 2) + 10) * natureMult + 50)
 // ============================================================
 function getNatureMultiplier(nature, statKey) {
   if (!nature) return 1;
@@ -1016,24 +1041,17 @@ function getIVBonus(statKey, ivs) {
   if (!ivs || !ivs.includes(statKey)) return 0;
   return IV_BONUS;
 }
-function getFinalStat(spirit, statKey, nature, ivs) {
+function getFinalStat(spirit, statKey, nature, ivs, level = DEFAULT_LEVEL) {
   if (!spirit) return 0;
   const base = spirit[statKey] || 0;
   const iv = getIVBonus(statKey, ivs);
   const mult = getNatureMultiplier(nature, statKey);
-  let val;
+  const lv = level == null ? DEFAULT_LEVEL : level;
+  const effective = base + iv / 2;
   if (statKey === 'hp') {
-    val = (base * 1.7 + iv * 0.85 + 70) * mult + 100;
-  } else {
-    // 特殊情况：向下取整
-    if (base === 105 && iv === 0 && mult === 1) {
-      val = 175;
-    }
-    else {
-      val = Math.round(base * 1.1 + iv * 0.55 + 10) * mult + 50;
-    }
+    return Math.round(Math.round((lv / 50 + 0.5) * effective + lv + 10) * mult + 100);
   }
-  return Math.round(val);
+  return Math.round(Math.round((lv / 100 + 0.5) * effective + 10) * mult + 50);
 }
 
 // ============================================================
@@ -1050,13 +1068,13 @@ function getDisplayDynamicMods() {
   return computeSkillDynamicModifiers(
     state.attacker, state.attackSkill, state.attackerNature, state.attackerIVs,
     state.defender, state.defenseSkill, state.defenderNature, state.defenderIVs,
-    state.starLayer
+    state.starLayer, getLevel('attacker'), getLevel('defender')
   );
 }
 function getDisplayStatValue(side, statKey, dyn) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
   if (!spirit) return 0;
-  const base = getFinalStat(spirit, statKey, getNature(side), getIVs(side));
+  const base = getFinalStat(spirit, statKey, getNature(side), getIVs(side), getLevel(side));
   if (statKey === 'hp') return base;
   const mods = dyn || {};
   if (statKey === 'spd') {
@@ -2868,16 +2886,16 @@ function isSkillModRelevant(skill, side) {
 function buildSkillModCtx(
   attacker, attackSkill, attackerNature, attackerIVs,
   defender, defenseSkill, defenderNature, defenderIVs,
-  starLayer
+  starLayer, attackerLevel = DEFAULT_LEVEL, defenderLevel = DEFAULT_LEVEL
 ) {
   const atkSpeedBonus = state.attackerSpeed;
   const defSpeedBonus = state.defenderSpeed;
   // 基线速度 = 性格/个体修正后的最终速度 + 速度 chip（百分比速度修正的基数）
   const atkBaseSpeed = attacker
-    ? getFinalStat(attacker, 'spd', attackerNature, attackerIVs) + atkSpeedBonus
+    ? getFinalStat(attacker, 'spd', attackerNature, attackerIVs, attackerLevel) + atkSpeedBonus
     : 0;
   const defBaseSpeed = defender
-    ? getFinalStat(defender, 'spd', defenderNature, defenderIVs) + defSpeedBonus
+    ? getFinalStat(defender, 'spd', defenderNature, defenderIVs, defenderLevel) + defSpeedBonus
     : 0;
   return {
     starLayer: starLayer ?? 0,
@@ -2889,6 +2907,8 @@ function buildSkillModCtx(
     defenderNature,
     attackerIVs,
     defenderIVs,
+    attackerLevel,
+    defenderLevel,
     attackerSpeedBonus: atkSpeedBonus,
     defenderSpeedBonus: defSpeedBonus,
     // 基线速度（不含动态修正）与当前有效速度（会被 speedAdd/speedPctAdd 更新）
@@ -2927,7 +2947,7 @@ function isSkillModActive(skill, side) {
   const ctx = buildSkillModCtx(
     state.attacker, state.attackSkill, state.attackerNature, state.attackerIVs,
     state.defender, state.defenseSkill, state.defenderNature, state.defenderIVs,
-    state.starLayer
+    state.starLayer, getLevel('attacker'), getLevel('defender')
   );
   try {
     return fn(ctx, fromAttacker) !== null;
@@ -4210,8 +4230,8 @@ const SKILL_MODS = {
   // 鸣沙陷阱：物防比敌方越高，本次技能威力越高
   鸣沙陷阱(ctx, fromAttacker) {
     if (!fromAttacker) return null;
-    const attackerDef = Math.max(0, Math.round(getFinalStat(ctx.attacker, 'def', ctx.attackerNature, ctx.attackerIVs) * (1 + getBuff('attacker', 'def') / 100)));
-    const defenderDef = Math.max(0, Math.round(getFinalStat(ctx.defender, 'def', ctx.defenderNature, ctx.defenderIVs) * (1 + getBuff('defender', 'def') / 100)));
+    const attackerDef = Math.max(0, Math.round(getFinalStat(ctx.attacker, 'def', ctx.attackerNature, ctx.attackerIVs, ctx.attackerLevel) * (1 + getBuff('attacker', 'def') / 100)));
+    const defenderDef = Math.max(0, Math.round(getFinalStat(ctx.defender, 'def', ctx.defenderNature, ctx.defenderIVs, ctx.defenderLevel) * (1 + getBuff('defender', 'def') / 100)));
     const defGap = attackerDef - defenderDef;
     if (defGap <= 0) return null;
     let powerAdd;
@@ -4330,6 +4350,20 @@ const SKILL_MODS = {
     return {
       powerMult: 0.6,
       notes: [{ key: 'mod.damageTakenCarried' }],
+    };
+  },
+  // 恶龙的奢望（特性）：初始等级 +39（60 → 99），回合结束时等级 -10。
+  // 等级本身由数值型手动 mod 输入（1~99），并通过 getLevel 透传给属性公式；
+  // 这里只处理"低于 80 级时自身受到的伤害 +40%"。
+  // 仅在持有者作为防御方时影响本次计算；攻击方视角不涉及"受到伤害"。
+  // 按现有约定，+40% 走 powerMult 通道，因此只作用于技能伤害，不影响星陨伤害。
+  恶龙的奢望(ctx, fromAttacker, input) {
+    if (fromAttacker) return null;
+    const level = Number(input) || 0;
+    if (level <= 0 || level >= 80) return null;
+    return {
+      powerMult: 1.4,
+      notes: [{ key: 'mod.damageTakenLowLevel', params: { level } }],
     };
   },
   // 虫群鼓舞（特性）：队伍中每有 1 只其他虫系精灵，自己入场时攻防速 +10%。
@@ -4455,6 +4489,17 @@ const SKILL_MODS_MANUAL = {
     unitKey: 'mod.manual.energyCost.unit',
     activeWhenZero: true,
   },
+  // 恶龙的奢望：自身当前等级 1~99。默认 99（初始 60 + 39）。
+  // 与其它手动 mod 不同，该值会被 getLevel 读取并参与属性公式，
+  // 因此"等级"本身不需要额外的 state 字段，随精灵配置一起持久化。
+  恶龙的奢望: {
+    defaultInput: LEVEL_MOD_DEFAULT,
+    inputType: 'number',
+    min: LEVEL_MIN,
+    max: LEVEL_MAX,
+    labelKey: 'mod.manual.dragonLevel.label',
+    unitKey: 'mod.manual.dragonLevel.unit',
+  },
 };
 for (const [key, cfg] of Object.entries(SKILL_MODS_MANUAL)) {
   if (SKILL_MODS[key]) {
@@ -4492,12 +4537,12 @@ const LAST_STRIKE_SKILLS = {
 function computeSkillDynamicModifiers(
   attacker, attackSkill,  attackerNature, attackerIVs,
   defender, defenseSkill, defenderNature, defenderIVs,
-  starLayer
+  starLayer, attackerLevel = DEFAULT_LEVEL, defenderLevel = DEFAULT_LEVEL
 ) {
   const ctx = buildSkillModCtx(
     attacker, attackSkill, attackerNature, attackerIVs,
     defender, defenseSkill, defenderNature, defenderIVs,
-    starLayer
+    starLayer, attackerLevel, defenderLevel
   );
   const result = { powerMultAdd: 1, powerMult: 1, powerAdd: 0, powerOverride: null, comboAdd: 0, comboMult: 1, matkAdd: 0, atkPctAdd: 0, defPctAdd: 0, speedAdd: 0, ignoreResist: false, elementOverride: null, notes: [] };
 
@@ -4624,8 +4669,10 @@ function computeFinalDamage(ctx) {
   const defNature = ctx.defenderNature;
   const atkIVs    = ctx.attackerIVs;
   const defIVs    = ctx.defenderIVs;
-  const atkBaseNoBuff  = getFinalStat(atk, 'atk',  atkNature, atkIVs);
-  const matkBaseNoBuff = getFinalStat(atk, 'matk', atkNature, atkIVs);
+  const atkLevel  = ctx.attackerLevel ?? DEFAULT_LEVEL;
+  const defLevel  = ctx.defenderLevel ?? DEFAULT_LEVEL;
+  const atkBaseNoBuff  = getFinalStat(atk, 'atk',  atkNature, atkIVs, atkLevel);
+  const matkBaseNoBuff = getFinalStat(atk, 'matk', atkNature, atkIVs, atkLevel);
   let isMagic;
   if (skill.damage_class === '自适应') {
     const atkFull  = atkBaseNoBuff  * (1 + (ctx.attackerBuff.atk  || 0) / 100);
@@ -4642,7 +4689,7 @@ function computeFinalDamage(ctx) {
   // buffs tied to star layer, etc.). Computed before atkStat/defStat so that
   // dynamic stat modifiers (e.g. 和弦共振's +50% 魔攻) can be added to the
   // buff percentage below.
-  const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n);
+  const dyn = computeSkillDynamicModifiers(atk, skill, atkNature, atkIVs, def, defSkill, defNature, defIVs, n, atkLevel, defLevel);
 
   // Buff (in %) is applied on top of final stat. Floored at 0 to avoid
   // nonsensical negative stats from extreme debuffs. Dynamic stat modifiers
@@ -4655,11 +4702,13 @@ function computeFinalDamage(ctx) {
   const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
   const defAddPct  = dyn.defPctAdd || 0;
   const atkStatBase = isMagic ? matkBaseNoBuff : atkBaseNoBuff;
-  const defStatBase = getFinalStat(def, defStatKey, defNature, defIVs);
+  const defStatBase = getFinalStat(def, defStatKey, defNature, defIVs, defLevel);
   const atkStat = Math.max(0, Math.round(atkStatBase * (1 + (atkBuffPct + atkAddPct) / 100)));
   const defStat = Math.max(0, Math.round(defStatBase * (1 + (defBuffPct + defAddPct) / 100)));
   // Defender's max HP for HP bar / kill check uses final HP (NOT buffed)
-  const defHP = getFinalStat(def, 'hp', defNature, defIVs);
+  const defHP = getFinalStat(def, 'hp', defNature, defIVs, defLevel);
+  // 等级系数：原 37/41 实际为 (攻击方等级 × 0.45 + 10) / 41（60 级时恰好是 37/41）。
+  const levelFactor = (atkLevel * 0.45 + 10) / 41;
   // 威力 chip — flat addition to base power (always shown).
   const powerBoost = ctx.attackerPowerBoost || 0;
   // 连击数 chip — flat addition to base combo count (always shown).
@@ -4686,7 +4735,7 @@ function computeFinalDamage(ctx) {
   const basePower = dyn.powerOverride != null ? dyn.powerOverride : (skill.power ?? 0);
   const power = Math.max(0, (basePower + powerBoost + dyn.powerAdd) * dyn.powerMult);
   const skillDmg = Math.floor(
-    power * (atkStat / defStat) * (37 / 41) * stab * skillEff * (defSkill.reduction ?? 1) * combo
+    power * (atkStat / defStat) * levelFactor * stab * skillEff * (defSkill.reduction ?? 1) * combo
   );
 
   // Starfall damage (幻 element)
@@ -4697,7 +4746,7 @@ function computeFinalDamage(ctx) {
   let starDmg = 0;
   if (starTriggered) {
     starDmg = Math.floor(
-      starPower * (atkStat / defStat) * (37 / 41) * starEff * (defSkill.reduction ?? 1)
+      starPower * (atkStat / defStat) * levelFactor * starEff * (defSkill.reduction ?? 1)
     );
   }
   const finalDamage = skillDmg + starDmg;
@@ -4717,7 +4766,8 @@ function computeFinalDamage(ctx) {
     atkStat, defStat, isMagic, dyn,
     atkStatBase, defStatBase,
     atkBuffPct, atkAddPct, defBuffPct, defAddPct,
-    powerBoost, attackerCombo, hasCombo
+    powerBoost, attackerCombo, hasCombo,
+    atkLevel, defLevel, levelFactor,
   };
 }
 
@@ -4749,6 +4799,8 @@ function calculateDamage() {
     attackerPowerBoost: state.attackerPowerBoost,
     attackerCombo: state.attackerCombo,
     starLayer: state.starLayer,
+    attackerLevel: getLevel('attacker'),
+    defenderLevel: getLevel('defender'),
   };
   const data = computeFinalDamage(ctx);
   renderResult(data);
@@ -5126,6 +5178,8 @@ function renderBreakdownList(breakdownList, data) {
   const effExpr = ignoredResist
     ? `${data.skillEff} <span class="label" style="font-size:0.7rem">${t('breakdown.resistIgnored', { eff: data.skillEffRaw })}</span>`
     : `${data.skillEff}`;
+  // 等级系数：(攻击方等级 × 0.45 + 10) / 41；60 级时显示为 (37/41)。
+  const levelFactorText = `(${Number((data.atkLevel * 0.45 + 10).toFixed(2))}/41)`;
   breakdownList.innerHTML = `
     <div class="label" style="color:var(--accent-cyan);font-weight:600;">—— ${t('breakdown.sectionSkill')} ——</div>
     <div><span class="label">${t('breakdown.attacker')}:</span> <span class="value">${displayName(data.atk)}</span></div>
@@ -5134,7 +5188,7 @@ function renderBreakdownList(breakdownList, data) {
     <div><span class="label">${defStatLabel}:</span> <span class="value">${defStatText}</span></div>
     <div><span class="label">${t('buffLabel.power')}:</span> <span class="value">${powerText}</span></div>
     <div><span class="label">${t('buffLabel.combo')}:</span> <span class="value">${comboText}</span></div>
-    <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × (37/41)${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ` (${t('buffLabel.combo')})` : ''}</span></div>
+    <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.atkStat} / ${data.defStat} × ${levelFactorText}${stabCoef} × ${effExpr} × ${(data.defSkill.reduction ?? 1).toFixed(2)}${effCombo !== 1 ? ' × ' + effCombo + ` (${t('buffLabel.combo')})` : ''}</span></div>
     ${dynNotesHTML}
     <div class="final-line"><span class="label">${t('breakdown.skillSubtotal')}:</span> <span class="value">${data.skillDmg.toLocaleString()}</span></div>
     <hr class="divider">
@@ -5146,7 +5200,7 @@ function renderBreakdownList(breakdownList, data) {
         ? `<div><span class="label">${atkStatLabel}:</span> <span class="value">${atkStatText}</span></div>
            <div><span class="label">${defStatLabel}:</span> <span class="value">${defStatText}</span></div>
            <div><span class="label">${t('breakdown.stellarEffect')}:</span> <span class="multiplier">×${data.starEff}</span></div>
-           <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × (37/41) × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
+           <div><span class="label">${t('breakdown.multiplier')}:</span> <span class="multiplier">${data.starPower} × ${data.atkStat}/${data.defStat} × ${levelFactorText} × ${data.starEff} × ${(data.defSkill.reduction ?? 1).toFixed(2)}</span></div>`
         : `<div><span class="label">${t('breakdown.triggered')}:</span> <span class="value" style="color:var(--text-secondary)">${t('breakdown.noLayers')}</span></div>`)}
     <div class="final-line"><span class="label">${t('breakdown.starSubtotal')}:</span> <span class="value">${data.starDmg.toLocaleString()}</span></div>
     <hr class="divider">
@@ -6394,7 +6448,6 @@ function buildQuestionSnapshot(_index) {
   const defStats = buildStatsRng('defender')(defender);
   const atkSkId  = buildSkillRng('attacker')(attacker);
   const defSkId  = buildSkillRng('defender')(defender);
-  const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs);
   // 手动技能输入：记忆优先（特性跟随 useMemoryStats，其他技能跟随
   // useMemorySkill）；记忆未提供时按该精灵随机池的 mods 权重抽样。
   // 只有本题实际生效的技能（精灵特性 + 本侧选中的技能）参与池抽样。
@@ -6402,6 +6455,10 @@ function buildQuestionSnapshot(_index) {
   const defAbility = getSpiritAbility(defender);
   const atkModInputs = resolveSkillModInputs('attacker', attacker, atkAbility?.id, atkSkId);
   const defModInputs = resolveSkillModInputs('defender', defender, defAbility?.id, defSkId);
+  // 等级：只有持有「恶龙的奢望」的精灵会偏离 60 级；未手动设置时取 mod 默认值。
+  const atkLevel = getLevelForAbility(atkModInputs, atkAbility);
+  const defLevel = getLevelForAbility(defModInputs, defAbility);
+  const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs, defLevel);
   return {
     attacker,
     defender,
@@ -6421,6 +6478,9 @@ function buildQuestionSnapshot(_index) {
     // 手动技能输入（如色散 toggle），applyQuestion 会写入 state 供伤害计算使用
     attackerModInputs: atkModInputs,
     defenderModInputs: defModInputs,
+    // 等级：评分与最优点二分需要用与题目快照一致的等级重算伤害
+    attackerLevel: atkLevel,
+    defenderLevel: defLevel,
     defHP,
   };
 }
@@ -6946,6 +7006,9 @@ function submitAnswer() {
     attackerPowerBoost: state.attackerPowerBoost,
     attackerCombo: state.attackerCombo,
     starLayer: 0,
+    // 等级必须与题目快照一致（冥古龙「恶龙的奢望」可能不等于 60）
+    attackerLevel: q.attackerLevel,
+    defenderLevel: q.defenderLevel,
   };
   const optimal = findMinKillLayer(baseSnap, q);
   // 评分：score = 100 - |s - o| × 10，截断到 [0, 100]
