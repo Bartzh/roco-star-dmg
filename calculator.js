@@ -2156,8 +2156,12 @@ function _initPickerGrid(side, opts) {
     inner.dataset.pickerWinBound = '1';
     inner.addEventListener('scroll', () => _onPickerGridScroll(side), { passive: true });
   }
-  // 恢复滚动位置：spacer 已把总高度撑到与全量渲染一致，可直接赋值
-  if (desired > 0) inner.scrollTop = desired;
+  // 始终显式设置滚动位置：innerHTML 替换后浏览器可能保留旧的 scrollTop，
+  // 而窗口是从 desired 处渲染的。若旧位置仍落在总高度内，scrollTop 不会变化、
+  // 也不会触发 scroll 事件，视口就会停在 bottom spacer 的空白里（直到用户
+  // 再滚一下才恢复）。这里同时主动同步一次窗口，避免依赖事件。
+  inner.scrollTop = desired;
+  _onPickerGridScroll(side);
 }
 
 // 渲染 picker 顶部的 toolbar：搜索框（内含"常见"chip + × 清空按钮）+ 系别 chip 行。
