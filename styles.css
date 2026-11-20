@@ -602,7 +602,7 @@ textarea::placeholder {
      命中缓存时插入当帧就是 .is-loaded，不做过渡，避免占位块闪一下。 */
   opacity: 0;
 }
-.spirit-picker-option .picker-image img.is-fading { transition: opacity 0.18s ease; }
+.spirit-picker-option .picker-image img.is-fading { transition: opacity 0.28s ease; }
 .spirit-picker-option .picker-image img.is-loaded { opacity: 1; }
 /* 加载失败：隐藏 img，退回占位块 */
 .spirit-picker-option .picker-image img.is-broken { display: none; }
@@ -629,7 +629,8 @@ textarea::placeholder {
      前面是给不支持 color-mix 的老 Safari 的兜底，后面覆盖。 */
   color: rgba(255,255,255,0.3);
   color: color-mix(in srgb, var(--el-color, #888) 42%, rgba(255,255,255,0.5));
-  transition: opacity 0.18s ease;
+  /* 没有过渡或过渡时长较短效果也不错 */
+  /* transition: opacity 0.18s ease; */
 }
 .spirit-picker-option .picker-name {
   font-weight: 600;
