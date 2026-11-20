@@ -536,6 +536,12 @@ textarea::placeholder {
   /* 让 grid 内部布局不影响外部，减少含 backdrop-filter 父级重排的范围。 */
   contain: layout;
 }
+/* 窗口化渲染的占位行（见 calculator.js「Picker grid 窗口化渲染」）：
+   横跨所有列，只负责撑出未渲染卡片的高度，本身不可见、不可交互。 */
+.spirit-picker-grid-inner > .picker-window-spacer {
+  grid-column: 1 / -1;
+  pointer-events: none;
+}
 .spirit-picker-option {
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
@@ -591,7 +597,18 @@ textarea::placeholder {
   height: 100%;
   object-fit: cover;
   display: block;
+  /* 未加载完成时先保持透明，由占位块盖住（避免白块与布局跳动）。
+     只有真正要等下载的图才会被加上 .is-fading 播淡入——
+     命中缓存时插入当帧就是 .is-loaded，不做过渡，避免占位块闪一下。 */
+  opacity: 0;
 }
+.spirit-picker-option .picker-image img.is-fading { transition: opacity 0.18s ease; }
+.spirit-picker-option .picker-image img.is-loaded { opacity: 1; }
+/* 加载失败：隐藏 img，退回占位块 */
+.spirit-picker-option .picker-image img.is-broken { display: none; }
+/* 立绘是带透明通道的 PNG，占位块叠在图片之上（img 在前、占位块在后）：
+   图片加载完成后隐藏占位块，否则底色 + 首字会透出来和立绘叠在一起。 */
+.spirit-picker-option .picker-image img.is-loaded + .placeholder { opacity: 0; }
 /* 攻击方立绘水平翻转：默认朝左 → 朝右（仅作用于攻击方选择区） */
 #attacker-select-area .picker-image img {
   transform: scaleX(-1);
@@ -608,8 +625,11 @@ textarea::placeholder {
   justify-content: center;
   font-size: 1.4rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
-  color: rgba(255,255,255,0.95);
+  /* 占位块不再铺满元素色的大色块（大面积纯色在图片加载时会"闪"）。
+     前面是给不支持 color-mix 的老 Safari 的兜底，后面覆盖。 */
+  color: rgba(255,255,255,0.3);
+  color: color-mix(in srgb, var(--el-color, #888) 42%, rgba(255,255,255,0.5));
+  transition: opacity 0.18s ease;
 }
 .spirit-picker-option .picker-name {
   font-weight: 600;

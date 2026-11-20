@@ -1785,9 +1785,16 @@ function _renderPickerOptionsHTML(side, list) {
         ? `<img class="type-icon" src="${el.iconUrl}" loading="lazy" alt="${escapeAttr(displayEl(el))}">`
         : `<span class="type-tag" style="--tag-color:${el.color};--tag-bg:${el.color}20;">${el.emoji} ${displayEl(el)}</span>`
     ).join('');
-    const illus = s.illustration_url
-      ? `<img src="${s.illustration_url}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'placeholder',textContent:'${initial}',style:'--el-color:${primaryColor}'}))">`
-      : `<div class="placeholder" style="--el-color:${primaryColor}">${initial}</div>`;
+    // 立绘是带透明通道的 PNG：占位块必须叠在图片之上（img 在前），
+    // 图片加载完成后由 CSS 把占位块隐藏，否则占位会透出来
+    // 与立绘叠在一起（img + .placeholder 相邻选择器，见 styles.css）。
+    // 只有当前窗口内的十几~三十几张卡片会渲染（见 Picker grid 窗口化渲染），
+    // 所以这里直接写 src，配合 loading="lazy" / decoding="async" 即可；
+    // 加载衔接（缓存命中不淡入、失败回退占位）在 _hydratePickerThumbs 里处理。
+    const illus = `
+      ${s.illustration_url ? `<img class="picker-thumb" src="${escapeAttr(s.illustration_url)}" loading="lazy" decoding="async" alt="">` : ''}
+      <div class="placeholder" style="--el-color:${primaryColor}">${initial}</div>
+    `;
     const isCurrent = !!(spirit && spirit.id === id);
     const optionAria = t('picker.option.aria', {
       name,
@@ -1806,6 +1813,34 @@ function _renderPickerOptionsHTML(side, list) {
       </div>
     `;
   }).join('');
+}
+
+// ============================================================
+// Picker 缩略图加载衔接
+// 窗口化渲染已经把 DOM 里的 <img> 限制在十几~三十几个，不需要再做
+// 按视口增删 src 的懒加载层。这里只处理三种加载状态：
+//   · 插入后同一帧内就加载完成（缓存命中）：直接显示，不播淡入，
+//     避免占位块闪现一下再淡出
+//   · 真正需要下载：插入后的下一帧才启用 0.18s 淡入，完成后覆盖占位块
+//   · 加载失败：隐藏 img，退回占位块（深色底 + 元素色细边框 + 首字）
+// ============================================================
+function _hydratePickerThumbs(scope) {
+  if (!scope) return;
+  const thumbs = scope.querySelectorAll('img.picker-thumb:not([data-thumb-ready])');
+  if (!thumbs.length) return;
+  thumbs.forEach(img => {
+    img.dataset.thumbReady = '1';
+    if (img.complete) {
+      img.classList.add(img.naturalWidth > 0 ? 'is-loaded' : 'is-broken');
+      return;
+    }
+    img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
+    img.addEventListener('error', () => img.classList.add('is-broken'), { once: true });
+    // 下一帧仍未加载完成 → 说明确实要等下载，这时才需要淡入过渡
+    requestAnimationFrame(() => {
+      if (!img.classList.contains('is-loaded')) img.classList.add('is-fading');
+    });
+  });
 }
 
 // 按当前 filter 过滤 SPRITES，返回 [id, sprite] 列表。
@@ -1854,6 +1889,275 @@ function filterSpirits(side, filter) {
     out.push(all[i]);
   }
   return out;
+}
+
+// ============================================================
+// Picker grid 窗口化渲染
+// 663 个选项一次性 innerHTML + 布局的成本极高：实测 6x CPU 节流的
+// Chromium 上 innerHTML ≈ 360ms、随后的布局 ≈ 430ms，iOS WebKit 更慢，
+// 表现就是点击精灵卡片后主线程被同步占满 1~2 秒、选择器迟迟不出现。
+// 这里只渲染滚动视口附近的行（上下各留 2 行缓冲），未渲染的行用上下两个
+// spacer 撑出等价高度；滚动时按需向下追加 / 向上前置，离视口太远的行会被
+// 从 DOM 剔除，因此 DOM 数量始终保持在几十个以内。已渲染的卡片不重建，
+// 避免图片反复卸载重载闪烁。行高 / 列数用最多 6 个卡片的探针实测。
+// ============================================================
+const PICKER_WINDOW_BUFFER_ROWS = 2;   // 视口上下各多渲染的行数
+const PICKER_WINDOW_GROW_ROWS = 3;     // 每次滚动触发时追加/前置的行数
+const PICKER_WINDOW_KEEP_ROWS = 4;     // 视口外最多保留的行数（超出即从 DOM 剔除）
+const _pickerWindow = { attacker: null, defender: null };
+
+function _pickerGridGap(inner) {
+  const cs = getComputedStyle(inner);
+  return parseFloat(cs.rowGap || cs.gap) || 0;
+}
+
+// 列数 / 行高测量结果按"容器宽度"缓存：同一宽度下不必每次都跑探针。
+const _pickerGridMetricsCache = { attacker: null, defender: null };
+
+// 探针：一次渲染最多 6 个卡片，实测列数（同一行内 top 相同的卡片数）与行高。
+// 不解析 getComputedStyle().gridTemplateColumns —— WebKit 下它可能返回
+// 未展开的 repeat(...)，按空格切分会把列数算成 1。
+function _measurePickerGrid(side, inner, list) {
+  const width = inner.clientWidth;
+  const cached = _pickerGridMetricsCache[side];
+  if (cached && Math.abs(cached.width - width) < 1) return cached;
+
+  const gap = _pickerGridGap(inner);
+  inner.innerHTML = _renderPickerOptionsHTML(side, list.slice(0, Math.min(6, list.length)));
+  const probes = Array.from(inner.querySelectorAll('.spirit-picker-option'));
+  const probeTop = probes.length ? probes[0].getBoundingClientRect().top : 0;
+  const cols = Math.max(1, probes.filter(el => Math.abs(el.getBoundingClientRect().top - probeTop) < 1).length);
+  const rowH = probes.length ? probes[0].getBoundingClientRect().height : 0;
+  const metrics = { width, cols, rowH, gap };
+  if (rowH > 0) _pickerGridMetricsCache[side] = metrics;
+  return metrics;
+}
+
+// 计算上下 spacer 应当占的高度：
+//   总高度 = rows*rowH + (rows-1)*gap（与全量渲染时完全一致）
+//   top spacer 高度 + 其后的 gap = startRow 行的高度，保证首行位置精确。
+function _pickerWindowSpacers(win) {
+  const { rows, rowH, gap, startRow, endRow } = win;
+  const stride = rowH + gap;
+  const total = rows * rowH + Math.max(0, rows - 1) * gap;
+  const viewRows = endRow - startRow;
+  const topH = startRow > 0 ? startRow * stride - gap : 0;
+  const contentH = viewRows * rowH + Math.max(0, viewRows - 1) * gap;
+  const offsetOfFirst = topH > 0 ? topH + gap : 0;
+  const remaining = total - offsetOfFirst - contentH;
+  const bottomH = endRow < rows ? Math.max(0, remaining - gap) : Math.max(0, remaining);
+  return { topH, bottomH };
+}
+
+function _createPickerSpacer(pos) {
+  const el = document.createElement('div');
+  el.className = 'picker-window-spacer';
+  el.dataset.pos = pos;
+  el.setAttribute('aria-hidden', 'true');
+  return el;
+}
+
+// 滚动增量渲染后同步 spacer（行数变化 → 高度变化）
+function _syncPickerWindowSpacers(win) {
+  const { topH, bottomH } = _pickerWindowSpacers(win);
+  const inner = win.inner;
+
+  let top = inner.querySelector('.picker-window-spacer[data-pos="top"]');
+  if (topH > 0) {
+    if (!top) {
+      top = _createPickerSpacer('top');
+      inner.insertBefore(top, inner.firstElementChild);
+    }
+    top.style.height = `${topH}px`;
+  } else if (top) {
+    top.remove();
+  }
+
+  let bottom = inner.querySelector('.picker-window-spacer[data-pos="bottom"]');
+  if (bottomH > 0) {
+    if (!bottom) {
+      bottom = _createPickerSpacer('bottom');
+      inner.appendChild(bottom);
+    }
+    bottom.style.height = `${bottomH}px`;
+  } else if (bottom) {
+    bottom.remove();
+  }
+}
+
+function _pickerWindowSliceHTML(win, startRow, endRow) {
+  return _renderPickerOptionsHTML(
+    win.side,
+    win.list.slice(startRow * win.cols, Math.min(win.list.length, endRow * win.cols))
+  );
+}
+
+// 全量重建窗口（打开选择器 / 筛选条件变化 / 大跨度跳动时）
+function _renderPickerWindow(win, startRow, endRow) {
+  win.startRow = startRow;
+  win.endRow = endRow;
+  const { topH, bottomH } = _pickerWindowSpacers(win);
+  const top = topH > 0
+    ? `<div class="picker-window-spacer" data-pos="top" aria-hidden="true" style="height:${topH}px"></div>`
+    : '';
+  const bottom = bottomH > 0
+    ? `<div class="picker-window-spacer" data-pos="bottom" aria-hidden="true" style="height:${bottomH}px"></div>`
+    : '';
+  // 整块替换后旧节点全部失效
+  win.inner.innerHTML = top + _pickerWindowSliceHTML(win, startRow, endRow) + bottom;
+  _hydratePickerThumbs(win.inner);
+}
+
+// 增量追加（dir='down'）/ 前置（dir='up'）若干行，返回是否真的扩了窗口。
+// 前置时 top spacer 同步缩短同样的高度，两者抵消 → scrollTop 不需要补偿。
+function _growPickerWindow(win, dir) {
+  let html = null;
+  if (dir === 'down') {
+    const endRow = Math.min(win.rows, win.endRow + PICKER_WINDOW_GROW_ROWS);
+    if (endRow <= win.endRow) return false;
+    html = _pickerWindowSliceHTML(win, win.endRow, endRow);
+    win.endRow = endRow;
+  } else {
+    const startRow = Math.max(0, win.startRow - PICKER_WINDOW_GROW_ROWS);
+    if (startRow >= win.startRow) return false;
+    html = _pickerWindowSliceHTML(win, startRow, win.startRow);
+    win.startRow = startRow;
+  }
+
+  if (dir === 'down') {
+    const bottomSpacer = win.inner.querySelector('.picker-window-spacer[data-pos="bottom"]');
+    if (bottomSpacer) bottomSpacer.insertAdjacentHTML('beforebegin', html);
+    else win.inner.insertAdjacentHTML('beforeend', html);
+  } else {
+    const topSpacer = win.inner.querySelector('.picker-window-spacer[data-pos="top"]');
+    if (topSpacer) topSpacer.insertAdjacentHTML('afterend', html);
+    else win.inner.insertAdjacentHTML('afterbegin', html);
+  }
+  _syncPickerWindowSpacers(win);
+  _hydratePickerThumbs(win.inner);
+  return true;
+}
+
+// 把离视口太远的行从 DOM 剔除（spacer 同步补高，可视位置完全不变），
+// 避免长时间上下滚动后 DOM 无限增长。
+function _trimPickerWindow(win) {
+  const scrollTop = win.inner.scrollTop;
+  const firstVisible = Math.floor(scrollTop / win.stride);
+  const lastVisible = Math.ceil((scrollTop + win.inner.clientHeight) / win.stride);
+  const minRow = Math.max(0, firstVisible - PICKER_WINDOW_BUFFER_ROWS - PICKER_WINDOW_KEEP_ROWS);
+  const maxRow = Math.min(win.rows, lastVisible + PICKER_WINDOW_BUFFER_ROWS + PICKER_WINDOW_KEEP_ROWS);
+  if (minRow <= win.startRow && maxRow >= win.endRow) return;
+
+  // 上方：删掉行 [startRow, minRow)
+  if (minRow > win.startRow) {
+    const els = win.inner.querySelectorAll('.spirit-picker-option');
+    const removeCount = (minRow - win.startRow) * win.cols;
+    for (let i = 0; i < removeCount && i < els.length; i++) els[i].remove();
+    win.startRow = minRow;
+  }
+  // 下方：删掉行 [maxRow, endRow)
+  if (maxRow < win.endRow) {
+    const els = win.inner.querySelectorAll('.spirit-picker-option');
+    const keepCount = Math.max(0, maxRow * win.cols - win.startRow * win.cols);
+    for (let i = els.length - 1; i >= keepCount; i--) els[i].remove();
+    win.endRow = maxRow;
+  }
+  _syncPickerWindowSpacers(win);
+}
+
+function _onPickerGridScroll(side) {
+  const win = _pickerWindow[side];
+  if (!win || !win.inner.isConnected) return;
+  const buffer = PICKER_WINDOW_BUFFER_ROWS;
+  const scrollTop = win.inner.scrollTop;
+  const viewRows = Math.max(1, Math.ceil(win.inner.clientHeight / win.stride));
+  const firstVisible = Math.floor(scrollTop / win.stride);
+  const lastVisible = firstVisible + viewRows;
+  // 当前窗口已覆盖视口 + 缓冲
+  if (lastVisible + buffer <= win.endRow && firstVisible - buffer >= win.startRow) {
+    _trimPickerWindow(win);
+    return;
+  }
+
+  const windowRows = Math.max(1, win.endRow - win.startRow);
+  // 与上面的"已覆盖"判断严格互补：
+  //   下方剩余行 = endRow - lastVisible，不足 buffer → needDown > 0
+  //   上方剩余行 = firstVisible - startRow，不足 buffer → needUp > 0
+  // （旧写法把 buffer 减在了 firstVisible 一侧，导致向上必须先滚出
+  //   2~3 行空白才开始补行。）
+  const needDown = lastVisible + buffer - win.endRow;
+  const needUp = win.startRow + buffer - firstVisible;
+  // 位移超过一整个窗口（拖滚动条直接跳、惯性长滑）：按新位置整块重建，
+  // 不要逐行增量扩，否则一次跳转要插入上百行。
+  if (needDown > windowRows || needUp > windowRows) {
+    const startRow = Math.min(win.rows - 1, Math.max(0, firstVisible - buffer));
+    _renderPickerWindow(win, startRow, Math.min(win.rows, startRow + windowRows));
+    win.inner.scrollTop = scrollTop;
+    return;
+  }
+  // 少量越界：按行增量扩，已渲染的卡片不重建
+  for (let guard = 0; guard < 8; guard++) {
+    const down = lastVisible + buffer - win.endRow;
+    const up = win.startRow + buffer - firstVisible;
+    if (down > 0) {
+      if (!_growPickerWindow(win, 'down')) break;
+    } else if (up > 0) {
+      if (!_growPickerWindow(win, 'up')) break;
+    } else {
+      break;
+    }
+  }
+  _trimPickerWindow(win);
+}
+
+// 初始化（或重建）某一侧选择器的窗口。opts.scrollTop 用于恢复上次滚动位置。
+function _initPickerGrid(side, opts) {
+  const inner = document.querySelector(`#${side}-picker-grid > .spirit-picker-grid-inner`);
+  if (!inner) return;
+  _pickerWindow[side] = null;
+
+  const list = filterSpirits(side, state.spiritPickerFilter[side]);
+
+  // 空结果：直接渲染空态文案（无需窗口化）
+  if (!list.length) {
+    inner.innerHTML = _renderPickerOptionsHTML(side, list);
+    return;
+  }
+
+  const { cols, rowH, gap } = _measurePickerGrid(side, inner, list);
+  if (!rowH) {
+    // 面板不可见 / 极端布局下量不到行高：退化为一次性渲染（不影响功能）
+    inner.innerHTML = _renderPickerOptionsHTML(side, list);
+    _hydratePickerThumbs(inner);
+    return;
+  }
+
+  const rows = Math.ceil(list.length / cols);
+  const stride = rowH + gap;
+  const viewH = inner.clientHeight || 438;
+  const windowRows = Math.max(1, Math.ceil(viewH / stride)) + PICKER_WINDOW_BUFFER_ROWS * 2;
+  const total = rows * rowH + Math.max(0, rows - 1) * gap;
+  const maxScroll = Math.max(0, total - viewH);
+  const desired = Math.min(maxScroll, Math.max(0, (opts && opts.scrollTop) || 0));
+
+  let startRow = Math.max(0, Math.floor(desired / stride) - PICKER_WINDOW_BUFFER_ROWS);
+  startRow = Math.min(startRow, rows - 1);
+  const endRow = Math.min(rows, startRow + windowRows);
+
+  const win = {
+    side, inner, list, cols, rowH, gap, stride, rows,
+    startRow: -1, endRow: -1,
+    width: inner.clientWidth,
+  };
+  _pickerWindow[side] = win;
+  _renderPickerWindow(win, startRow, endRow);
+
+  if (inner.dataset.pickerWinBound !== '1') {
+    inner.dataset.pickerWinBound = '1';
+    inner.addEventListener('scroll', () => _onPickerGridScroll(side), { passive: true });
+  }
+  // 恢复滚动位置：spacer 已把总高度撑到与全量渲染一致，可直接赋值
+  if (desired > 0) inner.scrollTop = desired;
 }
 
 // 渲染 picker 顶部的 toolbar：搜索框（内含"常见"chip + × 清空按钮）+ 系别 chip 行。
@@ -2024,6 +2328,14 @@ function startPickerToolbarAutoFit() {
   });
   window.addEventListener('resize', () => {
     document.querySelectorAll('.spirit-picker-toolbar').forEach(fitPickerToolbar);
+    // 容器宽度变化（窗口缩放 / 手机横竖屏切换）→ 列数与行高都可能变，
+    // 重新测量并重建窗口，保持当前滚动位置。
+    for (const side of ['attacker', 'defender']) {
+      const win = _pickerWindow[side];
+      if (!win || !win.inner.isConnected) continue;
+      if (Math.abs(win.inner.clientWidth - win.width) < 1) continue;
+      _initPickerGrid(side, { scrollTop: win.inner.scrollTop });
+    }
   });
 }
 if (document.readyState === 'loading') {
@@ -2059,8 +2371,6 @@ function renderSpiritPicker(side, opts) {
 
   const filter = state.spiritPickerFilter[side];
   const toolbarHTML = renderPickerToolbar(side, filter);
-  const filtered = filterSpirits(side, filter);
-  const optionsHTML = _renderPickerOptionsHTML(side, filtered);
   // skipAnimation 走 inline style：element 创建时就抑制 spiritAreaIn，
   // 比 body class 路线可靠（body class 移除时浏览器会重新计算 style，可能反而触发动画）。
   const animAttr = (opts && opts.skipAnimation) ? ' style="animation: none"' : '';
@@ -2072,25 +2382,21 @@ function renderSpiritPicker(side, opts) {
         ${cancelBtn}
       </div>
       ${toolbarHTML}
-      <div class="spirit-picker-grid" id="${side}-picker-grid"><div class="spirit-picker-grid-inner">${optionsHTML}</div></div>
+      <div class="spirit-picker-grid" id="${side}-picker-grid"><div class="spirit-picker-grid-inner"></div></div>
     </div>
   `;
   // 立即算一次列数（避免 MutationObserver 异步触发导致的视觉跳动）
   const tb = selectArea.querySelector('.spirit-picker-toolbar');
   if (tb) fitPickerToolbar(tb);
+  // grid 只渲染视口附近的行（见 Picker grid 窗口化渲染）
+  _initPickerGrid(side, { scrollTop: opts && opts.pickerScrollTop });
 }
 
 // 增量更新 grid（仅在搜索/筛选输入变化时调用，避免重渲 toolbar 失去焦点）。
 // 注意：滚动 + grid 在内层 .spirit-picker-grid-inner 上（外层只负责高度/对齐，
-// 见 styles.css 注释），innerHTML 设到内层，外层 id 仅作查询锚点。
+// 见 styles.css 注释）；筛选变化后列表整体变了，窗口从顶部重新开始。
 function refreshPickerGrid(side) {
-  const grid = document.getElementById(`${side}-picker-grid`);
-  if (!grid) return;
-  const inner = grid.querySelector('.spirit-picker-grid-inner');
-  if (!inner) return;
-  const filter = state.spiritPickerFilter[side];
-  const filtered = filterSpirits(side, filter);
-  inner.innerHTML = _renderPickerOptionsHTML(side, filtered);
+  _initPickerGrid(side, { scrollTop: 0 });
 }
 
 // 增量更新 toolbar 中各 chip 的 active 状态（不重建 DOM，因此 spirit-picker
@@ -2210,13 +2516,8 @@ function renderSpiritCard(side, opts) {
 // 滚动位置读写都走内层 .spirit-picker-grid-inner（外层不滚动，见 styles.css 注释）。
 function enterSpiritPicker(side) {
   state.spiritPicking[side] = true;
-  // 保留上次筛选状态与滚动位置
-  const savedScroll = state._pickerScrollTop[side] || 0;
-  renderSpiritArea(side);
-  if (savedScroll > 0) {
-    const inner = document.querySelector(`#${side}-picker-grid > .spirit-picker-grid-inner`);
-    if (inner) inner.scrollTop = savedScroll;
-  }
+  // 保留上次筛选状态与滚动位置（滚动恢复由 _initPickerGrid 直接把窗口定位到目标行）
+  renderSpiritArea(side, { pickerScrollTop: state._pickerScrollTop[side] || 0 });
   // 星标按钮 → 重置按钮（220ms 淡出 → 切换 → 220ms 淡入）
   _swapLabelAction(side, true);
 }
@@ -3428,16 +3729,29 @@ function renderInlineBadge(sk, powerClass = '') {
 const SKILL_NAME_MIN_FONT = 10.5;
 function fitSkillNamesIn(scope) {
   if (!scope) return;
-  scope.querySelectorAll('.skill-name').forEach(el => {
-    if (!el.clientWidth || !el.clientHeight) return;   // 隐藏状态不测量
-    el.style.fontSize = '';
-    const maxSize = parseFloat(getComputedStyle(el).fontSize);
-    let size = maxSize;
+  const names = scope.querySelectorAll('.skill-name');
+  if (!names.length) return;
+
+  // 先写后读再写，避免"每测一个元素就强制一次布局"的读写抖动：
+  // 旧实现里 62 个技能名各自 style 写入 + client/scroll 读取交替进行，
+  // 实测移动端 6x CPU 节流下要 270ms+。
+  for (const el of names) el.style.fontSize = '';
+
+  // 一次布局内读完所有元素
+  const overflow = [];
+  for (const el of names) {
+    if (!el.clientWidth || !el.clientHeight) continue;   // 隐藏状态不测量
+    if (el.scrollHeight > el.clientHeight + 1) overflow.push(el);
+  }
+
+  // 只对真正放不下的（极长英文名 / 窄屏）逐个缩小，通常只有 0~5 个
+  for (const el of overflow) {
+    let size = parseFloat(getComputedStyle(el).fontSize);
     while (el.scrollHeight > el.clientHeight + 1 && size > SKILL_NAME_MIN_FONT) {
       size = Math.max(SKILL_NAME_MIN_FONT, size - 0.5);
       el.style.fontSize = `${size}px`;
     }
-  });
+  }
 }
 
 // 面板宽度随断点/布局变化时重新适配。.skill-list-inner 在 renderSkills
