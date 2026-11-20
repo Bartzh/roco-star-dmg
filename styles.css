@@ -2407,9 +2407,10 @@ body.challenge-running.challenge-answered .challenge-answer-result { display: fl
   justify-content: center;
   font-size: 2.4rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.95);
-  background: linear-gradient(135deg, var(--el-color, #888) 0%, color-mix(in srgb, var(--el-color, #888) 50%, #000) 100%);
-  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  /* 与选择器缩略图的占位保持一致：不铺色块、不加边框与投影，
+     只留一个淡淡的元素色首字（外层 .spirit-image 负责尺寸）。 */
+  color: rgba(255,255,255,0.3);
+  color: color-mix(in srgb, var(--el-color, #888) 42%, rgba(255,255,255,0.5));
 }
 
 /* Type tags wrapper */
