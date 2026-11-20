@@ -142,6 +142,12 @@
       'dataMgr.import': `导入`,
       'dataMgr.close': `关闭`,
 
+      /* ---- 云存档冲突（仅 Toy 构建使用） ---- */
+      'cloud.conflict.title': `存档冲突`,
+      'cloud.conflict.body': `云端存档和本机都有修改。请选择要保留的版本，另一份会被覆盖。`,
+      'cloud.conflict.cloud': `使用云端`,
+      'cloud.conflict.local': `保留本地`,
+
       /* ---- Stats / nature / IV ---- */
       'stat.hp': `生命`,
       'stat.atk': `物攻`,
@@ -433,6 +439,12 @@
       'dataMgr.export': `Export`,
       'dataMgr.import': `Import`,
       'dataMgr.close': `Close`,
+
+      /* ---- Cloud save conflict (Toy build only) ---- */
+      'cloud.conflict.title': `Save Conflict`,
+      'cloud.conflict.body': `Both the cloud save and this device have changes. Choose which one to keep; the other will be overwritten.`,
+      'cloud.conflict.cloud': `Use Cloud Save`,
+      'cloud.conflict.local': `Keep Local`,
 
       /* ---- Stats / nature / IV ---- */
       'stat.hp': `HP`,

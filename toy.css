@@ -28,3 +28,40 @@
            calc(20px + var(--toy-safe-bottom))
            calc(20px + var(--toy-safe-left));
 }
+
+/* ============================================================
+ * 云存档调试面板（URL 带 ?clouddebug 或 #clouddebug 时显示）
+ * 由 toy-sync.js 动态创建，普通用户不会看到。
+ * ============================================================ */
+.cloud-debug {
+  position: fixed;
+  left: 8px;
+  bottom: calc(8px + var(--toy-safe-bottom));
+  z-index: 10001;
+  max-width: min(92vw, 460px);
+  max-height: 38vh;
+  overflow-y: auto;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #d6d6d6;
+  text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
+  pointer-events: auto;
+}
+.cloud-debug-title {
+  margin-bottom: 4px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.cloud-debug-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cloud-debug-line.is-ok { color: #7ce38b; }
+.cloud-debug-line.is-warn { color: #ffc46b; }
+.cloud-debug-line.is-err { color: #ff7b7b; }

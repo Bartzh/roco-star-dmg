@@ -205,16 +205,18 @@ _TOY_COPY = [
     (
         '本站只保存记忆和收藏的精灵数据在你的浏览器里，不会上传到任何服务器。'
         '下面可以开关记忆功能，对数据进行备份、导入或清除。',
-        '记忆和收藏的精灵配置保存在本机，清除 B站 缓存后可能丢失。'
+        '记忆和收藏会保存在本机，并自动同步到 B站 云存档（按登录账号隔离）；'
+        '未登录时仅保存在本机，清除 B站 缓存后可能丢失。'
         '下面可以开关记忆功能，对数据进行导入或清除。'
     ),
     (
         'This site only stores remembered and favorited Jinie data in your browser; '
         'nothing is uploaded to any server. Below you can toggle memory, back up, '
         'import or clear your data.',
-        'Remembered configurations and favorites are stored on this device and may be '
-        'lost if the Bilibili app cache is cleared. Below you can toggle memory and '
-        'import or clear your data.'
+        'Remembered configurations and favorites are saved on this device and synced '
+        'to Bilibili cloud storage (isolated per account). Without signing in they stay '
+        'on this device and may be lost if the app cache is cleared. Below you can '
+        'toggle memory and import or clear your data.'
     ),
     (
         '数据加载失败: {msg}<br><br>若用 file:// 打开，请先执行 '
@@ -287,7 +289,8 @@ def build_toy(source_html):
     html = html.replace(
         '<script src="./calculator.js" defer></script>',
         '<script src="./calculator.js" defer></script>\n'
-        '<script src="./toy-boot.js" defer></script>'
+        '<script src="./toy-boot.js" defer></script>\n'
+        '<script src="./toy-sync.js" defer></script>'
     )
     # 语言切换链接指向显式 index.html，避免 Toy 下裸路径 / 纯 query 的解析差异
     html = html.replace('href="?lang=zh"', 'href="./index.html?lang=zh"')
@@ -305,7 +308,7 @@ def build_toy(source_html):
             f.write(text)
         print(f'Wrote toy/{name}')
 
-    for name in ('styles.css', 'toy.css', 'toy-boot.js', 'favicon.ico'):
+    for name in ('styles.css', 'toy.css', 'toy-boot.js', 'toy-sync.js', 'favicon.ico'):
         shutil.copy2(os.path.join(ROOT, name), os.path.join(TOY_DIR, name))
         print(f'Copied {name} to toy/')
 

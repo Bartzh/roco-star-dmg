@@ -307,10 +307,19 @@ function loadSpiritConfig(id, side) {
   return _parseSpiritConfig(raw, side);
 }
 
+// 本地存档发生变化时的通知钩子：网页版没有监听者（no-op）；
+// Toy 构建由 toy-sync.js 注册，用于把变更延迟同步到 B站 云存档。
+function _notifyLocalChange() {
+  if (typeof window.__rocoLocalChanged === 'function') {
+    window.__rocoLocalChanged();
+  }
+}
+
 function _saveSpiritConfig(id, side, entry) {
   if (!id || !VALID_SIDES.has(side)) return;
   try {
     localStorage.setItem(_spiritConfigKey(id, side), _serializeSpiritConfig(entry));
+    _notifyLocalChange();
   } catch (_) { /* 配额超限 / 存储被禁用 —— 静默忽略 */ }
 }
 
@@ -391,6 +400,7 @@ function _loadFavorites(side) {
 function _saveFavorites(side) {
   try {
     localStorage.setItem(FAVORITES_KEY_PREFIX + side, JSON.stringify(_favoritesCache[side]));
+    _notifyLocalChange();
   } catch (_) { /* 配额超限 / 存储被禁用 —— 静默忽略 */ }
 }
 
@@ -466,6 +476,7 @@ function _loadSettings() {
 function _saveSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(_settingsCache));
+    _notifyLocalChange();
   } catch (_) { /* 静默 */ }
 }
 
@@ -510,6 +521,7 @@ function _clearAllSpiritConfigs() {
   for (const key of _collectStorageKeys().spiritConfigs) {
     try { localStorage.removeItem(key); } catch (_) {}
   }
+  _notifyLocalChange();
 }
 
 // 清除两侧收藏键并重置缓存（回退默认列表）。
@@ -518,6 +530,7 @@ function _clearAllFavorites() {
     try { localStorage.removeItem(FAVORITES_KEY_PREFIX + side); } catch (_) {}
     _favoritesCache[side] = null;   // 强制下次读取时回退默认
   }
+  _notifyLocalChange();
 }
 
 // 导出全部数据为结构化 JSON 并触发下载。
@@ -641,6 +654,8 @@ function _applyImportedData(data, importFav, importCfg) {
       } catch (_) {}
     }
   }
+  // 导入属于本地变更：通知 Toy 云存档在刷新后把新数据推上去
+  _notifyLocalChange();
   // 刷新页面以应用所有变更（避免复杂的 UI 状态同步）
   location.reload();
 }
