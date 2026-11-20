@@ -23,3 +23,6 @@ calculator.built.html
 
 # dist
 dist/
+
+# Toy 发布包（build.py --toy 生成）
+toy/

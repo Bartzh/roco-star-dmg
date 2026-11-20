@@ -1,0 +1,30 @@
+/* ============================================================
+ * toy.css — Toy 构建专用样式（网页版 dist/ 不加载）
+ *
+ * 配合 toy-boot.js 使用：沉浸模式下内容会延伸到状态栏 / 底部条，
+ * 安全区由 SDK 的 safeArea 写入 --toy-safe-* 变量；SDK 数据到达前
+ * 先用 CSS env() 兜底，避免首帧被刘海或底部条遮挡。
+ * ============================================================ */
+:root {
+  --toy-safe-top: env(safe-area-inset-top, 0px);
+  --toy-safe-right: env(safe-area-inset-right, 0px);
+  --toy-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --toy-safe-left: env(safe-area-inset-left, 0px);
+}
+
+.container {
+  padding-top: calc(30px + var(--toy-safe-top));
+  padding-left: calc(12px + var(--toy-safe-left));
+  padding-right: calc(12px + var(--toy-safe-right));
+}
+
+.footer {
+  padding-bottom: calc(16px + var(--toy-safe-bottom));
+}
+
+.modal-overlay {
+  padding: calc(20px + var(--toy-safe-top))
+           calc(20px + var(--toy-safe-right))
+           calc(20px + var(--toy-safe-bottom))
+           calc(20px + var(--toy-safe-left));
+}
