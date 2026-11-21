@@ -219,6 +219,16 @@ _TOY_COPY = [
         'toggle memory and import or clear your data.'
     ),
     (
+        '从 JSON 文件导入数据，将完全替换现有数据并刷新页面',
+        '从 JSON 文件导入数据，将完全替换现有数据并刷新页面'
+        '（如果你曾使用过网页版，Toy版不支持导出数据）'
+    ),
+    (
+        'Imports data from a JSON file. This fully replaces existing data and reloads the page.',
+        'Imports data from a JSON file. This fully replaces existing data and reloads the page. '
+        '(If you have used the web version, note that the Toy version cannot export data.)'
+    ),
+    (
         '数据加载失败: {msg}<br><br>若用 file:// 打开，请先执行 '
         '<code>python build.py</code> 生成 calculator.built.html。',
         '数据加载失败: {msg}<br><br>请稍后重试，或反馈给作者。'

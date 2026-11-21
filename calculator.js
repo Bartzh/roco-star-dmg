@@ -5712,6 +5712,12 @@ const MODAL_CONTENT_ZH = {
   announcement: {
     title: '更新公告',
     html: `
+      <h3>Bilibili Toy适配 <span class="modal-date">· 2026-11-21</span></h3>
+      <ul>
+        <li>新增 B站 Toy 版：<a href="https://www.bilibili.com/toy/stardmg/index.html" target="_blank" rel="noopener noreferrer">https://www.bilibili.com/toy/stardmg/index.html</a></li>
+        <li>支持云存档（按 B站 账号同步记忆与收藏）、手机端竖屏锁定与沉浸显示。</li>
+      </ul>
+      <hr>
       <h3>手动调整技能 <span class="modal-date">· 2026-11-17</span></h3>
       <ul>
         <li>新增适配部分可手动调整效果的技能，包括：色散、偏振、魔能爆、虫群鼓舞/突袭、恶龙的奢望。</li>
@@ -5877,7 +5883,8 @@ const MODAL_CONTENT_ZH = {
 
       <h3>关于</h3>
       <ul>
-        <li>国内主站：<a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
+        <li>全球主站：<a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
+        <li>B站Toy版：<a href="https://www.bilibili.com/toy/stardmg/index.html" target="_blank" rel="noopener noreferrer">https://www.bilibili.com/toy/stardmg/index.html</a></li>
         <li>备用镜像：<a href="https://bartzh.github.io/roco-star-dmg/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></li>
         <li>开源仓库：<a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">Bartzh/roco-star-dmg</a></li>
         <li>作者B站主页：<a href="https://space.bilibili.com/235905700" target="_blank" rel="noopener noreferrer">Bilibili Space</a></li>
@@ -5891,6 +5898,12 @@ const MODAL_CONTENT_EN = {
   announcement: {
     title: 'Update Announcement',
     html: `
+      <h3>Bilibili Toy Support <span class="modal-date">· 2026-11-21</span></h3>
+      <ul>
+        <li>Now available as a Bilibili Toy: <a href="https://www.bilibili.com/toy/stardmg/index.html" target="_blank" rel="noopener noreferrer">https://www.bilibili.com/toy/stardmg/index.html</a></li>
+        <li>Cloud saves (synced per Bilibili account), phone portrait lock and immersive display are supported.</li>
+      </ul>
+      <hr>
       <h3>Manual Skill Adjustments <span class="modal-date">· 2026-11-17</span></h3>
       <ul>
         <li>Added support for skills whose effects can be adjusted manually, including Dispersion, Polarization, Mana Burst, Swarm Rally / Swarm Blitz and 恶龙的奢望.</li>
@@ -6057,6 +6070,7 @@ const MODAL_CONTENT_EN = {
       <h3>About</h3>
       <ul>
         <li>Primary site: <a href="https://stardmg.top/" target="_blank" rel="noopener noreferrer">stardmg.top</a></li>
+        <li>Bilibili Toy version: <a href="https://www.bilibili.com/toy/stardmg/index.html" target="_blank" rel="noopener noreferrer">https://www.bilibili.com/toy/stardmg/index.html</a></li>
         <li>Mirror: <a href="https://bartzh.github.io/roco-star-dmg/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></li>
         <li>Source repository: <a href="https://github.com/Bartzh/roco-star-dmg" target="_blank" rel="noopener noreferrer">Bartzh/roco-star-dmg</a></li>
         <li>Author's Bilibili page: <a href="https://space.bilibili.com/235905700" target="_blank" rel="noopener noreferrer">Bilibili Space</a></li>
