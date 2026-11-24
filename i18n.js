@@ -294,7 +294,8 @@
       'mod.powerOffClass': `威力 ×0.5（非敌方系别技能）`,
       'mod.powerVsHybrid': `威力 +50%（对混血精灵）`,
       'mod.damageTakenCarried': `受到伤害 -40%（攻击系别匹配携带技能）`,
-      'mod.damageTakenLowLevel': `受到伤害 +40%（当前等级 {level} < 80）`,
+      'mod.damageTakenLowLevel': `受到伤害 +{pct}%（当前等级 {level} < 80）`,
+      'mod.physAtkPerLevel': `物攻 +{pct}%（战斗中每提升 1 级 +5%，当前等级 {level}）`,
       'mod.swarmStat': `攻防速 +{pct}%（其他虫系精灵 {count} 只 ×{perPct}%）`,
       'mod.powerEnergyCost': `威力 {power}（消耗能量 {energy} 点）`,
 
@@ -592,7 +593,8 @@
       'mod.powerOffClass': `Power ×0.5 (skill class differs from the enemy's class)`,
       'mod.powerVsHybrid': `Power +50% (vs. Hybrid Jinies)`,
       'mod.damageTakenCarried': `Damage taken -40% (attacking class matches an equipped skill)`,
-      'mod.damageTakenLowLevel': `Damage taken +40% (current level {level} < 80)`,
+      'mod.damageTakenLowLevel': `Damage taken +{pct}% (current level {level} < 80)`,
+      'mod.physAtkPerLevel': `ATK +{pct}% (+5% per level gained in battle, current level {level})`,
       'mod.swarmStat': `Attack, Defense and Speed +{pct}% ({count} other Bug-class Jinies ×{perPct}%)`,
       'mod.powerEnergyCost': `Power {power} (Energy consumed {energy})`,
 

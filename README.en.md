@@ -286,7 +286,7 @@ starfall damage = floor(
 total = skill damage + starfall damage
 ```
 
-`n` is the starfall layer (0–99). Starfall damage is not applied when the skill itself is 幻-element. Stats are calculated at level 60 by default (nature ×1.2 / ×0.9, up to three IVs at +60 each); the Mogulong trait 恶龙的奢望 changes the level to 1–99 and feeds it into the stat formula. The breakdown panel shows each of these terms.
+`n` is the starfall layer (0–99). Starfall damage is not applied when the skill itself is 幻-element. Stats are calculated at level 60 by default (nature ×1.2 / ×0.9, up to three IVs at +60 each); the traits 恶龙的奢望, 圣龙的心愿 and 圣龙的守护 change the level to 1–99 and feed it into the stat formula. The breakdown panel shows each of these terms.
 
 ## Deployment
 

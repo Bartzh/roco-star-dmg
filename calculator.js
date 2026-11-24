@@ -161,15 +161,20 @@ const STAT_KEYS = ['hp', 'atk', 'matk', 'def', 'mdef', 'spd'];
 const MAX_IV = 3;
 const IV_BONUS = 60;
 
-// 等级：所有精灵默认按满级 60 级计算。唯一会改变等级的是冥古龙特性
-// 「恶龙的奢望」（初始等级 +39，回合结束时 -10），其等级通过数值型
-// 手动 mod 输入保存（state.skillModInputs[side][LEVEL_MOD_KEY]）。
-// 等级无法用百分比 mod 表达，必须透传给 getFinalStat 参与属性计算。
+// 等级：所有精灵默认按满级 60 级计算。会改变等级的是几个"升级类"特性：
+//   - 恶龙的奢望：初始等级 +39（60 → 99），回合结束时 -10；
+//   - 圣龙的心愿：己方每使用 1 次能耗为 3 的技能，入场前等级 +2；
+//   - 圣龙的守护：战斗中每提升 1 级，物攻 +5%。
+// 它们的等级都通过数值型手动 mod 输入保存
+// （state.skillModInputs[side][技能名]）。等级无法用百分比 mod 表达，
+// 必须透传给 getFinalStat 参与属性计算。
 const DEFAULT_LEVEL = 60;
 const LEVEL_MOD_KEY = '恶龙的奢望';
-const LEVEL_MOD_DEFAULT = 99; // 初始 60 + 39
+const LEVEL_MOD_DEFAULT = 99; // 恶龙的奢望：初始 60 + 39
 const LEVEL_MIN = 1;
 const LEVEL_MAX = 99;
+// 所有会改变自身等级的 mod key（getLevel 只识别这些特性）。
+const LEVEL_MOD_KEYS = new Set([LEVEL_MOD_KEY, '圣龙的心愿', '圣龙的守护']);
 
 // Defaults: attacker = +SPD/-HP nature, IVs in [ATK, MATK, SPD]
 //           defender = +HP/-ATK nature, IVs in [HP, DEF, MDEF]
@@ -937,14 +942,17 @@ let state = {
 function getNature(side)  { return side === 'attacker' ? state.attackerNature : state.defenderNature; }
 function getIVs(side)     { return side === 'attacker' ? state.attackerIVs    : state.defenderIVs; }
 
-// 从手动 mod 输入中解析等级：只有持有「恶龙的奢望」的精灵才会有该输入，
-// 其余精灵一律按默认 60 级。未手动调整时回退到该 mod 的默认值（99）。
+// 从手动 mod 输入中解析等级：只有持有升级类特性（恶龙的奢望 /
+// 圣龙的心愿 / 圣龙的守护）的精灵才会有该输入，其余精灵一律按默认 60 级。
+// 未手动调整时回退到该特性的默认值（恶龙的奢望 99，圣龙系列 60）。
 function getLevelForAbility(inputs, ability) {
   const key = ability && (ability.modKey || ability.id);
-  if (key !== LEVEL_MOD_KEY) return DEFAULT_LEVEL;
-  const v = Number(inputs && inputs[LEVEL_MOD_KEY]);
-  if (Number.isFinite(v) && v > 0) return v;
-  return LEVEL_MOD_DEFAULT;
+  if (!LEVEL_MOD_KEYS.has(key)) return DEFAULT_LEVEL;
+  const v = Number(inputs && inputs[key]);
+  if (Number.isFinite(v) && v > 0) {
+    return Math.max(LEVEL_MIN, Math.min(LEVEL_MAX, Math.round(v)));
+  }
+  return key === LEVEL_MOD_KEY ? LEVEL_MOD_DEFAULT : DEFAULT_LEVEL;
 }
 function getLevel(side) {
   const spirit = side === 'attacker' ? state.attacker : state.defender;
@@ -1104,10 +1112,14 @@ function getDisplayStatValue(side, statKey, dyn) {
   }
   // 动态修正按持有者一侧取：攻 buff 作用于该侧的物攻/魔攻，防 buff 作用于
   // 该侧的物防/魔防（如虫群鼓舞对持有者同时提供攻 / 防 / 速）。
+  // physAtkPctAdd 只加物攻（如圣龙的守护：每提升 1 级物攻 +5%）。
   const atkPct = side === 'attacker' ? (mods.attackerAtkPctAdd || 0) : (mods.defenderAtkPctAdd || 0);
+  const physAtkPct = side === 'attacker'
+    ? (mods.attackerPhysAtkPctAdd || 0)
+    : (mods.defenderPhysAtkPctAdd || 0);
   const defPct = side === 'attacker' ? (mods.attackerDefPctAdd || 0) : (mods.defenderDefPctAdd || 0);
   let pct = 0;
-  if (statKey === 'atk')       pct = getBuff(side, 'atk')  + atkPct;
+  if (statKey === 'atk')       pct = getBuff(side, 'atk')  + atkPct + physAtkPct;
   else if (statKey === 'matk') pct = getBuff(side, 'matk') + atkPct + (side === 'attacker' ? (mods.matkAdd || 0) : 0);
   else if (statKey === 'def')  pct = getBuff(side, 'def')  + defPct;
   else                         pct = getBuff(side, 'mdef') + defPct;
@@ -4160,7 +4172,7 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 //     comboAdd?: number, comboMult?: number, powerMult?: number, powerAdd?: number,
 //     powerOverride?: number,
 //     ignoreResist?: boolean, elementOverride?: string,
-//     matkAdd?: number, atkPctAdd?: number, defPctAdd?: number,
+//     matkAdd?: number, atkPctAdd?: number, physAtkPctAdd?: number, defPctAdd?: number,
 //     speedAdd?: number, speedPctAdd?: number,
 //     notes?: string[],
 //   }.
@@ -4177,6 +4189,9 @@ function _setActiveSkill(side, prevIdx, newIdx) {
 // atkPctAdd: percentage points added to the holder's attack buff
 //   (物攻/魔攻通用，与 chip buff 相加)。伤害公式只取攻击方的这份加成；
 //   防御方持有的部分仅用于属性面板显示。
+// physAtkPctAdd: percentage points added to the holder's 物攻 only
+//   (仅物攻，不动魔攻；与 chip buff 相加)。如圣龙的守护：每提升 1 级物攻 +5%。
+//   伤害公式只取攻击方的这份加成；防御方持有的部分仅用于属性面板显示。
 // defPctAdd: percentage points added to the holder's defense buff
 //   (物防/魔防通用，与 chip buff 相加)。伤害公式只取防御方的这份加成；
 //   攻击方持有的部分仅用于属性面板显示。
@@ -4702,8 +4717,41 @@ const SKILL_MODS = {
     if (level <= 0 || level >= 80) return null;
     return {
       powerMult: 1.4,
-      notes: [{ key: 'mod.damageTakenLowLevel', params: { level } }],
+      notes: [{ key: 'mod.damageTakenLowLevel', params: { level, pct: 40 } }],
     };
+  },
+  // 圣龙的心愿（特性）：己方精灵每使用 1 次能耗为 3 的技能，自己入场前等级 +2。
+  // 等级同样由数值型手动 mod 输入（1~99，默认 60），通过 getLevel 参与属性公式；
+  // 这里只处理"低于 80 级时自身受到的伤害 +30%"（仅防御方视角生效）。
+  圣龙的心愿(ctx, fromAttacker, input) {
+    if (fromAttacker) return null;
+    const level = Number(input) || 0;
+    if (level <= 0 || level >= 80) return null;
+    return {
+      powerMult: 1.3,
+      notes: [{ key: 'mod.damageTakenLowLevel', params: { level, pct: 30 } }],
+    };
+  },
+  // 圣龙的守护（特性）：在战斗中每提升 1 级（相对基础 60 级），物攻 +5%；
+  // 低于 80 级时自身受到的伤害 +30%。等级由手动输入（1~99，默认 60）提供，
+  // 等级本身通过 getLevel 参与属性公式，这里只处理物攻加成与受伤加成。
+  圣龙的守护(ctx, fromAttacker, input) {
+    const level = Number(input) || 0;
+    if (level <= 0) return null;
+    const mod = {};
+    const gained = Math.max(0, level - DEFAULT_LEVEL);
+    if (gained > 0) {
+      const pct = gained * 5;
+      mod.physAtkPctAdd = pct;
+      mod.notes = [{ key: 'mod.physAtkPerLevel', params: { pct, level } }];
+    }
+    if (!fromAttacker && level < 80) {
+      mod.powerMult = 1.3;
+      (mod.notes || (mod.notes = [])).push(
+        { key: 'mod.damageTakenLowLevel', params: { level, pct: 30 } }
+      );
+    }
+    return Object.keys(mod).length ? mod : null;
   },
   // 虫群鼓舞（特性）：队伍中每有 1 只其他虫系精灵，自己入场时攻防速 +10%。
   // 计算器没有队伍概念，由用户点击 mod-icon 在弹窗中选择数量（0~5）。
@@ -4777,6 +4825,7 @@ const SKILL_MODS_SIDES = {
   狂欢开始: 'defender', 绝对秩序: 'defender', 偏振: 'defender',
   // 双方都可能触发（特性随持有者在哪一侧生效）
   展翅: 'both', 虫群鼓舞: 'both', 虫群突袭: 'both',
+  圣龙的心愿: 'both', 圣龙的守护: 'both',
 };
 SKILL_MODS_SIDES["“国王”的威严"] = 'attacker';
 // 把 sides 挂到对应函数上，isSkillModRelevant 通过 fn.sides 查询
@@ -4839,6 +4888,24 @@ const SKILL_MODS_MANUAL = {
     labelKey: 'mod.manual.dragonLevel.label',
     unitKey: 'mod.manual.dragonLevel.unit',
   },
+  // 圣龙的心愿 / 圣龙的守护：自身当前等级 1~99，默认 60（基础等级）。
+  // 与恶龙的奢望一样，该值会被 getLevel 读取并参与属性公式。
+  圣龙的心愿: {
+    defaultInput: DEFAULT_LEVEL,
+    inputType: 'number',
+    min: LEVEL_MIN,
+    max: LEVEL_MAX,
+    labelKey: 'mod.manual.dragonLevel.label',
+    unitKey: 'mod.manual.dragonLevel.unit',
+  },
+  圣龙的守护: {
+    defaultInput: DEFAULT_LEVEL,
+    inputType: 'number',
+    min: LEVEL_MIN,
+    max: LEVEL_MAX,
+    labelKey: 'mod.manual.dragonLevel.label',
+    unitKey: 'mod.manual.dragonLevel.unit',
+  },
 };
 for (const [key, cfg] of Object.entries(SKILL_MODS_MANUAL)) {
   if (SKILL_MODS[key]) {
@@ -4888,8 +4955,8 @@ function computeSkillDynamicModifiers(
   const result = {
     powerMultAdd: 1, powerMult: 1, powerAdd: 0, powerOverride: null,
     comboAdd: 0, comboMult: 1, matkAdd: 0,
-    attackerAtkPctAdd: 0, attackerDefPctAdd: 0,
-    defenderAtkPctAdd: 0, defenderDefPctAdd: 0,
+    attackerAtkPctAdd: 0, attackerDefPctAdd: 0, attackerPhysAtkPctAdd: 0,
+    defenderAtkPctAdd: 0, defenderDefPctAdd: 0, defenderPhysAtkPctAdd: 0,
     speedAdd: 0, ignoreResist: false, elementOverride: null, notes: []
   };
 
@@ -4961,6 +5028,10 @@ function computeSkillDynamicModifiers(
     if (mod.atkPctAdd) {
       if (fromAttacker) result.attackerAtkPctAdd += mod.atkPctAdd;
       else              result.defenderAtkPctAdd += mod.atkPctAdd;
+    }
+    if (mod.physAtkPctAdd) {
+      if (fromAttacker) result.attackerPhysAtkPctAdd += mod.physAtkPctAdd;
+      else              result.defenderPhysAtkPctAdd += mod.physAtkPctAdd;
     }
     if (mod.defPctAdd) {
       if (fromAttacker) result.attackerDefPctAdd += mod.defPctAdd;
@@ -5050,10 +5121,13 @@ function computeFinalDamage(ctx) {
   // are additive with the chip buff:
   //   - matkAdd            : 仅魔攻（历史字段，如 和弦共振）
   //   - attackerAtkPctAdd  : 攻击方的物攻/魔攻通用加成（如 虫群鼓舞的攻 +N%）
+  //   - attackerPhysAtkPctAdd : 攻击方的物攻加成（如 圣龙的守护：每级物攻 +5%）
   //   - defenderDefPctAdd  : 防御方的物防/魔防通用加成（如 虫群鼓舞的防 +N%）
   // 其余两项（攻击方的防 / 防御方的攻）只用于属性面板显示，不进入伤害公式。
   const atkBuffPct = (isMagic ? (ctx.attackerBuff.matk || 0) : (ctx.attackerBuff.atk || 0));
-  const atkAddPct  = (isMagic ? (dyn.matkAdd || 0) : 0) + (dyn.attackerAtkPctAdd || 0);
+  const atkAddPct  = (isMagic
+    ? (dyn.matkAdd || 0)
+    : (dyn.attackerPhysAtkPctAdd || 0)) + (dyn.attackerAtkPctAdd || 0);
   const defBuffPct = (isMagic ? (ctx.defenderBuff.mdef || 0) : (ctx.defenderBuff.def  || 0));
   const defAddPct  = dyn.defenderDefPctAdd || 0;
   const atkStatBase = isMagic ? matkBaseNoBuff : atkBaseNoBuff;
@@ -6837,7 +6911,8 @@ function buildQuestionSnapshot(_index) {
   const defAbility = getSpiritAbility(defender);
   const atkModInputs = resolveSkillModInputs('attacker', attacker, atkAbility?.id, atkSkId);
   const defModInputs = resolveSkillModInputs('defender', defender, defAbility?.id, defSkId);
-  // 等级：只有持有「恶龙的奢望」的精灵会偏离 60 级；未手动设置时取 mod 默认值。
+  // 等级：只有持有升级类特性（恶龙的奢望 / 圣龙的心愿 / 圣龙的守护）
+  // 的精灵会偏离 60 级；未手动设置时取 mod 默认值。
   const atkLevel = getLevelForAbility(atkModInputs, atkAbility);
   const defLevel = getLevelForAbility(defModInputs, defAbility);
   const defHP = getFinalStat(defender, 'hp', defStats.nature, defStats.ivs, defLevel);
@@ -7388,7 +7463,7 @@ function submitAnswer() {
     attackerPowerBoost: state.attackerPowerBoost,
     attackerCombo: state.attackerCombo,
     starLayer: 0,
-    // 等级必须与题目快照一致（冥古龙「恶龙的奢望」可能不等于 60）
+    // 等级必须与题目快照一致（升级类特性可能使等级不等于 60）
     attackerLevel: q.attackerLevel,
     defenderLevel: q.defenderLevel,
   };
