@@ -5794,8 +5794,8 @@ const MODAL_CONTENT_ZH = {
       <hr>
       <h3>手动调整技能 <span class="modal-date">· 2026-11-17</span></h3>
       <ul>
-        <li>新增适配部分可手动调整效果的技能，包括：色散、偏振、魔能爆、虫群鼓舞/突袭、恶龙的奢望。</li>
-        <li>属性面板数值现随buff、等级（冥古龙）动态更新。</li>
+        <li>新增适配部分可手动调整效果的技能，包括：色散、偏振、魔能爆、虫群鼓舞/突袭、恶龙的奢望、圣龙的心愿/守护。</li>
+        <li>属性面板数值现随buff、等级动态更新。</li>
       </ul>
       <hr>
       <h3>S5 数据更新 <span class="modal-date">· 2026-11-05</span></h3>
@@ -5980,8 +5980,8 @@ const MODAL_CONTENT_EN = {
       <hr>
       <h3>Manual Skill Adjustments <span class="modal-date">· 2026-11-17</span></h3>
       <ul>
-        <li>Added support for skills whose effects can be adjusted manually, including Dispersion, Polarization, Mana Burst, Swarm Rally / Swarm Blitz and 恶龙的奢望.</li>
-        <li>Stat panel values now update dynamically with buffs and level (冥古龙).</li>
+        <li>Added support for skills whose effects can be adjusted manually, including Dispersion, Polarization, Mana Burst, Swarm Rally / Swarm Blitz, 恶龙的奢望 and 圣龙的心愿/守护.</li>
+        <li>Stat panel values now update dynamically with buffs and level.</li>
       </ul>
       <hr>
       <h3>S5 Data Update <span class="modal-date">· 2026-11-05</span></h3>
