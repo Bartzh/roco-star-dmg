@@ -90,7 +90,7 @@ if crawling_core:
     illustration_urls = get_image_urls(
         'pet_illustration_urls',
         {p_info['title']: f'文件:{p_info['image']['illustration']}' for p_info in core.values() if p_info.get('image')},
-        400
+        570
     )
     with open('datas/intermediate/pet_illustration_urls.json', 'w', encoding='utf-8') as f:
         json.dump(illustration_urls, f, indent=4, ensure_ascii=False)
@@ -128,7 +128,7 @@ if crawling_s5_jinies:
     s5_jinies_urls = get_image_urls(
         's5_jinies_urls',
         {j_info['title']: f'文件:{j_info['image']['illustration']}' for j_info in s5_jinies.values() if j_info.get('image')},
-        400
+        570
     )
     with open('datas/intermediate/pet_illustration_urls.json', 'r', encoding='utf-8') as f:
         illustration_urls = json.load(f)
